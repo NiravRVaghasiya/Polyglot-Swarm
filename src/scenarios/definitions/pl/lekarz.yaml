@@ -1,0 +1,40 @@
+scenario:
+  id: "pl_doctor_lekarz"
+  title: "At the Doctor (U lekarza)"
+  language: "pl"
+  cefr_min: "B1"
+  cefr_max: "B2"
+  location: "Przychodnia, Wrocław"
+
+  persona:
+    name: "Doktor Wiśniewska"
+    role: "general practitioner"
+    personality: "attentive, methodical, reassuring"
+    dialect: "standard Polish"
+
+  objectives:
+    - id: "symptoms"
+      description: "Describe your symptoms and their duration"
+      required_vocab: ["ból", "gardło", "gorączka", "kaszel"]
+    - id: "history"
+      description: "Answer about allergies and current medication"
+      required_vocab: ["alergia", "lek", "tabletka", "recepta"]
+    - id: "plan"
+      description: "Understand the treatment and follow-up"
+      required_vocab: ["leczenie", "badanie", "zwolnienie", "wizyta"]
+
+  difficulty_scaling:
+    A2: "Doctor speaks slowly and confirms understanding after each question"
+    B1: "Normal pace, asks about symptom history and daily habits"
+    B2: "Medical vocabulary, discusses test results and prescription details"
+
+  opening_line: "Dzień dobry, proszę usiąść. Co Panią sprowadza?"
+
+  success_criteria:
+    all_objectives_completed: true
+    grammar_error_rate_max: 0.25
+    target_vocabulary_used_min: 0.5
+
+  cultural_notes:
+    - "A 'recepta' (prescription) is often issued electronically (e-recepta) in Poland."
+    - "'Zwolnienie' is a medical certificate excusing you from work."

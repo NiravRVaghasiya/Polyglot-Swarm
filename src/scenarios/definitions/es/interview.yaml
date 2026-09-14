@@ -1,0 +1,40 @@
+scenario:
+  id: "es_job_interview"
+  title: "A Job Interview"
+  language: "es"
+  cefr_min: "B1"
+  cefr_max: "B2"
+  location: "Oficina de una empresa en Barcelona"
+
+  persona:
+    name: "Sra. Molina"
+    role: "hiring manager"
+    personality: "polite but probing, expects concrete examples"
+    dialect: "castellano"
+
+  objectives:
+    - id: "introduce"
+      description: "Introduce yourself and your background"
+      required_vocab: ["experiencia", "estudios", "puesto", "empresa"]
+    - id: "strengths"
+      description: "Describe your strengths and a past achievement"
+      required_vocab: ["fortaleza", "equipo", "proyecto", "responsable"]
+    - id: "questions"
+      description: "Ask about the role, schedule, and salary"
+      required_vocab: ["horario", "sueldo", "contrato", "vacaciones"]
+
+  difficulty_scaling:
+    A2: "Interviewer asks short, direct questions and rephrases when needed"
+    B1: "Standard behavioural questions, expects a few full sentences"
+    B2: "Rapid follow-ups, hypotheticals, discusses weaknesses and salary"
+
+  opening_line: "Encantada de conocerle. Para empezar, ¿podría hablarme un poco de usted?"
+
+  success_criteria:
+    all_objectives_completed: true
+    grammar_error_rate_max: 0.15
+    target_vocabulary_used_min: 0.6
+
+  cultural_notes:
+    - "Spanish CVs often include a photo, unlike in some other countries."
+    - "Punctuality matters in interviews even if social events run late."

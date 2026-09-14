@@ -1,0 +1,40 @@
+scenario:
+  id: "it_train_station"
+  title: "At the Train Station (Alla stazione)"
+  language: "it"
+  cefr_min: "A2"
+  cefr_max: "B1"
+  location: "Stazione di Roma Termini"
+
+  persona:
+    name: "Paolo"
+    role: "ticket office clerk"
+    personality: "efficient, helpful when asked precisely"
+    dialect: "standard Italian"
+
+  objectives:
+    - id: "buy_ticket"
+      description: "Buy a ticket to your destination"
+      required_vocab: ["biglietto", "andata", "ritorno", "destinazione"]
+    - id: "schedule"
+      description: "Ask about departure time and platform"
+      required_vocab: ["treno", "orario", "binario", "partenza"]
+    - id: "changes"
+      description: "Ask about connections and validating the ticket"
+      required_vocab: ["coincidenza", "cambio", "convalidare", "ritardo"]
+
+  difficulty_scaling:
+    A2: "Clerk speaks slowly, states times and platform clearly"
+    B1: "Normal pace, explains connections and fare options"
+    B2: "Fast speech, strikes and delays, regional vs high-speed trains"
+
+  opening_line: "Buongiorno, mi dica: dove deve andare?"
+
+  success_criteria:
+    all_objectives_completed: true
+    grammar_error_rate_max: 0.25
+    target_vocabulary_used_min: 0.5
+
+  cultural_notes:
+    - "Regional tickets often must be validated ('convalidare') before boarding."
+    - "High-speed trains (Frecce) have assigned seats; regionali usually do not."

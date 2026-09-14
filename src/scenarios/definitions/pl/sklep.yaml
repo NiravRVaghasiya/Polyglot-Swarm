@@ -1,0 +1,40 @@
+scenario:
+  id: "pl_grocery_shop"
+  title: "At the Grocery Shop (Sklep spożywczy)"
+  language: "pl"
+  cefr_min: "A2"
+  cefr_max: "B1"
+  location: "Osiedlowy sklep spożywczy w Krakowie"
+
+  persona:
+    name: "Pani Kowalska"
+    role: "shopkeeper"
+    personality: "warm, patient with foreigners, a little chatty"
+    dialect: "standard Polish"
+
+  objectives:
+    - id: "greet_and_ask"
+      description: "Greet and ask where items are"
+      required_vocab: ["dzień", "dobry", "chleb", "mleko"]
+    - id: "quantities"
+      description: "Ask for quantities and weights"
+      required_vocab: ["kilogram", "dekagramy", "proszę", "ile"]
+    - id: "pay"
+      description: "Ask the total and pay"
+      required_vocab: ["razem", "złotych", "kartą", "paragon"]
+
+  difficulty_scaling:
+    A2: "Shopkeeper speaks slowly, repeats prices, accepts pointing and short answers"
+    B1: "Normal pace, small talk about the weather, suggests fresh items"
+    B2: "Fast speech, diminutives, regional food names and idioms"
+
+  opening_line: "Dzień dobry! W czym mogę pomóc?"
+
+  success_criteria:
+    all_objectives_completed: true
+    grammar_error_rate_max: 0.3
+    target_vocabulary_used_min: 0.5
+
+  cultural_notes:
+    - "Cold cuts and cheese are often ordered by 'deko' (dekagrams, 10g units)."
+    - "Many small shops prefer cards now, but keep coins for a paragon (receipt)."

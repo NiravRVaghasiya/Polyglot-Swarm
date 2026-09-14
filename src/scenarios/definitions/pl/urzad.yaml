@@ -1,0 +1,40 @@
+scenario:
+  id: "pl_office_urzad"
+  title: "At the Government Office (Urząd)"
+  language: "pl"
+  cefr_min: "B1"
+  cefr_max: "B2"
+  location: "Urząd miasta, Warszawa"
+
+  persona:
+    name: "Pan Nowak"
+    role: "civil servant"
+    personality: "formal, procedural, expects the correct documents"
+    dialect: "standard Polish"
+
+  objectives:
+    - id: "state_purpose"
+      description: "Explain why you have come and take a ticket"
+      required_vocab: ["sprawa", "numerek", "okienko", "formularz"]
+    - id: "documents"
+      description: "Present your documents and fill in a form"
+      required_vocab: ["dokument", "podpis", "wniosek", "adres"]
+    - id: "next_steps"
+      description: "Ask about deadlines and how you will be notified"
+      required_vocab: ["termin", "urzędnik", "potwierdzenie", "odbiór"]
+
+  difficulty_scaling:
+    A2: "Clerk speaks slowly and points to the right form"
+    B1: "Normal pace, asks for specific documents and clarifications"
+    B2: "Bureaucratic vocabulary, cross-references regulations, tight deadlines"
+
+  opening_line: "Dzień dobry. Proszę podać numerek. W jakiej sprawie?"
+
+  success_criteria:
+    all_objectives_completed: true
+    grammar_error_rate_max: 0.2
+    target_vocabulary_used_min: 0.5
+
+  cultural_notes:
+    - "Polish offices rely on printed forms ('wniosek'); bring originals and copies."
+    - "Formal address (Pan/Pani) is expected throughout an urząd visit."

@@ -1,0 +1,40 @@
+scenario:
+  id: "it_job_interview_colloquio"
+  title: "A Job Interview (Colloquio di lavoro)"
+  language: "it"
+  cefr_min: "B1"
+  cefr_max: "B2"
+  location: "Ufficio di un'azienda a Milano"
+
+  persona:
+    name: "Dott. Conti"
+    role: "hiring manager"
+    personality: "polished, analytical, expects concrete examples"
+    dialect: "standard Italian"
+
+  objectives:
+    - id: "introduce"
+      description: "Introduce yourself and your background"
+      required_vocab: ["esperienza", "studi", "posizione", "azienda"]
+    - id: "strengths"
+      description: "Describe your strengths and a past project"
+      required_vocab: ["capacità", "squadra", "progetto", "responsabile"]
+    - id: "questions"
+      description: "Ask about hours, salary, and contract"
+      required_vocab: ["orario", "stipendio", "contratto", "ferie"]
+
+  difficulty_scaling:
+    A2: "Interviewer asks short questions and rephrases patiently"
+    B1: "Standard behavioural questions, expects several full sentences"
+    B2: "Rapid follow-ups, hypotheticals, negotiates salary and terms"
+
+  opening_line: "Piacere di conoscerLa. Per iniziare, mi parli un po' di Lei."
+
+  success_criteria:
+    all_objectives_completed: true
+    grammar_error_rate_max: 0.15
+    target_vocabulary_used_min: 0.6
+
+  cultural_notes:
+    - "Milan is Italy's business hub; punctuality and a smart appearance count."
+    - "Formal 'Lei' is expected throughout an Italian interview."

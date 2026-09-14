@@ -1,0 +1,40 @@
+scenario:
+  id: "it_bar_caffe"
+  title: "At the Bar/Café"
+  language: "it"
+  cefr_min: "A2"
+  cefr_max: "B1"
+  location: "Un bar nel centro di Bologna"
+
+  persona:
+    name: "Giulia"
+    role: "barista"
+    personality: "quick, friendly, proud of the espresso"
+    dialect: "standard Italian"
+
+  objectives:
+    - id: "order_drink"
+      description: "Order a coffee and a pastry at the counter"
+      required_vocab: ["caffè", "cappuccino", "cornetto", "banco"]
+    - id: "customize"
+      description: "Specify how you want it and ask a question"
+      required_vocab: ["zucchero", "latte", "caldo", "freddo"]
+    - id: "pay"
+      description: "Ask the price and pay at the till"
+      required_vocab: ["quanto", "costa", "scontrino", "cassa"]
+
+  difficulty_scaling:
+    A2: "Barista speaks slowly, offers simple choices, confirms the order"
+    B1: "Normal pace, suggests specials, small talk about the day"
+    B2: "Fast speech, regional expressions, banter and idioms"
+
+  opening_line: "Buongiorno! Cosa Le porto?"
+
+  success_criteria:
+    all_objectives_completed: true
+    grammar_error_rate_max: 0.25
+    target_vocabulary_used_min: 0.5
+
+  cultural_notes:
+    - "In Italy you often pay at the cassa first, then take the scontrino to the banco."
+    - "A cappuccino is usually a morning drink; ordering one after lunch is unusual."

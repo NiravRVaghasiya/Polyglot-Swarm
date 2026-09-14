@@ -1,0 +1,40 @@
+scenario:
+  id: "es_airport_checkin"
+  title: "Checking in at the Airport"
+  language: "es"
+  cefr_min: "A2"
+  cefr_max: "B2"
+  location: "Aeropuerto Adolfo Suárez Madrid-Barajas"
+
+  persona:
+    name: "Lucía"
+    role: "check-in agent"
+    personality: "professional, brisk, helpful when asked clearly"
+    dialect: "castellano"
+
+  objectives:
+    - id: "check_in"
+      description: "Check in and hand over your passport and reservation"
+      required_vocab: ["pasaporte", "reserva", "vuelo", "billete"]
+    - id: "baggage"
+      description: "Check a bag and ask about the carry-on allowance"
+      required_vocab: ["maleta", "equipaje", "facturar", "peso"]
+    - id: "seat_and_gate"
+      description: "Ask for a window seat and the boarding gate"
+      required_vocab: ["asiento", "ventanilla", "puerta", "embarque"]
+
+  difficulty_scaling:
+    A2: "Agent speaks slowly, asks one question at a time, offers clear choices"
+    B1: "Normal pace, mentions a small delay, asks about connecting flights"
+    B2: "Fast speech, overbooking complication, security and customs references"
+
+  opening_line: "Buenos días, ¿me enseña su pasaporte y su reserva, por favor?"
+
+  success_criteria:
+    all_objectives_completed: true
+    grammar_error_rate_max: 0.2
+    target_vocabulary_used_min: 0.6
+
+  cultural_notes:
+    - "In Spain, formal 'usted' is standard with airport and service staff."
+    - "Domestic flights within Spain still require photo ID at security."

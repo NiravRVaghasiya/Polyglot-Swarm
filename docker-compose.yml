@@ -1,0 +1,58 @@
+# Polyglot Swarm — local-first deployment.
+#
+#   docker compose up            # API (:8000) + Gradio UI (:7860)
+#   docker compose --profile local-llm up   # also start Ollama
+#
+# Copy .env.example to .env and set your LLM API key(s) first.
+
+services:
+  api:
+    build: .
+    image: polyglot-swarm
+    command: uvicorn src.api.app:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - polyglot-data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  ui:
+    # Reuse the image built by the api service.
+    image: polyglot-swarm
+    build: .
+    command: python -m src.main
+    ports:
+      - "7860:7860"
+    env_file:
+      - .env
+    environment:
+      # Point the UI at the API service inside the compose network.
+      GRADIO_SERVER_PORT: "7860"
+    volumes:
+      - polyglot-data:/data
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Optional local LLM for privacy mode. Enable with: --profile local-llm
+  ollama:
+    image: ollama/ollama:latest
+    profiles: ["local-llm"]
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-models:/root/.ollama
+    restart: unless-stopped
+
+volumes:
+  polyglot-data:
+  ollama-models:

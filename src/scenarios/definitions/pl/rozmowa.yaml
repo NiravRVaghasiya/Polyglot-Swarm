@@ -1,0 +1,40 @@
+scenario:
+  id: "pl_job_interview_rozmowa"
+  title: "A Job Interview (Rozmowa kwalifikacyjna)"
+  language: "pl"
+  cefr_min: "B1"
+  cefr_max: "B2"
+  location: "Biuro firmy w Gdańsku"
+
+  persona:
+    name: "Pan Zieliński"
+    role: "hiring manager"
+    personality: "professional, direct, wants concrete examples"
+    dialect: "standard Polish"
+
+  objectives:
+    - id: "introduce"
+      description: "Introduce yourself and your background"
+      required_vocab: ["doświadczenie", "wykształcenie", "stanowisko", "firma"]
+    - id: "strengths"
+      description: "Talk about your strengths and a project"
+      required_vocab: ["umiejętności", "zespół", "projekt", "odpowiedzialny"]
+    - id: "questions"
+      description: "Ask about hours, salary, and contract"
+      required_vocab: ["godziny", "wynagrodzenie", "umowa", "urlop"]
+
+  difficulty_scaling:
+    A2: "Interviewer asks short questions and rephrases patiently"
+    B1: "Standard behavioural questions, expects several full sentences"
+    B2: "Rapid follow-ups, hypotheticals, negotiates salary and terms"
+
+  opening_line: "Dzień dobry, miło mi Pana poznać. Proszę opowiedzieć coś o sobie."
+
+  success_criteria:
+    all_objectives_completed: true
+    grammar_error_rate_max: 0.15
+    target_vocabulary_used_min: 0.6
+
+  cultural_notes:
+    - "'Umowa o pracę' (employment contract) is prized over civil-law contracts."
+    - "Formal Pan/Pani address is standard in Polish interviews."

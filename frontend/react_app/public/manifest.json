@@ -1,0 +1,10 @@
+{
+  "name": "Polyglot Swarm",
+  "short_name": "Polyglot",
+  "description": "Multi-agent AI language tutor",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#4f46e5",
+  "icons": []
+}

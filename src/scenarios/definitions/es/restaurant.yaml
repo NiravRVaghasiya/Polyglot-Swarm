@@ -1,0 +1,44 @@
+scenario:
+  id: "es_restaurant_ordering"
+  title: "Ordering at a Restaurant in Madrid"
+  language: "es"
+  cefr_min: "A2"
+  cefr_max: "B2"
+  location: "La Madrileña, a traditional restaurant in central Madrid"
+
+  persona:
+    name: "Carlos"
+    role: "waiter"
+    personality: "efficient but friendly, proud of the daily specials, speaks at moderate pace"
+    dialect: "castellano"
+
+  objectives:
+    - id: "greet_and_seat"
+      description: "Greet the waiter and ask for a table"
+      required_vocab: ["mesa", "reserva", "personas", "terraza"]
+    - id: "order_food"
+      description: "Look at the menu and order a main course + drink"
+      required_vocab: ["carta", "menú", "plato", "bebida", "recomendar"]
+    - id: "handle_issue"
+      description: "Handle a minor issue (wrong order, missing item)"
+      required_vocab: ["disculpe", "pedí", "cambiar", "falta"]
+    - id: "pay"
+      description: "Ask for the bill and pay"
+      required_vocab: ["cuenta", "propina", "tarjeta", "efectivo"]
+
+  difficulty_scaling:
+    A2: "Waiter speaks slowly, offers binary choices, accepts single-word answers"
+    B1: "Normal speed, asks follow-up questions, introduces daily specials"
+    B2: "Fast speech, uses idioms ('está para chuparse los dedos'), adds complications"
+
+  opening_line: "¡Buenas tardes! Bienvenido a La Madrileña. ¿Mesa para cuántas personas?"
+
+  success_criteria:
+    all_objectives_completed: true
+    grammar_error_rate_max: 0.2
+    target_vocabulary_used_min: 0.6
+
+  cultural_notes:
+    - "In Spain, lunch is the main meal (2-4 PM). Dinner is light and late (9-11 PM)."
+    - "Tipping is not obligatory in Spain. Rounding up or leaving 5-10% is appreciated."
+    - "'La cuenta, por favor' is the standard way to ask for the bill."

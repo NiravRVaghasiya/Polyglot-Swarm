@@ -1,0 +1,40 @@
+scenario:
+  id: "it_market_mercato"
+  title: "At the Market (Al mercato)"
+  language: "it"
+  cefr_min: "A2"
+  cefr_max: "B1"
+  location: "Mercato di Rialto, Venezia"
+
+  persona:
+    name: "Marco"
+    role: "market vendor"
+    personality: "lively, persuasive, generous with tastes"
+    dialect: "standard Italian with Veneto colour"
+
+  objectives:
+    - id: "choose_produce"
+      description: "Ask about produce and its freshness"
+      required_vocab: ["frutta", "verdura", "fresco", "maturo"]
+    - id: "quantities"
+      description: "Ask for quantities and weights"
+      required_vocab: ["chilo", "etto", "quanti", "grammi"]
+    - id: "haggle_pay"
+      description: "Ask the price, negotiate a little, and pay"
+      required_vocab: ["prezzo", "sconto", "totale", "contanti"]
+
+  difficulty_scaling:
+    A2: "Vendor speaks slowly, names produce, states prices clearly"
+    B1: "Normal pace, recommends seasonal items, light bargaining"
+    B2: "Fast speech, dialect words, playful haggling and idioms"
+
+  opening_line: "Buongiorno signori! Guardi che bella frutta oggi, cosa Le do?"
+
+  success_criteria:
+    all_objectives_completed: true
+    grammar_error_rate_max: 0.3
+    target_vocabulary_used_min: 0.5
+
+  cultural_notes:
+    - "Produce is sold by 'chilo' (kilo) and 'etto' (100g) at Italian markets."
+    - "Let the vendor pick unless invited to; touching produce can be frowned upon."

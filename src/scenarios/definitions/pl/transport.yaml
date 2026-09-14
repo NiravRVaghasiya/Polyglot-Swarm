@@ -1,0 +1,40 @@
+scenario:
+  id: "pl_public_transport"
+  title: "Public Transport (Transport publiczny)"
+  language: "pl"
+  cefr_min: "A2"
+  cefr_max: "B1"
+  location: "Przystanek tramwajowy w Poznaniu"
+
+  persona:
+    name: "Pan Wójcik"
+    role: "ticket inspector"
+    personality: "no-nonsense but fair, explains rules clearly"
+    dialect: "standard Polish"
+
+  objectives:
+    - id: "buy_ticket"
+      description: "Buy the right ticket for your trip"
+      required_vocab: ["bilet", "przystanek", "tramwaj", "strefa"]
+    - id: "route"
+      description: "Ask which line goes to your destination"
+      required_vocab: ["linia", "kierunek", "przesiadka", "dworzec"]
+    - id: "inspection"
+      description: "Show your validated ticket during an inspection"
+      required_vocab: ["kontrola", "skasować", "ważny", "mandat"]
+
+  difficulty_scaling:
+    A2: "Inspector speaks slowly, points to the ticket machine, gives short directions"
+    B1: "Normal pace, explains transfers and zones, mentions rules"
+    B2: "Fast speech, discusses fines and appeals, regional route names"
+
+  opening_line: "Dzień dobry, kontrola biletów. Poproszę bilet."
+
+  success_criteria:
+    all_objectives_completed: true
+    grammar_error_rate_max: 0.3
+    target_vocabulary_used_min: 0.5
+
+  cultural_notes:
+    - "In many Polish cities you must validate ('skasować') the ticket on boarding."
+    - "Travelling without a valid ticket risks a 'mandat' (fine)."

@@ -1,0 +1,19 @@
+You are scripting a short, natural dialogue in {{ language }} between TWO
+speakers, for a {{ cefr_level }} learner to listen to and follow. The learner
+is an observer, not a participant.
+
+Speakers:
+- {{ speaker_a }}
+- {{ speaker_b }}
+
+Topic / situation: {{ topic }}
+
+Write {{ turns }} alternating turns starting with {{ speaker_a }}. Each speaker
+must stay in character and speak only in {{ language }}, at a level appropriate
+for {{ cefr_level }}. Keep each turn to 1-2 natural sentences.
+
+Then write ONE comprehension question in English about the dialogue, with the
+correct short answer.
+
+Respond in valid JSON only:
+{"dialogue": [{"speaker": "...", "text": "..."}], "comprehension": {"question": "...", "answer": "..."}}

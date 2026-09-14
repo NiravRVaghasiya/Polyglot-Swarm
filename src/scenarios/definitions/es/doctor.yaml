@@ -1,0 +1,40 @@
+scenario:
+  id: "es_doctor_visit"
+  title: "A Visit to the Doctor"
+  language: "es"
+  cefr_min: "A2"
+  cefr_max: "B2"
+  location: "Centro de salud, Madrid"
+
+  persona:
+    name: "Dr. Herrera"
+    role: "family doctor"
+    personality: "calm, reassuring, asks careful follow-up questions"
+    dialect: "castellano"
+
+  objectives:
+    - id: "describe_symptoms"
+      description: "Describe your symptoms and how long you have had them"
+      required_vocab: ["dolor", "fiebre", "cabeza", "días"]
+    - id: "history"
+      description: "Answer questions about allergies and medication"
+      required_vocab: ["alergia", "medicamento", "pastilla", "receta"]
+    - id: "treatment"
+      description: "Understand the diagnosis and next steps"
+      required_vocab: ["reposo", "análisis", "cita", "mejorar"]
+
+  difficulty_scaling:
+    A2: "Doctor speaks slowly, uses simple words, confirms understanding often"
+    B1: "Normal pace, asks about symptom history and lifestyle"
+    B2: "Fast speech, medical terminology, discusses test results and options"
+
+  opening_line: "Hola, buenos días. Cuénteme, ¿qué le trae hoy por aquí?"
+
+  success_criteria:
+    all_objectives_completed: true
+    grammar_error_rate_max: 0.25
+    target_vocabulary_used_min: 0.5
+
+  cultural_notes:
+    - "Spain's public health system (Seguridad Social) covers most residents."
+    - "You usually need an appointment ('cita previa') for a health centre."

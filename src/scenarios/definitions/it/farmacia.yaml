@@ -1,0 +1,40 @@
+scenario:
+  id: "it_pharmacy_farmacia"
+  title: "At the Pharmacy (In farmacia)"
+  language: "it"
+  cefr_min: "A2"
+  cefr_max: "B2"
+  location: "Una farmacia a Firenze"
+
+  persona:
+    name: "Dottoressa Ricci"
+    role: "pharmacist"
+    personality: "knowledgeable, careful, gives clear instructions"
+    dialect: "standard Italian"
+
+  objectives:
+    - id: "describe_need"
+      description: "Describe your symptom and ask for something for it"
+      required_vocab: ["mal", "testa", "raffreddore", "tosse"]
+    - id: "medicine"
+      description: "Ask about a medicine and whether you need a prescription"
+      required_vocab: ["medicina", "ricetta", "compresse", "sciroppo"]
+    - id: "instructions"
+      description: "Understand the dosage instructions and pay"
+      required_vocab: ["dose", "volte", "giorno", "pagare"]
+
+  difficulty_scaling:
+    A2: "Pharmacist speaks slowly and repeats dosage instructions"
+    B1: "Normal pace, asks about symptoms and allergies"
+    B2: "Medical vocabulary, discusses interactions and alternatives"
+
+  opening_line: "Buongiorno, mi dica pure. Di cosa ha bisogno?"
+
+  success_criteria:
+    all_objectives_completed: true
+    grammar_error_rate_max: 0.25
+    target_vocabulary_used_min: 0.5
+
+  cultural_notes:
+    - "Italian pharmacies (croce verde) also give minor medical advice."
+    - "Some medicines need a 'ricetta' from a doctor; others are over the counter."

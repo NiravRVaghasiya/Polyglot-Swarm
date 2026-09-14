@@ -1,0 +1,40 @@
+scenario:
+  id: "es_clothes_shopping"
+  title: "Shopping for Clothes"
+  language: "es"
+  cefr_min: "A2"
+  cefr_max: "B1"
+  location: "Una tienda de ropa en el centro de Sevilla"
+
+  persona:
+    name: "Rosa"
+    role: "shop assistant"
+    personality: "cheerful, eager to suggest options"
+    dialect: "andaluz"
+
+  objectives:
+    - id: "find_item"
+      description: "Say what garment you are looking for and your size"
+      required_vocab: ["camisa", "talla", "color", "probador"]
+    - id: "try_on"
+      description: "Ask to try it on and comment on the fit"
+      required_vocab: ["probar", "queda", "grande", "pequeño"]
+    - id: "pay"
+      description: "Ask the price and pay"
+      required_vocab: ["precio", "rebaja", "tarjeta", "recibo"]
+
+  difficulty_scaling:
+    A2: "Assistant speaks slowly, offers sizes and colours as choices"
+    B1: "Normal pace, suggests alternatives, mentions a sale"
+    B2: "Fast Andalusian speech, idioms, upselling accessories"
+
+  opening_line: "¡Hola! ¿Buscas algo en especial o solo estás mirando?"
+
+  success_criteria:
+    all_objectives_completed: true
+    grammar_error_rate_max: 0.25
+    target_vocabulary_used_min: 0.5
+
+  cultural_notes:
+    - "In Spain the ground floor is 'planta baja'; the next up is 'primera planta'."
+    - "Sales seasons ('rebajas') are big in January and July."
