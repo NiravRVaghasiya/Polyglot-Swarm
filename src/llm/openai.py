@@ -41,14 +41,19 @@ class OpenAIProvider(LLMProvider):
 
     def _build_client(self, *, temperature: float, max_tokens: int) -> Any:
         # Lazy import so the module loads without langchain-openai installed.
-        from langchain_openai import ChatOpenAI  # type: ignore[import-not-found]
+        from langchain_openai import ChatOpenAI
 
-        return ChatOpenAI(
-            model=self.model,
-            api_key=self.api_key,
-            temperature=temperature,
-            max_tokens=max_tokens,
-        )
+        # Built as a mapping (like the Claude adapter) because ``ChatOpenAI``
+        # types ``api_key`` as ``SecretStr`` and exposes ``max_tokens`` under
+        # the ``max_completion_tokens`` alias; pydantic still accepts the plain
+        # string and the field name at runtime, across SDK versions.
+        kwargs: dict[str, Any] = {
+            "model": self.model,
+            "api_key": self.api_key,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+        }
+        return ChatOpenAI(**kwargs)
 
     async def generate(
         self,

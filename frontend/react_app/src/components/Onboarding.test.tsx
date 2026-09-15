@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { Onboarding } from "./Onboarding";
-import { api } from "@/lib/api";
+import { api, type UserProfile } from "@/lib/api";
 
 describe("Onboarding wizard", () => {
   beforeEach(() => {
@@ -52,11 +52,11 @@ describe("Onboarding wizard", () => {
   });
 
   it("disables the button while saving", async () => {
-    let resolve: (v: unknown) => void = () => {};
+    let resolve: (value: UserProfile) => void = () => {};
     vi.spyOn(api, "updateProfile").mockReturnValue(
-      new Promise((r) => {
+      new Promise<UserProfile>((r) => {
         resolve = r;
-      }) as ReturnType<typeof api.updateProfile>,
+      }),
     );
     render(<Onboarding token="t" onComplete={() => {}} />);
     const btn = screen.getByText("Start learning");
@@ -71,5 +71,6 @@ describe("Onboarding wizard", () => {
       interests: [],
       preferences: {},
     });
+    await waitFor(() => expect(screen.getByText("Start learning")).toBeInTheDocument());
   });
 });
