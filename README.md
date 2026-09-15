@@ -140,6 +140,52 @@ docker compose --profile local-llm up   # also start an Ollama container (:11434
 5. At session end you get a report; new vocabulary is scheduled with **FSRS**, and your **CEFR profile** is recomputed.
 6. Next session, the **curriculum planner** uses the model to choose what's worth practicing, and FSRS surfaces due reviews in context.
 
+## Measured results
+
+The project ships three measurement harnesses — component benchmarks, evaluation
+suites, and a component-ablation study — and a generator that runs them and writes
+[`docs/results.md`](docs/results.md). The numbers below are the latest run
+(`make results`).
+
+> **Read this first.** These numbers are produced in **deterministic mode**
+> (`POLYGLOT_DETERMINISTIC=1`), where LLM calls resolve to a reproducible
+> fake/scripted provider. They validate the *machinery, decision logic, and
+> pipeline wiring* — **not** live-model quality. Live-model precision, recall,
+> and latency will differ, and no study with real learners has been run yet.
+> The full caveats live in [`docs/results.md`](docs/results.md#known-limitations).
+
+**Component benchmarks** — all pass:
+
+| Benchmark | Key metrics |
+|---|---|
+| `grammar_precision` | precision 1.000 · recall 1.000 · false-correction-rate 0.000 (8 cases) |
+| `verifier_calibration` | ECE 0.000 (30 predictions) |
+| `structured_output_parseable` | valid JSON ✓ |
+| `provider_latency` | round-trips through the provider layer ✓ |
+
+**Evaluation suites** — 11/11 pass, e.g. grammar F1 1.000 (FCR 0.000, 17 cases),
+vocabulary extraction F1 1.000, assessment CEFR correlation 1.000 / band-MAE 0.000,
+curriculum target-coverage 1.000, and a regression gate over all rolled-up suites.
+
+**Ablation study** — which architectural components actually create the
+learner-model signal. Metric is mean grammar+vocabulary mastery gain over one
+scripted session:
+
+| Arm | Description | Mastery gain |
+|---|---|---|
+| A | conversation only | +0.000 |
+| B | conversation + memory | +0.000 |
+| C | conversation + FSRS review | +0.000 |
+| D | conversation + analysis (learner model) | **+0.333** |
+| E | full system | **+0.333** |
+
+The arms *without* the analysis pipeline (A/B/C) accumulate no learner-model
+evidence and show zero gain; the arms *with* it (D/E) show a positive gain — the
+intended result: the analysis components are what turn a conversation into
+measurable evidence about the learner.
+
+Regenerate everything with `make results` (or `polyglot results`).
+
 ## Languages
 
 The generic agents work with **any language you name** — just pass it to `chat` or the API. Three languages additionally ship a **language pack** (Spanish, Polish, Italian) with a grammar-construction taxonomy, frequency list, collocations, register notes, and cross-language transfer data. Adding resources for a new language is data, not code — see [`docs/language-packs.md`](docs/language-packs.md).
