@@ -65,6 +65,72 @@ export interface VocabPoint {
   cumulative: number;
 }
 
+// --- Learner model (Phase 16) ---
+export interface PlanAction {
+  type: string;
+  target: string;
+  skill: string | null;
+  reason: string;
+  priority: number;
+  estimated_minutes: number;
+}
+
+export interface PlanResponse {
+  language: string;
+  goal: string;
+  actions: PlanAction[];
+}
+
+export interface SkillAssessment {
+  skill?: string | null;
+  cefr: string;
+  mastery: number;
+  confidence: number;
+  sample_size: number;
+}
+
+export interface CEFRProfile {
+  language: string;
+  overall: string;
+  skills: Record<string, SkillAssessment>;
+}
+
+export interface SkillBelief {
+  skill: string;
+  mastery: number;
+  uncertainty: number;
+  sample_size: number;
+}
+
+export interface Insights {
+  language: string;
+  current_cefr: string | null;
+  overall_cefr: string;
+  weakest_skills: string[];
+  top_weaknesses: { error_type: string; occurrences: number }[];
+  recommended_focus: string[];
+  streak: number;
+}
+
+export interface UserProfile {
+  user_id: string;
+  native_language: string;
+  target_languages: string[];
+  cefr_by_language: Record<string, string>;
+  goals: string[];
+  interests: string[];
+  preferences: Record<string, unknown>;
+}
+
+export interface TranscribeResponse {
+  transcript: string;
+}
+
+export interface TtsResponse {
+  audio_base64: string;
+  audio_format: string;
+}
+
 async function request<T>(
   path: string,
   options: { method?: string; body?: unknown; token?: string | null } = {},
@@ -150,4 +216,59 @@ export const api = {
       `/api/v1/progress/vocabulary${language ? `?language=${encodeURIComponent(language)}` : ""}`,
       { token },
     ).then((r) => r.growth),
+
+  // --- Learner model (Phase 16) ---
+  todaysPlan: (
+    token: string,
+    opts: { language?: string; minutes?: number; goal?: string } = {},
+  ) => {
+    const params = new URLSearchParams();
+    if (opts.language) params.set("language", opts.language);
+    if (opts.minutes !== undefined) params.set("minutes", String(opts.minutes));
+    if (opts.goal) params.set("goal", opts.goal);
+    const qs = params.toString();
+    return request<PlanResponse>(`/api/v1/learner/plan${qs ? `?${qs}` : ""}`, { token });
+  },
+
+  cefrProfile: (token: string, language?: string) =>
+    request<CEFRProfile>(
+      `/api/v1/learner/cefr${language ? `?language=${encodeURIComponent(language)}` : ""}`,
+      { token },
+    ),
+
+  skillMap: (token: string, language?: string) =>
+    request<{ language: string; skills: SkillBelief[] }>(
+      `/api/v1/learner/skill-map${language ? `?language=${encodeURIComponent(language)}` : ""}`,
+      { token },
+    ).then((r) => r.skills),
+
+  insights: (token: string, language?: string) =>
+    request<Insights>(
+      `/api/v1/learner/insights${language ? `?language=${encodeURIComponent(language)}` : ""}`,
+      { token },
+    ),
+
+  // --- Profile / onboarding ---
+  getProfile: (token: string) => request<UserProfile>("/api/v1/profile", { token }),
+
+  updateProfile: (token: string, fields: Partial<UserProfile>) =>
+    request<UserProfile>("/api/v1/profile", { method: "PUT", body: fields, token }),
+
+  // --- Voice ---
+  transcribe: (
+    token: string,
+    opts: { audio_base64: string; audio_format?: string; language?: string },
+  ) =>
+    request<TranscribeResponse>("/api/v1/voice/transcribe", {
+      method: "POST",
+      body: opts,
+      token,
+    }),
+
+  speak: (token: string, text: string, language?: string) =>
+    request<TtsResponse>("/api/v1/voice/speak", {
+      method: "POST",
+      body: { text, language },
+      token,
+    }),
 };

@@ -32,7 +32,7 @@ class TestVoiceMapping:
 
 
 class _FakeCommunicate:
-    last: "_FakeCommunicate | None" = None
+    last: _FakeCommunicate | None = None
 
     def __init__(self, text, voice):
         self.text = text

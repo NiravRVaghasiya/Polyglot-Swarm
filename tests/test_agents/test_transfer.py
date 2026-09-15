@@ -43,9 +43,7 @@ _COGNATE_PAYLOAD = (
 class TestSuggestTransfers:
     async def test_returns_cognates(self, monkeypatch):
         monkeypatch.setattr(transfer, "get_provider", lambda tier: FakeProvider(_COGNATE_PAYLOAD))
-        out = await transfer.suggest_transfers(
-            "Spanish", ["restaurante"], ["Italian", "Polish"]
-        )
+        out = await transfer.suggest_transfers("Spanish", ["restaurante"], ["Italian", "Polish"])
         assert out[0]["word"] == "restaurante"
         assert out[0]["cognates"]["Italian"] == "ristorante"
 
@@ -98,9 +96,7 @@ class TestTransferNode:
     async def test_maps_new_vocabulary(self, temp_storage, monkeypatch):
         from src.memory import user_profile
 
-        user_profile.create_profile(
-            "u1", target_languages=["Spanish", "Italian", "Polish"]
-        )
+        user_profile.create_profile("u1", target_languages=["Spanish", "Italian", "Polish"])
         monkeypatch.setattr(transfer, "get_provider", lambda tier: FakeProvider(_COGNATE_PAYLOAD))
 
         state = {
@@ -114,9 +110,7 @@ class TestTransferNode:
     async def test_excludes_source_language(self, temp_storage, monkeypatch):
         from src.memory import user_profile
 
-        user_profile.create_profile(
-            "u1", target_languages=["Spanish", "Italian"]
-        )
+        user_profile.create_profile("u1", target_languages=["Spanish", "Italian"])
         captured = {}
 
         async def fake_suggest(source, words, others):

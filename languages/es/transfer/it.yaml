@@ -1,0 +1,24 @@
+# Spanish -> Italian transfer resource.
+# Two closely related Romance languages (~82% lexical similarity): rich positive
+# transfer, but several notorious false friends.
+target_language: Italian
+cognates:
+  - source: familia
+    target: famiglia
+    note: family — near-identical, straightforward cognate
+  - source: restaurante
+    target: ristorante
+    note: restaurant — regular -ante/-ante correspondence
+  - source: gracias
+    target: grazie
+    note: thank you
+false_friends:
+  - source: burro
+    target: burro
+    note: ES burro = donkey; IT burro = butter. Classic false friend.
+  - source: salir
+    target: salire
+    note: ES salir = to leave/go out; IT salire = to go up/climb.
+  - source: aceite
+    target: aceto
+    note: ES aceite = oil; IT aceto = vinegar (oil is olio).

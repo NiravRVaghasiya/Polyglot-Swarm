@@ -7,7 +7,6 @@ import pytest
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 from src.agents import conversation, cultural, evaluator, grammar, vocabulary
-from src.config import settings
 from src.llm.provider import LLMProvider
 from src.orchestrator.graph import compile_graph
 

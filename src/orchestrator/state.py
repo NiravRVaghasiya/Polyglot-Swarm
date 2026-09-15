@@ -1,7 +1,7 @@
 """LangGraph state definition for the learning session."""
 
 from operator import add
-from typing import Annotated, Any, TypedDict
+from typing import Annotated, Any, NotRequired, TypedDict
 
 
 class GrammarError(TypedDict):
@@ -12,6 +12,11 @@ class GrammarError(TypedDict):
     rule: str
     explanation: str
     severity: str  # "minor", "moderate", "critical"
+    # Phase 4 taxonomy (optional; consumers read via .get with defaults).
+    classification: NotRequired[str]  # wrong|awkward|regional|informal|acceptable|...
+    construction: NotRequired[str]
+    confidence: NotRequired[float]
+    alternatives: NotRequired[list[str]]
 
 
 class VocabularyItem(TypedDict):
@@ -36,6 +41,10 @@ class LearnerState(TypedDict):
     user_id: str  # Owner of the session; keys all persisted memory
     language: str  # Free-form language name (e.g., "Spanish", "Japanese", "Arabic")
     mode: str  # "conversation", "review", "drill", "assessment"
+    # The interaction id the current turn is running under (Phase 17
+    # observability); set by src.api.sessions.run_turn from the contextvar so
+    # anything reading state directly can also correlate to it.
+    interaction_id: NotRequired[str]
 
     # --- Conversation ---
     messages: Annotated[list[dict[str, Any]], add]  # Chat history (appended via reducer)

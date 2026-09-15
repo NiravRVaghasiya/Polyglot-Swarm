@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-import pytest
-
+from src.llm.claude import ClaudeProvider
 from src.llm.provider import (
     JSON_MODE_INSTRUCTION,
     Message,
     apply_json_mode,
 )
-from src.llm.claude import ClaudeProvider
 
 
 class TestApplyJsonMode:
@@ -67,9 +65,7 @@ class TestClaudeProviderGenerate:
             Message("user", "Hola"),
         ]
 
-        result = await provider.generate(
-            messages, temperature=0.3, max_tokens=123
-        )
+        result = await provider.generate(messages, temperature=0.3, max_tokens=123)
 
         assert result == "canned reply"
 

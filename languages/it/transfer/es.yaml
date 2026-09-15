@@ -1,0 +1,19 @@
+# Italian -> Spanish transfer resource (mirror of the ES->IT relations).
+target_language: Spanish
+cognates:
+  - source: famiglia
+    target: familia
+    note: family
+  - source: ristorante
+    target: restaurante
+    note: restaurant
+  - source: grazie
+    target: gracias
+    note: thank you
+false_friends:
+  - source: burro
+    target: burro
+    note: IT burro = butter; ES burro = donkey.
+  - source: salire
+    target: salir
+    note: IT salire = to go up; ES salir = to leave/go out.

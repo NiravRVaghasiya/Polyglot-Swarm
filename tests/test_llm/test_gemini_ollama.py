@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from src.llm.provider import JSON_MODE_INSTRUCTION, Message
 from src.llm.gemini import GeminiProvider
 from src.llm.ollama import OllamaProvider, _strip_provider_prefix
+from src.llm.provider import JSON_MODE_INSTRUCTION, Message
 
 
 class TestGeminiAvailability:
@@ -40,9 +40,7 @@ class TestGeminiGenerate:
         await provider.generate([Message("user", "json please")], json_mode=True)
 
         model = fake_langchain.last_instance
-        assert any(
-            JSON_MODE_INSTRUCTION in m.content for m in model.invoked_with
-        )
+        assert any(JSON_MODE_INSTRUCTION in m.content for m in model.invoked_with)
 
 
 class TestOllamaStripPrefix:
@@ -63,9 +61,7 @@ class TestOllamaAvailability:
 
 class TestOllamaGenerate:
     async def test_maps_messages_and_params(self, fake_langchain):
-        provider = OllamaProvider(
-            model="ollama/llama3.1:8b", base_url="http://localhost:11434"
-        )
+        provider = OllamaProvider(model="ollama/llama3.1:8b", base_url="http://localhost:11434")
         messages = [Message("system", "sys"), Message("user", "cześć")]
 
         result = await provider.generate(messages, temperature=0.2, max_tokens=32)

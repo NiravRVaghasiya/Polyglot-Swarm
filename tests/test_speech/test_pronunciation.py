@@ -19,9 +19,7 @@ class TestAssess:
 
     def test_flags_missed_word(self):
         # Learner dropped/mispronounced "restaurante" -> ASR heard something else.
-        result = assess_pronunciation(
-            "quiero ir al restaurante", "quiero ir al rrrestorante"
-        )
+        result = assess_pronunciation("quiero ir al restaurante", "quiero ir al rrrestorante")
         assert "restaurante" in result["problem_words"]
         assert result["accuracy"] < 1.0
 

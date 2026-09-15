@@ -79,9 +79,7 @@ def top_weaknesses(
     return [dict(r) for r in rows]
 
 
-def cefr_progression(
-    user_id: str, language: str | None = None
-) -> list[dict[str, Any]]:
+def cefr_progression(user_id: str, language: str | None = None) -> list[dict[str, Any]]:
     """CEFR estimates over time from assessment/session logs.
 
     Returns ``{"date", "cefr"}`` for sessions that recorded a CEFR estimate,
@@ -118,9 +116,7 @@ def _session_dates(user_id: str, language: str | None) -> list[str]:
     return [r["day"] for r in rows]
 
 
-def current_streak(
-    user_id: str, language: str | None = None, *, today: str | None = None
-) -> int:
+def current_streak(user_id: str, language: str | None = None, *, today: str | None = None) -> int:
     """Consecutive-day study streak ending today (or yesterday).
 
     A streak counts back from today through consecutive days with at least one
@@ -146,9 +142,7 @@ def current_streak(
     return streak
 
 
-def progress_overview(
-    user_id: str, language: str | None = None
-) -> dict[str, Any]:
+def progress_overview(user_id: str, language: str | None = None) -> dict[str, Any]:
     """A compact summary combining the key progress metrics for dashboards."""
     analytics.init_db()
     growth = vocabulary_growth(user_id, language)

@@ -18,7 +18,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from src.llm.factory import get_provider
-from src.llm.prompts import render
+from src.llm.prompts import render_prompt
 from src.llm.provider import Message
 
 logger = logging.getLogger("polyglot.ingestion")
@@ -44,12 +44,14 @@ async def simplify_and_extract(
     if not content.strip():
         return {"simplified": "", "vocab": []}
 
-    prompt = render(
-        "ingestion.jinja2",
-        language=language,
-        cefr_level=cefr_level,
-        max_vocab=max_vocab,
-        content=content[:_MAX_CONTENT_CHARS],
+    prompt = str(
+        render_prompt(
+            "ingestion",
+            language=language,
+            cefr_level=cefr_level,
+            max_vocab=max_vocab,
+            content=content[:_MAX_CONTENT_CHARS],
+        )
     )
 
     provider = get_provider("primary")

@@ -36,22 +36,26 @@ def mock_providers(monkeypatch):
             return self.reply
 
     monkeypatch.setattr(
-        peer, "get_provider",
+        peer,
+        "get_provider",
         lambda tier: Scripted(
             '{"dialogue": [{"speaker": "Ana", "text": "Hola"}], '
             '"comprehension": {"question": "Who?", "answer": "Ana"}}'
         ),
     )
     monkeypatch.setattr(
-        writing, "get_provider",
+        writing,
+        "get_provider",
         lambda tier: Scripted(
             '{"corrections": [], "style_notes": [], "overall": "Great!", "corrected_text": "ok"}'
         ),
     )
     monkeypatch.setattr(
-        ingestion, "get_provider",
+        ingestion,
+        "get_provider",
         lambda tier: Scripted(
-            '{"simplified": "El gato.", "vocab": [{"word": "gato", "translation": "cat", "pos": "noun"}]}'
+            '{"simplified": "El gato.", "vocab": '
+            '[{"word": "gato", "translation": "cat", "pos": "noun"}]}'
         ),
     )
 

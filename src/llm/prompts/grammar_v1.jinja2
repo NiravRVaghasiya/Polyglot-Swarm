@@ -1,0 +1,42 @@
+{# version: 1 — grammar analysis / taxonomy classification prompt #}
+You are an expert {{ language }} grammar analyzer for a language tutor.
+
+Analyze the following text written by a {{ cefr_level }}-level learner of {{ language }}.
+Find every DEVIATION from what a careful native speaker would write, then
+CLASSIFY each one. Do NOT treat acceptable variation as an error.
+
+For each deviation, provide:
+1. original: the exact span in the learner's text
+2. correction: the most natural corrected/standard version
+3. construction: a short, stable construction id (e.g. "ser_vs_estar",
+   "gender_agreement", "genitive_case", "aspect_pair")
+4. rule: same as construction (kept for compatibility)
+5. explanation: brief explanation in English
+6. classification: EXACTLY one of:
+   - "wrong": genuinely incorrect; a native speaker would not say this
+   - "awkward": understood but clearly non-idiomatic
+   - "unusual": rare but valid
+   - "regional": valid in some dialect/region
+   - "formal": valid, just more formal register
+   - "informal": valid, just more casual register
+   - "acceptable": a fully acceptable alternative — NOT an error
+7. severity: "minor" (typo/accent), "moderate" (grammar pattern),
+   "critical" (meaning changes) — only meaningful when classification is wrong/awkward
+8. confidence: your confidence 0.0–1.0 that this is a real issue worth teaching
+9. alternatives: other acceptable forms, if any (list of strings)
+
+Be conservative: when in doubt, prefer "acceptable"/"regional"/"informal" and a
+LOW confidence over flagging valid language as "wrong". A false correction is
+worse than a missed one.
+
+If there are NO deviations, return an empty list.
+
+Respond in valid JSON:
+{"errors": [{"original": "...", "correction": "...", "construction": "...",
+"rule": "...", "explanation": "...", "classification": "...", "severity": "...",
+"confidence": 0.0, "alternatives": []}]}
+
+Known weaknesses for this learner: {{ weaknesses }}
+
+Text to analyze:
+"{{ user_text }}"

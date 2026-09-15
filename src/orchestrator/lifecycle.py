@@ -20,14 +20,21 @@ surfacing works end to end today.
 
 from __future__ import annotations
 
+import logging
 import uuid
+from datetime import UTC, datetime
 from typing import Any
 
+from src import evidence
 from src.agents.assessment import assessment_node
 from src.agents.srs import schedule_new_items
 from src.agents.transfer import transfer_node
-from src.memory import analytics, session_history, user_profile, vocabulary_db
+from src.evidence.events import EventType
+from src.learner import get_knowledge_model
+from src.memory import analytics, session_history, sessions, user_profile, vocabulary_db
 from src.orchestrator.state import LearnerState
+
+logger = logging.getLogger("polyglot.lifecycle")
 
 
 def _default_scenario(language: str) -> dict[str, Any]:
@@ -74,13 +81,9 @@ def build_initial_state(
 
         loaded_scenario = get_scenario(scenario_id)
         if language is None:
-            language = _LANG_CODE_TO_NAME.get(
-                loaded_scenario.language, loaded_scenario.language
-            )
+            language = _LANG_CODE_TO_NAME.get(loaded_scenario.language, loaded_scenario.language)
 
-    lang = language or (
-        profile.target_languages[0] if profile.target_languages else "Spanish"
-    )
+    lang = language or (profile.target_languages[0] if profile.target_languages else "Spanish")
 
     if loaded_scenario is not None:
         from src.scenarios.engine import build_scenario_context
@@ -89,8 +92,19 @@ def build_initial_state(
 
     due = vocabulary_db.get_due(user_id, lang, limit=20)
 
+    resolved_session_id = session_id or str(uuid.uuid4())
+
+    # Record the session lifecycle so it is resumable/auditable (Phase 2).
+    sessions.start_session(
+        resolved_session_id,
+        user_id,
+        lang,
+        mode=mode,
+        scenario_id=scenario_id,
+    )
+
     return LearnerState(
-        session_id=session_id or str(uuid.uuid4()),
+        session_id=resolved_session_id,
         user_id=user_id,
         language=lang,
         mode=mode,
@@ -123,54 +137,126 @@ def persist_session(state: LearnerState, *, duration_minutes: float = 0.0) -> di
     user_id = state["user_id"]
     language = state["language"]
 
-    # --- New vocabulary -> personal lexicon, scheduled via FSRS. ---
+    # --- Evidence pipeline: emit + persist structured events FIRST. ---
+    # This separates "what happened" (events) from "what we believe" (the
+    # vocabulary lexicon and grammar error taxonomy derived below). The belief
+    # layer is fed from the deduplicated, normalized events rather than directly
+    # from raw LLM output.
+    events = evidence.process_session(dict(state))
+    grammar_events = [e for e in events if e.event_type == EventType.GRAMMAR_ERROR]
+    vocab_events = [e for e in events if e.event_type == EventType.VOCAB_PRODUCED]
+
+    # --- Derive vocabulary belief -> personal lexicon, scheduled via FSRS. ---
     new_vocab: list[dict[str, Any]] = [
-        dict(v) for v in state.get("new_vocabulary", []) if v.get("word")
+        {
+            "word": e.item_id,
+            "translation": e.payload.get("translation", ""),
+            "pos": e.payload.get("pos", ""),
+            "context_sentence": e.payload.get("context_sentence", ""),
+        }
+        for e in vocab_events
+        if e.item_id
     ]
     scheduled = schedule_new_items(new_vocab)
     vocab_written = 0
+    now_iso = datetime.now(UTC).isoformat()
     for item, card in zip(new_vocab, scheduled, strict=True):
+        word = item["word"]
         vocabulary_db.upsert_word(
             user_id,
             language,
-            item["word"],
+            word,
             translation=item.get("translation", ""),
             pos=item.get("pos", ""),
             context=item.get("context_sentence") or None,
             card_state=card["card_state"],
             next_review=card["next_review"],
         )
+        # Phase 5: a produced word is evidence toward the production dimension,
+        # and stamp first_seen. The word row now exists (upserted above).
+        vocabulary_db.set_metadata(user_id, language, word, first_seen=now_iso)
+        vocabulary_db.record_dimension(
+            user_id, language, word, "production", success=True, at=now_iso
+        )
         vocab_written += 1
 
-    # --- Grammar errors -> persistent error taxonomy. ---
+    # --- Derive grammar belief -> persistent error taxonomy (from events). ---
+    # Phase 23: analytics is a durable secondary store, not the record of truth
+    # for "did this session happen" (that's src.memory.sessions, updated below).
+    # A failure writing one error-pattern row must not abort the rest of
+    # finalization — the evidence pipeline already persisted the underlying
+    # events above, so this is best-effort enrichment on top of that.
     errors_written = 0
-    for err in state.get("grammar_errors", []):
-        rule = err.get("rule") or "unknown"
-        analytics.record_error(user_id, language, rule)
-        errors_written += 1
+    for e in grammar_events:
+        try:
+            analytics.record_error(user_id, language, e.item_id or "unknown")
+            errors_written += 1
+        except Exception as exc:  # noqa: BLE001 - analytics must never block finalization
+            logger.error(
+                "analytics.record_error failed for user=%s error_type=%s: %s",
+                user_id,
+                e.item_id,
+                exc,
+            )
 
-    # --- Conversation turns -> session history. ---
+    # --- Conversation turns -> session history (durable turn log). ---
     turns_written = session_history.record_turns(
         state["session_id"], user_id, language, state.get("messages", [])
     )
 
-    # --- Session metrics -> analytics. ---
-    analytics.log_session(
-        user_id,
-        language,
-        session_type=state.get("mode", "conversation"),
-        duration_minutes=duration_minutes,
-        words_practiced=len(state.get("new_vocabulary", [])),
-        new_words_learned=vocab_written,
-        grammar_errors=errors_written,
-        cefr_estimate=state.get("cefr_level"),
-    )
+    # --- Session metrics -> analytics (best-effort; see note above). ---
+    try:
+        analytics.log_session(
+            user_id,
+            language,
+            session_type=state.get("mode", "conversation"),
+            duration_minutes=duration_minutes,
+            words_practiced=len(vocab_events),
+            new_words_learned=vocab_written,
+            grammar_errors=errors_written,
+            cefr_estimate=state.get("cefr_level"),
+        )
+    except Exception as exc:  # noqa: BLE001 - analytics must never block finalization
+        logger.error("analytics.log_session failed for session=%s: %s", state["session_id"], exc)
+
+    # --- Learner model: update skill beliefs from THIS session's events. ---
+    # The knowledge model consumes the evidence (already persisted above),
+    # producing posterior mastery + uncertainty per skill, then snapshots the
+    # model for longitudinal analysis (Phase 6).
+    model = get_knowledge_model()
+    model.update_from_events(user_id, language, [e.model_dump() for e in events])
+    model.snapshot(user_id, language, reason="session_end")
+
+    # --- Session lifecycle -> mark completed (resumable registry, Phase 2). ---
+    sessions.end_session(state["session_id"], status="completed")
 
     return {
         "vocabulary": vocab_written,
         "grammar_errors": errors_written,
         "turns": turns_written,
+        "events": len(events),
     }
+
+
+def _evaluate_scenario_outcome(state: LearnerState, scenario_id: str) -> dict[str, Any] | None:
+    """Evaluate the scenario's success/failure for the report (best-effort).
+
+    Reconstructs the :class:`Scenario` by id and runs ``evaluate_success`` over
+    the conversation. Returns ``None`` if the scenario can't be loaded (e.g. a
+    default/ad-hoc scenario), so the report simply omits the section.
+    """
+    from src.scenarios.engine import evaluate_success
+    from src.scenarios.loader import ScenarioError, get_scenario
+
+    try:
+        scenario = get_scenario(scenario_id)
+    except ScenarioError:
+        return None
+
+    messages = state.get("messages", [])
+    user_turns = [m for m in messages if m.get("role") == "user"]
+    error_rate = len(state.get("grammar_errors", [])) / max(len(user_turns), 1)
+    return evaluate_success(scenario, messages, grammar_error_rate=error_rate)
 
 
 def build_session_report(state: LearnerState) -> str:
@@ -210,6 +296,22 @@ def build_session_report(state: LearnerState) -> str:
     # CEFR
     lines.append(f"📈 Level estimate: {state.get('cefr_level', 'unknown')}")
 
+    # Scenario outcome (Phase 13): did the learner meet the scenario's goals?
+    scenario_ctx = state.get("current_scenario") or {}
+    scenario_id = scenario_ctx.get("scenario_id")
+    if scenario_id:
+        outcome = _evaluate_scenario_outcome(state, scenario_id)
+        if outcome is not None:
+            status = "✅ passed" if outcome["passed"] else "◻ not yet"
+            lines.append(f"🎯 Scenario '{scenario_id}': {status}")
+            lines.append(
+                f"   objectives {'✓' if outcome['objectives_completed'] else '✗'}"
+                f" | target vocab {int(outcome['vocab_coverage'] * 100)}%"
+                f" | grammar {'ok' if outcome['grammar_ok'] else 'high error rate'}"
+            )
+            for reason in outcome.get("failure_reasons", []):
+                lines.append(f"   ⚠ failure: {reason}")
+
     # Cross-language transfer
     if transfers:
         lines.append("🔗 Cross-language transfer:")
@@ -228,9 +330,7 @@ def build_session_report(state: LearnerState) -> str:
     return "\n".join(lines)
 
 
-async def finalize_session(
-    state: LearnerState, *, duration_minutes: float = 0.0
-) -> dict[str, Any]:
+async def finalize_session(state: LearnerState, *, duration_minutes: float = 0.0) -> dict[str, Any]:
     """Run end-of-session agents, persist outputs, and build the report.
 
     Order:

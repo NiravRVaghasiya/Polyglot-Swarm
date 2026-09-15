@@ -71,7 +71,8 @@ class TestErrorPatterns:
 class TestSessions:
     def test_log_and_read_back(self, temp_storage):
         analytics.log_session(
-            "u1", "Spanish",
+            "u1",
+            "Spanish",
             session_type="conversation",
             duration_minutes=12.5,
             words_practiced=8,

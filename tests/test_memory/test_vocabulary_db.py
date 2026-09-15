@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from src.memory import vocabulary_db as vdb
 
@@ -14,8 +14,12 @@ def _iso(dt):
 class TestUpsert:
     def test_insert_new_word(self, temp_storage):
         row = vdb.upsert_word(
-            "u1", "Spanish", "mesa",
-            translation="table", pos="noun", cefr_level="A1",
+            "u1",
+            "Spanish",
+            "mesa",
+            translation="table",
+            pos="noun",
+            cefr_level="A1",
             context="Una mesa para dos",
         )
         assert row["word"] == "mesa"
@@ -68,7 +72,7 @@ class TestReviewOutcome:
 
 class TestGetDue:
     def test_returns_only_due(self, temp_storage):
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         past = _iso(now - timedelta(hours=1))
         future = _iso(now + timedelta(days=2))
 
@@ -79,7 +83,7 @@ class TestGetDue:
         assert [d["word"] for d in due] == ["due_word"]
 
     def test_orders_most_overdue_first(self, temp_storage):
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         vdb.upsert_word("u1", "Spanish", "recent", next_review=_iso(now - timedelta(minutes=5)))
         vdb.upsert_word("u1", "Spanish", "old", next_review=_iso(now - timedelta(days=3)))
 
@@ -87,14 +91,14 @@ class TestGetDue:
         assert [d["word"] for d in due] == ["old", "recent"]
 
     def test_respects_limit(self, temp_storage):
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         past = _iso(now - timedelta(hours=1))
         for i in range(10):
             vdb.upsert_word("u1", "Spanish", f"w{i}", next_review=past)
         assert len(vdb.get_due("u1", limit=3)) == 3
 
     def test_filters_by_language(self, temp_storage):
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         past = _iso(now - timedelta(hours=1))
         vdb.upsert_word("u1", "Spanish", "es_word", next_review=past)
         vdb.upsert_word("u1", "Italian", "it_word", next_review=past)
@@ -110,6 +114,8 @@ class TestGetDue:
 class TestCardState:
     def test_card_state_round_trips_as_dict(self, temp_storage):
         card = {"stability": 1.2, "difficulty": 5.0, "reps": 1}
-        vdb.upsert_word("u1", "Spanish", "mesa", card_state=card, next_review="2026-01-01T00:00:00+00:00")
+        vdb.upsert_word(
+            "u1", "Spanish", "mesa", card_state=card, next_review="2026-01-01T00:00:00+00:00"
+        )
         row = vdb.get_all_for_user("u1")[0]
         assert row["card_state"] == card

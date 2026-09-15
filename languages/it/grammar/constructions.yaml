@@ -1,0 +1,52 @@
+# Italian grammar taxonomy — seed constructions.
+language: Italian
+constructions:
+  - construction: gender_agreement
+    cefr: A1
+    explanation: >
+      Articles and adjectives agree in gender and number with the noun.
+    examples:
+      - "la casa bianca"
+      - "i libri rossi"
+    prerequisites: []
+    common_interferences:
+      - "English adjectives do not inflect."
+
+  - construction: passato_prossimo_vs_imperfetto
+    cefr: B1
+    explanation: >
+      The passato prossimo marks completed past actions; the imperfetto marks
+      ongoing, habitual, or background past states.
+    examples:
+      - "Ho mangiato alle due. (completed)"
+      - "Mangiavo ogni giorno. (habitual)"
+    prerequisites:
+      - gender_agreement
+    common_interferences:
+      - "English simple past does not distinguish these aspects."
+      - "Spanish learners map preterite/imperfect closely (positive transfer)."
+
+  - construction: subjunctive_congiuntivo
+    cefr: B2
+    explanation: >
+      The congiuntivo expresses doubt, desire, and opinion in subordinate
+      clauses after certain triggers.
+    examples:
+      - "Penso che sia giusto."
+      - "Spero che tu venga."
+    prerequisites: []
+    common_interferences:
+      - "English rarely uses an explicit subjunctive."
+
+  - construction: preposition_articulation
+    cefr: A2
+    explanation: >
+      Simple prepositions combine with the definite article (di + il = del,
+      a + la = alla, etc.).
+    examples:
+      - "il libro del ragazzo"
+      - "vado alla stazione"
+    prerequisites:
+      - gender_agreement
+    common_interferences:
+      - "English prepositions do not fuse with articles."

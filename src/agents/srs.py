@@ -81,9 +81,7 @@ def process_review_response(card_state: dict[str, Any], rating: int) -> dict[str
     card = Card.from_dict(card_state)  # type: ignore[arg-type]
     fsrs_rating = _RATING_MAP.get(rating, Rating.Good)
 
-    updated_card, review_log = scheduler.review_card(
-        card, fsrs_rating, datetime.now(UTC)
-    )
+    updated_card, review_log = scheduler.review_card(card, fsrs_rating, datetime.now(UTC))
 
     return {
         "card_state": updated_card.to_dict(),
@@ -95,16 +93,10 @@ def process_review_response(card_state: dict[str, Any], rating: int) -> dict[str
     }
 
 
-def get_due_items(
-    all_items: list[dict[str, Any]], limit: int = 10
-) -> list[dict[str, Any]]:
+def get_due_items(all_items: list[dict[str, Any]], limit: int = 10) -> list[dict[str, Any]]:
     """Return items whose ``next_review`` is due now, most overdue first."""
     now = datetime.now(UTC)
-    due = [
-        item
-        for item in all_items
-        if datetime.fromisoformat(item["next_review"]) <= now
-    ]
+    due = [item for item in all_items if datetime.fromisoformat(item["next_review"]) <= now]
     due.sort(key=lambda x: x["next_review"])
     return due[:limit]
 

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from src.agents.difficulty_signals import assess_difficulty, combine, extract_signals
 from src.orchestrator.state import LearnerState
 
 CEFR_ORDER = ["A1", "A2", "B1", "B2", "C1", "C2"]
@@ -60,19 +61,30 @@ def guidance_for_level(level: str) -> str:
 
 
 def adaptive_node(state: LearnerState) -> dict[str, Any]:
-    """Adjust the session's effective difficulty from the evaluator's signal.
+    """Adjust the session's effective difficulty from multiple signals.
 
-    Returns a state update with the (possibly changed) ``cefr_level`` and a
-    ``difficulty_guidance`` injected into ``current_scenario`` so the next
-    Conversation turn adapts.
+    Phase 14: rather than reacting to a single "more correct -> harder" rule,
+    this blends the Evaluator's per-turn difficulty signal with a multi-signal
+    controller (accuracy, lexical diversity, response length, repair frequency,
+    fatigue — see :mod:`src.agents.difficulty_signals`). The combined verdict
+    nudges the effective CEFR level, and the corresponding guidance is injected
+    into ``current_scenario`` for the next Conversation turn.
+
+    Returns ``{"cefr_level", "current_scenario"}`` — the contract is unchanged;
+    ``current_scenario`` also carries ``difficulty_signals`` for observability.
     """
     evaluation = state.get("evaluation") or {}
-    difficulty = evaluation.get("difficulty_assessment", "appropriate")
+    evaluator_signal = evaluation.get("difficulty_assessment", "appropriate")
     current = state.get("cefr_level", "A2")
+
+    signals = extract_signals(dict(state))
+    controller_signal = assess_difficulty(signals)
+    difficulty = combine(evaluator_signal, controller_signal)
 
     new_level = next_level(current, difficulty)
 
     scenario = dict(state.get("current_scenario") or {})
     scenario["difficulty_guidance"] = guidance_for_level(new_level)
+    scenario["difficulty_signals"] = signals.as_dict()
 
     return {"cefr_level": new_level, "current_scenario": scenario}

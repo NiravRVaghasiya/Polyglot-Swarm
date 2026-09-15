@@ -7,7 +7,7 @@ import types
 
 import pytest
 
-from src.speech.livekit_agent import LiveKitVoiceAgent, VoicePipeline
+from src.speech.livekit_agent import LiveKitVoiceAgent, VoicePipeline, _default_synthesizer
 from src.speech.stt import SpeechDependencyError
 
 
@@ -43,7 +43,8 @@ class TestVoicePipeline:
         result = await pipeline.handle_audio(b"raw-audio")
 
         assert order == ["stt", "agent", "tts"]
-        assert pipeline.trace == ["stt", "agent", "tts"]
+        # Phase 15: a VAD gate runs before STT.
+        assert pipeline.trace == ["vad", "stt", "agent", "tts"]
         assert result["transcript"] == "hola mesa"
         assert result["reply"] == "¡Bienvenido!"
         assert result["audio"].startswith(b"AUDIO:")
@@ -86,6 +87,61 @@ def fake_livekit(monkeypatch):
     module.rtc = rtc
     monkeypatch.setitem(sys.modules, "livekit", module)
     return room
+
+
+class TestDefaultSynthesizerFallback:
+    """Phase 23: TTS-unavailable degrades to text-only (empty audio), not a crash."""
+
+    async def test_missing_edge_tts_falls_back_to_empty_audio(self, monkeypatch):
+        async def boom(text, *, language=None, voice=None):
+            raise SpeechDependencyError("edge-tts is not installed. Install the voice extra")
+
+        monkeypatch.setattr("src.speech.tts.synthesize", boom)
+
+        audio = await _default_synthesizer("hola", "Spanish")
+        assert audio == b""
+
+    async def test_unexpected_tts_error_also_falls_back(self, monkeypatch):
+        async def boom(text, *, language=None, voice=None):
+            raise RuntimeError("edge servers unreachable")
+
+        monkeypatch.setattr("src.speech.tts.synthesize", boom)
+
+        audio = await _default_synthesizer("hola", "Spanish")
+        assert audio == b""
+
+    async def test_successful_synthesis_passes_through(self, monkeypatch):
+        async def fake_synthesize(text, *, language=None, voice=None):
+            return b"REAL_AUDIO"
+
+        monkeypatch.setattr("src.speech.tts.synthesize", fake_synthesize)
+
+        audio = await _default_synthesizer("hola", "Spanish")
+        assert audio == b"REAL_AUDIO"
+
+    async def test_pipeline_completes_turn_when_tts_unavailable(self):
+        """End-to-end: a full VoicePipeline turn survives a TTS outage."""
+
+        async def fake_transcribe(audio, language):
+            return "hola"
+
+        async def fake_respond(text):
+            return "¡hola!"
+
+        pipeline = VoicePipeline(
+            language="Spanish",
+            transcribe=fake_transcribe,
+            respond=fake_respond,
+            synthesize=_default_synthesizer,
+        )
+
+        # No monkeypatch of tts.synthesize here: edge_tts is very likely not
+        # installed in the test environment, so this exercises the real
+        # ImportError -> SpeechDependencyError -> fallback path end to end.
+        result = await pipeline.handle_audio(b"raw-audio")
+        assert result["transcript"] == "hola"
+        assert result["reply"] == "¡hola!"
+        assert result["audio"] == b""  # degraded gracefully, turn still completed
 
 
 class TestLiveKitAgent:

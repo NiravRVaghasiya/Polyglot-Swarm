@@ -1,0 +1,64 @@
+# Polish grammar taxonomy — seed constructions.
+# Polish is chosen as a high-morphology validation language (cases + aspect).
+language: Polish
+constructions:
+  - construction: nominative_case
+    cefr: A1
+    explanation: >
+      The nominative is the base case, used for the subject of a sentence and
+      for the citation form of nouns.
+    examples:
+      - "To jest kot. (kot — nominative)"
+    prerequisites: []
+    common_interferences:
+      - "English has no case marking on nouns."
+
+  - construction: genitive_case
+    cefr: A2
+    explanation: >
+      The genitive marks possession, negation of direct objects, and objects of
+      many prepositions and quantifiers.
+    examples:
+      - "Nie mam czasu. (czasu — genitive after negation)"
+      - "szklanka wody (wody — genitive after quantity)"
+    prerequisites:
+      - nominative_case
+    common_interferences:
+      - "English marks possession with 's or 'of', not a noun case."
+
+  - construction: instrumental_case
+    cefr: B1
+    explanation: >
+      The instrumental marks the means/instrument, accompaniment (with z), and
+      predicate nouns after być (to be).
+    examples:
+      - "Jadę autobusem. (autobusem — by bus)"
+      - "Jestem nauczycielem. (nauczycielem — predicate)"
+    prerequisites:
+      - nominative_case
+    common_interferences:
+      - "English uses prepositions (by/with) rather than a case."
+
+  - construction: verb_aspect
+    cefr: B1
+    explanation: >
+      Polish verbs come in aspect pairs: imperfective (ongoing/habitual) vs
+      perfective (completed). The pair choice changes meaning, not just tense.
+    examples:
+      - "Czytałem książkę. (imperfective — was reading)"
+      - "Przeczytałem książkę. (perfective — read it through)"
+    prerequisites: []
+    common_interferences:
+      - "English aspect is expressed periphrastically, not by verb pairs."
+
+  - construction: gender_agreement
+    cefr: A1
+    explanation: >
+      Adjectives agree with nouns in gender, number, and case.
+    examples:
+      - "duży dom (masculine)"
+      - "duża książka (feminine)"
+    prerequisites:
+      - nominative_case
+    common_interferences:
+      - "English adjectives are invariant."

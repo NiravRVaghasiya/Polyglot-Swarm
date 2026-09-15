@@ -1,0 +1,17 @@
+# Italian collocations — fixed multi-word units.
+collocations:
+  - phrase: prendere una decisione
+    translation: to make a decision
+    pattern: verb + noun
+    cefr: B1
+    register: neutral
+  - phrase: fare una domanda
+    translation: to ask a question
+    pattern: verb + noun
+    cefr: A2
+    register: neutral
+  - phrase: avere voglia di
+    translation: to feel like (something)
+    pattern: verb + noun + prep
+    cefr: B1
+    register: neutral

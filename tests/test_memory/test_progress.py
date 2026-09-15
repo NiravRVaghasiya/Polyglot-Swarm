@@ -13,13 +13,16 @@ def _iso(d):
 
 class TestVocabularyGrowth:
     def test_cumulative_series(self, temp_storage):
-        analytics.log_session("u1", "Spanish", new_words_learned=3,
-                              timestamp="2026-01-01T10:00:00+00:00")
-        analytics.log_session("u1", "Spanish", new_words_learned=2,
-                              timestamp="2026-01-02T10:00:00+00:00")
+        analytics.log_session(
+            "u1", "Spanish", new_words_learned=3, timestamp="2026-01-01T10:00:00+00:00"
+        )
+        analytics.log_session(
+            "u1", "Spanish", new_words_learned=2, timestamp="2026-01-02T10:00:00+00:00"
+        )
         # Two sessions same day accumulate.
-        analytics.log_session("u1", "Spanish", new_words_learned=1,
-                              timestamp="2026-01-02T18:00:00+00:00")
+        analytics.log_session(
+            "u1", "Spanish", new_words_learned=1, timestamp="2026-01-02T18:00:00+00:00"
+        )
 
         series = progress.vocabulary_growth("u1", "Spanish", days=100000)
         assert series[0] == {"date": "2026-01-01", "new_words": 3, "cumulative": 3}
@@ -60,10 +63,12 @@ class TestTopWeaknesses:
 
 class TestCefrProgression:
     def test_series(self, temp_storage):
-        analytics.log_session("u1", "Spanish", cefr_estimate="A2",
-                              timestamp="2026-01-01T00:00:00+00:00")
-        analytics.log_session("u1", "Spanish", cefr_estimate="B1",
-                              timestamp="2026-02-01T00:00:00+00:00")
+        analytics.log_session(
+            "u1", "Spanish", cefr_estimate="A2", timestamp="2026-01-01T00:00:00+00:00"
+        )
+        analytics.log_session(
+            "u1", "Spanish", cefr_estimate="B1", timestamp="2026-02-01T00:00:00+00:00"
+        )
         prog = progress.cefr_progression("u1", "Spanish")
         assert [p["cefr"] for p in prog] == ["A2", "B1"]
 
@@ -97,8 +102,9 @@ class TestStreak:
 class TestOverview:
     def test_combines_metrics(self, temp_storage):
         recent = _iso(datetime.now(UTC))
-        analytics.log_session("u1", "Spanish", new_words_learned=4, cefr_estimate="A2",
-                              timestamp=recent)
+        analytics.log_session(
+            "u1", "Spanish", new_words_learned=4, cefr_estimate="A2", timestamp=recent
+        )
         for _ in range(2):
             analytics.record_error("u1", "Spanish", "ser_vs_estar")
 

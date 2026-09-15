@@ -53,17 +53,13 @@ class VectorStore:
         self._embedding_function = ef
 
         self._collections: dict[str, Any] = {
-            name: self._client.get_or_create_collection(
-                name=name, embedding_function=ef
-            )
+            name: self._client.get_or_create_collection(name=name, embedding_function=ef)
             for name in COLLECTIONS
         }
 
     def _collection(self, name: str) -> Any:
         if name not in self._collections:
-            raise ValueError(
-                f"Unknown collection {name!r}. Valid: {', '.join(COLLECTIONS)}"
-            )
+            raise ValueError(f"Unknown collection {name!r}. Valid: {', '.join(COLLECTIONS)}")
         return self._collections[name]
 
     def add(
@@ -78,9 +74,7 @@ class VectorStore:
 
         Uses ``upsert`` so re-adding the same id updates rather than errors.
         """
-        self._collection(collection).upsert(
-            ids=ids, documents=documents, metadatas=metadatas
-        )
+        self._collection(collection).upsert(ids=ids, documents=documents, metadatas=metadatas)
 
     def query(
         self,
@@ -110,6 +104,32 @@ class VectorStore:
     def count(self, collection: str) -> int:
         """Return the number of documents in a collection."""
         return int(self._collection(collection).count())
+
+    def get_all(self, collection: str, *, where: dict[str, Any]) -> list[dict[str, Any]]:
+        """Exact metadata-filtered retrieval (no semantic query vector needed).
+
+        Unlike :meth:`query`, this returns every matching document rather than
+        the nearest-N to some query text — used for exports (Phase 21: "give me
+        everything for this user"), where completeness matters more than
+        relevance ranking.
+        """
+        result = self._collection(collection).get(where=where)
+        ids = result.get("ids") or []
+        documents = result.get("documents") or []
+        metadatas = result.get("metadatas") or []
+        return [
+            {
+                "id": doc_id,
+                "document": documents[i] if i < len(documents) else None,
+                "metadata": metadatas[i] if i < len(metadatas) else None,
+            }
+            for i, doc_id in enumerate(ids)
+        ]
+
+    def delete(self, collection: str, *, where: dict[str, Any]) -> None:
+        """Delete every document in ``collection`` matching ``where`` (Phase 21
+        data deletion). A no-op if nothing matches."""
+        self._collection(collection).delete(where=where)
 
     @staticmethod
     def _flatten(result: dict[str, Any]) -> list[dict[str, Any]]:

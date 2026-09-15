@@ -43,7 +43,7 @@ class StubEmbeddingFunction(EmbeddingFunction):
         return {}
 
     @staticmethod
-    def build_from_config(config: dict) -> "StubEmbeddingFunction":
+    def build_from_config(config: dict) -> StubEmbeddingFunction:
         return StubEmbeddingFunction()
 
 
@@ -89,9 +89,7 @@ class TestAddAndQuery:
             documents=["food table", "food table"],
             metadatas=[{"language": "Spanish"}, {"language": "Italian"}],
         )
-        hits = store.query(
-            "vocabulary", text="food", where={"language": "Italian"}
-        )
+        hits = store.query("vocabulary", text="food", where={"language": "Italian"})
         assert len(hits) == 1
         assert hits[0]["id"] == "it"
 

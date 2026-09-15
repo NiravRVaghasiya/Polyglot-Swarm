@@ -31,7 +31,7 @@ def _strip_provider_prefix(model: str) -> str:
     but the Ollama client expects the bare model name.
     """
     prefix = "ollama/"
-    return model[len(prefix):] if model.startswith(prefix) else model
+    return model[len(prefix) :] if model.startswith(prefix) else model
 
 
 class OllamaProvider(LLMProvider):

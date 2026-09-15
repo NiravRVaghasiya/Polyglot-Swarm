@@ -1,0 +1,9 @@
+language: Spanish
+code: es
+family: Romance
+dialect: Castilian (peninsular); also Latin American variants
+writing_system: Latin
+notes: >
+  Baseline Romance validation language. High lexical overlap with Italian
+  (~82% cognates), useful for cross-language transfer. Rich verb morphology,
+  ser/estar distinction, subjunctive mood.

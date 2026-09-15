@@ -21,8 +21,16 @@ def temp_storage(tmp_path, monkeypatch):
 class TestVocabBands:
     @pytest.mark.parametrize(
         "words,expected",
-        [(0, "A1"), (300, "A1"), (500, "A2"), (999, "A2"),
-         (1500, "B1"), (3000, "B2"), (5000, "C1"), (9000, "C2")],
+        [
+            (0, "A1"),
+            (300, "A1"),
+            (500, "A2"),
+            (999, "A2"),
+            (1500, "B1"),
+            (3000, "B2"),
+            (5000, "C1"),
+            (9000, "C2"),
+        ],
     )
     def test_vocab_band(self, words, expected):
         assert assessment._vocab_band(words) == expected

@@ -33,9 +33,7 @@ class TestBuildInitialStateWithScenario:
         assert state["language"] == "Italian"
 
     def test_explicit_language_overrides(self, temp_storage):
-        state = build_initial_state(
-            "u1", "Spanish", scenario_id="es_restaurant_ordering"
-        )
+        state = build_initial_state("u1", "Spanish", scenario_id="es_restaurant_ordering")
         assert state["language"] == "Spanish"
 
     def test_difficulty_guidance_present(self, temp_storage):

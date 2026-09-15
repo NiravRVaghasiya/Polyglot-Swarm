@@ -16,7 +16,7 @@ import logging
 from typing import Any
 
 from src.llm.factory import get_provider
-from src.llm.prompts import render
+from src.llm.prompts import render_prompt
 from src.llm.provider import Message
 
 logger = logging.getLogger("polyglot.writing")
@@ -40,7 +40,7 @@ async def assess_writing(
     if not text.strip():
         return {"corrections": [], "style_notes": [], "overall": "", "corrected_text": ""}
 
-    prompt = render("writing.jinja2", language=language, cefr_level=cefr_level, text=text)
+    prompt = str(render_prompt("writing", language=language, cefr_level=cefr_level, text=text))
 
     provider = get_provider("primary")
     try:

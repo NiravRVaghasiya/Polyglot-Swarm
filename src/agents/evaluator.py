@@ -20,9 +20,11 @@ import json
 import logging
 from typing import Any
 
+from src.evaluation import verifier
+from src.evaluation.policies import is_high_impact
 from src.llm.factory import get_provider
-from src.llm.prompts import render
-from src.llm.provider import Message
+from src.llm.prompts import render_prompt
+from src.llm.provider import Message, Tier
 from src.orchestrator.state import LearnerState
 
 logger = logging.getLogger("polyglot.evaluator")
@@ -53,16 +55,27 @@ async def evaluator_node(state: LearnerState) -> dict[str, Any]:
         }
         return {"evaluation": evaluation, "grammar_errors": grammar_errors}
 
-    prompt = render(
-        "evaluator.jinja2",
-        language=state["language"],
-        cefr_level=state.get("cefr_level", "A2"),
-        user_text=user_input,
-        grammar_errors=grammar_errors,
-        cultural_notes=cultural_notes,
+    prompt = str(
+        render_prompt(
+            "evaluator",
+            language=state["language"],
+            cefr_level=state.get("cefr_level", "A2"),
+            user_text=user_input,
+            grammar_errors=grammar_errors,
+            cultural_notes=cultural_notes,
+        )
     )
 
-    provider = get_provider("fast")
+    # Phase 22 budget-aware routing: the "fast"/cheap tier is enough to
+    # rubber-stamp routine, low-impact flags, but a genuinely high-impact
+    # correction (a confident "wrong"/"awkward" call at moderate-or-worse
+    # severity — see policies.is_high_impact) is exactly the case where a
+    # false positive is most costly to the learner, so it's worth spending
+    # the stronger "primary" tier's better judgment. Escalating only when
+    # warranted (rather than always using primary) is what keeps the
+    # per-turn cost down on the common case.
+    tier: Tier = "primary" if any(is_high_impact(dict(e)) for e in grammar_errors) else "fast"
+    provider = get_provider(tier)
     try:
         response_text = await provider.generate(
             [
@@ -79,21 +92,58 @@ async def evaluator_node(state: LearnerState) -> dict[str, Any]:
         parsed = {"overrides": [], "adjustments": {}, "notes": []}
 
     override_indices = _valid_override_indices(parsed.get("overrides", []), len(grammar_errors))
-    validated_errors = [
-        e for i, e in enumerate(grammar_errors) if i not in override_indices
-    ]
+    llm_decisions = _parse_decisions(parsed.get("decisions", []), len(grammar_errors))
+
+    # Phase 9: run the verifier — accept / revise / reject / abstain per error,
+    # reconciling grammar-vs-cultural conflicts. Legacy ``overrides`` are honored
+    # as forced drops so the existing protocol keeps working.
+    outcome = verifier.verify_errors(
+        [dict(e) for e in grammar_errors],
+        cultural_notes=cultural_notes,
+        llm_decisions=llm_decisions,
+        override_indices=override_indices,
+    )
+    validated_errors = outcome.kept
+    dropped = sorted(set(outcome.dropped_indices))
 
     difficulty = parsed.get("adjustments", {}).get("difficulty", heuristic_difficulty)
 
     evaluation = {
         "grammar_errors_validated": len(validated_errors),
-        "grammar_errors_overridden": len(override_indices),
+        "grammar_errors_overridden": len(dropped),
         "difficulty_assessment": difficulty,
-        "overrides": sorted(override_indices),
+        "overrides": dropped,
         "notes": [n for n in parsed.get("notes", []) if isinstance(n, str)],
+        # Phase 9 additions (observability of the verifier's reasoning).
+        "verifier": {
+            "decisions": {str(i): d for i, d in outcome.decisions.items()},
+            "abstained": outcome.abstained,
+            "revised": outcome.revised,
+        },
     }
 
     return {"evaluation": evaluation, "grammar_errors": validated_errors}
+
+
+def _parse_decisions(raw: Any, count: int) -> dict[int, dict[str, Any]]:
+    """Coerce an optional per-error decisions list into an index->decision map.
+
+    Each entry may carry ``index`` (else positional), ``decision``,
+    ``confidence``, ``revised`` — the :class:`VerifierDecision` shape.
+    """
+    out: dict[int, dict[str, Any]] = {}
+    if not isinstance(raw, list):
+        return out
+    for pos, item in enumerate(raw):
+        if not isinstance(item, dict):
+            continue
+        try:
+            idx = int(item.get("index", pos))
+        except (TypeError, ValueError):
+            idx = pos
+        if 0 <= idx < count:
+            out[idx] = item
+    return out
 
 
 def _valid_override_indices(raw: Any, count: int) -> set[int]:

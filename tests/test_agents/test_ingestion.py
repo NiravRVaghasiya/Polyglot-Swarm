@@ -87,7 +87,10 @@ class TestSimplifyAndExtract:
                 raise RuntimeError("down")
 
         monkeypatch.setattr(ingestion, "get_provider", lambda tier: Boom())
-        assert await ingestion.simplify_and_extract("Spanish", "x") == {"simplified": "", "vocab": []}
+        assert await ingestion.simplify_and_extract("Spanish", "x") == {
+            "simplified": "",
+            "vocab": [],
+        }
 
 
 class TestIngest:
@@ -112,6 +115,10 @@ class TestIngest:
         assert {d["word"] for d in due} == {"gato", "pescado"}
 
     async def test_empty_content_stores_nothing(self, temp_storage, monkeypatch):
-        monkeypatch.setattr(ingestion, "get_provider", lambda tier: FakeProvider('{"simplified":"","vocab":[]}'))
+        monkeypatch.setattr(
+            ingestion,
+            "get_provider",
+            lambda tier: FakeProvider('{"simplified":"","vocab":[]}'),
+        )
         result = await ingestion.ingest("u1", "Spanish", "")
         assert result["stored"] == 0

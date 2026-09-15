@@ -141,4 +141,18 @@ async def assessment_node(state: LearnerState) -> dict[str, str]:
         cefr_estimate=new_level,
     )
 
+    # Phase 12: build and persist the multidimensional CEFR profile (per-skill
+    # band + confidence + sample size) from the learner knowledge model. This is
+    # additive — the overall ``cefr_level`` above is still the value the rest of
+    # the app reads; the profile enriches it without changing that contract.
+    try:
+        from src.assessment.cefr_profile import build_cefr_profile, persist_profile
+
+        profile_estimate = build_cefr_profile(user_id, language, fallback_cefr=new_level)
+        persist_profile(user_id, profile_estimate)
+    except Exception as exc:  # noqa: BLE001 - profiling must not break assessment
+        import logging
+
+        logging.getLogger("polyglot.assessment").warning("CEFR profile failed: %s", exc)
+
     return {"cefr_level": new_level}

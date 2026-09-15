@@ -14,7 +14,7 @@ import logging
 from typing import Any
 
 from src.llm.factory import get_provider
-from src.llm.prompts import render
+from src.llm.prompts import render_prompt
 from src.llm.provider import Message
 from src.memory import progress, vocabulary_db
 from src.orchestrator.state import LearnerState
@@ -40,13 +40,15 @@ async def generate_drills(
     if not weaknesses and not due_words:
         return []
 
-    prompt = render(
-        "drills.jinja2",
-        language=language,
-        cefr_level=cefr_level,
-        weaknesses=weaknesses,
-        due_words=due_words,
-        max_items=max_items,
+    prompt = str(
+        render_prompt(
+            "drills",
+            language=language,
+            cefr_level=cefr_level,
+            weaknesses=weaknesses,
+            due_words=due_words,
+            max_items=max_items,
+        )
     )
 
     provider = get_provider("fast")

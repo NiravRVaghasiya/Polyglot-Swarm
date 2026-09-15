@@ -1,293 +1,203 @@
 # 🌍 Polyglot Swarm
 
-**Multi-agent AI system for adaptive language learning**
+**A self-hostable, multi-agent AI language tutor that models what you can and can't do — and picks the highest-value thing to practice next.**
 
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 [![LangGraph](https://img.shields.io/badge/orchestration-LangGraph-orange.svg)](https://github.com/langchain-ai/langgraph)
 [![FSRS](https://img.shields.io/badge/SRS-FSRS-purple.svg)](https://github.com/open-spaced-repetition/py-fsrs)
 
-> A coordinated swarm of AI agents that work together to teach you Spanish, Polish, and Italian through immersive conversation, intelligent error tracking, and personalized spaced repetition.
+> Polyglot Swarm holds scenario-based conversations in your target language, silently tracks your grammar and vocabulary as structured evidence, maintains a per-skill model of your competence, and uses that model to schedule reviews and choose your next activity. It runs fully local if you want it to.
 
 ---
 
-## Why Polyglot Swarm?
+## What it actually does
 
-| Traditional Tools | Polyglot Swarm |
-|------------------|----------------|
-| Gamified but scripted (Duolingo) | Dynamic, scenario-based conversations |
-| Forgets between sessions (ChatGPT) | Persistent memory — remembers YOUR weaknesses |
-| Pure memorization (Anki) | Learns vocabulary IN CONTEXT from conversations |
-| Expensive tutors ($30/hr) | Free, self-hostable, private |
-| One approach fits all | 7 specialized agents collaborating in real-time |
+- **Scenario conversations** — role-play a waiter, landlord, doctor, or a free-form chat, in any language you name.
+- **Silent, calibrated correction** — grammar deviations are detected, classified (wrong / awkward / regional / informal / acceptable), and only surfaced when the tutor is confident. Uncertain calls are *abstained*, not asserted — a false correction is treated as worse than a missed one.
+- **A persistent learner model** — evidence from every turn updates per-skill mastery beliefs (grammar, vocabulary, speaking, listening, reading, writing, pragmatics), each with an uncertainty and sample size. This is the core of the system, not the number of agents.
+- **Next-best-action planning** — a deterministic curriculum planner ranks what to practice by expected learning value, subject to due reviews, weaknesses, and a time budget.
+- **FSRS spaced repetition** — vocabulary learned in conversation is scheduled with the real `py-fsrs` scheduler; reviews measure actual recall and feed it back into the model.
+- **Multidimensional CEFR** — a per-skill CEFR profile with confidence, not a single made-up number.
+- **Cross-language transfer** — cognates and false friends across your languages, retrieved from linguistic resources and verified by the model.
+- **Voice** — microphone → Whisper STT → conversation → Edge TTS, in both the Gradio app and the React app (optional `voice` extra; degrades to text-only when absent).
+- **Observability** — every model decision is correlated by an interaction id and reconstructable as a trace; cost/latency/tokens are tracked per call.
+- **Privacy** — set `LOCAL_ONLY=true` and no learning data leaves your machine, regardless of which API keys are configured.
+
+For the current measured numbers (component benchmarks, evaluation suites, and the component-ablation study), see [`docs/results.md`](docs/results.md) — regenerate it any time with `make results`.
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────┐
-│              USER INTERFACE (Chat / Voice)            │
-└────────────────────────┬────────────────────────────┘
-                         │
-                         ▼
-┌─────────────────────────────────────────────────────┐
-│              LANGGRAPH ORCHESTRATOR                   │
-│   State machine • Checkpointing • Parallel fan-out   │
-└──┬──────┬──────┬──────┬──────┬──────┬───────────────┘
-   │      │      │      │      │      │
-   ▼      ▼      ▼      ▼      ▼      ▼
-┌─────┐┌─────┐┌─────┐┌─────┐┌─────┐┌─────┐
-│Conv.││Gram.││Vocab││FSRS ││Cult.││Eval.│
-│Agent││Agent││Agent││Sched││Agent││Agent│
-└─────┘└─────┘└─────┘└─────┘└─────┘└─────┘
-        (works with ANY target language)
-   │      │      │      │      │      │
-   └──────┴──────┴──────┴──────┴──────┘
+                USER  (text / voice / React / Gradio / CLI)
                   │
                   ▼
-┌─────────────────────────────────────────────────────┐
-│                  MEMORY LAYER                         │
-│  ChromaDB (vectors) • SQLite (SRS) • User Profile    │
-└─────────────────────────────────────────────────────┘
+        FastAPI + auth  ──►  LangGraph orchestrator (SQLite-checkpointed)
+                  │
+                  ▼
+          Conversation engine
+                  │
+     ┌────────────┼────────────┐
+     ▼            ▼            ▼
+  Grammar     Vocabulary    Cultural        →  Evaluator / Verifier
+  analysis     analysis     analysis           (accept / revise / abstain)
+     └────────────┼────────────┘
+                  ▼
+          Evidence pipeline  (what happened, not what we believe)
+                  │
+                  ▼
+        Learner Knowledge Model  (per-skill mastery + uncertainty)
+                  │
+     ┌────────────┼────────────┐
+     ▼            ▼            ▼
+  Assessment   Curriculum    FSRS
+   (CEFR)      / planner    scheduler
+     └────────────┼────────────┘
+                  ▼
+          Next best learning action  ──►  USER
+
+  Cross-cutting: observability/tracing · evaluation harness · experiment
+  platform · language packs · safety/verifier · security/privacy
 ```
 
-## Features
+See [`docs/architecture.md`](docs/architecture.md) for how these layers actually fit together in code.
 
-### 🎭 7 Specialized Agents
-
-| Agent | What It Does |
-|-------|-------------|
-| **Conversation** | Native-speaker persona in scenario-based dialogues (waiter, landlord, doctor) |
-| **Grammar** | Silent error detection — collects mistakes, explains at session end |
-| **Vocabulary** | Tracks every word you know/don't know, builds personal lexicon |
-| **FSRS Scheduler** | State-of-the-art spaced repetition (20-40% better than Anki's SM-2) |
-| **Cultural** | Teaches register (tú/usted), idioms, and cultural norms |
-| **Transfer** | Exploits cognates across your languages (ES↔IT: 82% similarity!) |
-| **Evaluator** | QA layer — catches false corrections, adjusts difficulty in real-time |
-
-### 🎯 Key Capabilities
-
-- **Immersive Scenarios** — Order food in Madrid, rent an apartment in Warsaw, interview in Milan
-- **FSRS Spaced Repetition** — Vocabulary from conversations auto-schedules for optimal review
-- **Grammar Error Taxonomy** — Persistent tracking of YOUR specific weaknesses across sessions
-- **Cross-Language Transfer** — Learning Italian? Leverage your Spanish (82% cognates!)
-- **CEFR Level Estimation** — Automatic proficiency tracking (A1→C2)
-- **Multi-Provider LLM** — Claude (quality) / Gemini Flash (speed) / Ollama (privacy)
-- **Voice Support** — Whisper STT + TTS via LiveKit (coming in v0.2)
-
-### 🌐 Any Language You Want
-
-Polyglot Swarm works with **any language** — just tell it what you want to learn:
-
-```bash
-polyglot chat --language "Japanese"
-polyglot chat --language "Polish"
-polyglot chat --language "Swahili"
-```
-
-The agents automatically adapt their prompts, grammar analysis, and cultural context to your target language. No configuration needed — just type the language name.
-
-## Quick Start
+## Quick start
 
 ### Prerequisites
 
 - Python 3.12+
-- An LLM API key (Claude, Gemini, or OpenAI) — OR Ollama for fully local
+- At least one of: an LLM API key (Anthropic / Google / OpenAI), a local Ollama endpoint, or `POLYGLOT_DETERMINISTIC=1` for a fully offline demo.
 
-### Installation
+### Install
 
 ```bash
-# Clone the repo
-git clone https://github.com/YOUR_USERNAME/polyglot-swarm.git
-cd polyglot-swarm
+git clone https://github.com/NiravRVaghasiya/Polyglot-Swarm.git
+cd Polyglot-Swarm
 
-# Install with uv (recommended)
-uv sync
+pip install -e ".[dev]"        # add ".[voice]" or ".[all]" for STT/TTS
 
-# Or with pip
-pip install -e ".[dev]"
-
-# Copy environment template
-cp .env.example .env
-# Edit .env with your API keys
+cp .env.example .env           # set an LLM key, or OLLAMA_BASE_URL, or leave it for deterministic mode
 ```
+
+All configuration is environment variables (loaded from `.env` via pydantic-settings) — see [`.env.example`](.env.example) for the full list and [`docs/deployment.md`](docs/deployment.md) for details.
 
 ### Run
 
 ```bash
-# Start the chat interface (Gradio)
+# Terminal chat (any language by name, or a scenario by id)
+polyglot chat --language Spanish
+polyglot chat --scenario es_restaurant_ordering
+polyglot scenarios                         # list scenario ids
+
+# Gradio app (chat + voice)
 python -m src.main
 
-# Or start the API server
+# REST API (see http://localhost:8000/docs)
 uvicorn src.api.app:app --reload
 
-# Or use the CLI
-polyglot chat --language es --scenario restaurant
+# React dashboard (separate Next.js app)
+cd frontend/react_app && npm install && npm run dev
 ```
 
-### First Session
+Check your configuration and provider health at any time:
 
-```
-$ polyglot chat --language es
-
-🌍 Polyglot Swarm v0.1.0
-📍 Language: Spanish (auto-detected from 'es') | Level: Auto-detect | Mode: Conversation
-
-🎭 Carlos (waiter at La Madrileña):
-   "¡Buenas tardes! Bienvenido. ¿Mesa para cuántas personas?"
-
-You: Hola, una mesa para dos, por favor.
-
-🎭 Carlos: "Perfecto. Síganme, por favor. ¿Prefieren terraza o interior?"
-
-You: La terraza, gracias.
-
-━━━ Session Report ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-✅ Grammar: No errors detected
-📚 New vocabulary: terraza, interior, síganme
-📊 Level estimate: A2 (elementary)
-🔄 Next review: 3 items scheduled for tomorrow
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```bash
+polyglot health
 ```
 
-You can also learn less common languages:
+### The CLI
 
-```
-$ polyglot chat --language "Korean"
+Beyond `chat`, the `polyglot` command exposes the learner model and operations directly:
 
-🌍 Polyglot Swarm v0.1.0
-📍 Language: Korean | Level: Auto-detect | Mode: Conversation
+| Command | What it does |
+|---|---|
+| `polyglot plan` | Show the next-best-action learning plan |
+| `polyglot assess` | Show the multidimensional CEFR profile |
+| `polyglot progress` | Progress overview + streaks |
+| `polyglot drill` / `write` / `peer` / `ingest` | Targeted drills, writing feedback, peer dialogue, external-text ingestion |
+| `polyglot trace <session_id>` | Reconstruct a session as a full trace |
+| `polyglot cost session/user` | LLM cost and latency, scoped to a session or user |
+| `polyglot experiment ...` | Run the ablation study, assign variants, record/measure outcomes |
+| `polyglot privacy export/delete` | Export or permanently delete your own data |
+| `polyglot security backup/audit` | Database backups and the audit log |
+| `polyglot results` | Regenerate `docs/results.md` from the measurement harnesses |
 
-🎭 지민 (barista at a Seoul café):
-   "안녕하세요! 어서오세요. 뭐 드릴까요?"
+## Docker
 
-You: 아메리카노 하나 주세요.
-...
-```
-
-## Project Structure
-
-```
-polyglot-swarm/
-├── src/
-│   ├── orchestrator/       # LangGraph state machine
-│   │   ├── graph.py        # Graph definition + compilation
-│   │   ├── state.py        # LearnerState TypedDict
-│   │   └── router.py       # Intent classification
-│   ├── agents/             # Specialized agent implementations
-│   │   ├── base.py         # Abstract agent interface
-│   │   ├── conversation.py # Persona-based dialogue
-│   │   ├── grammar.py      # Error detection + taxonomy
-│   │   ├── vocabulary.py   # Word tracking + embeddings
-│   │   ├── srs.py          # FSRS scheduling integration
-│   │   ├── cultural.py     # Pragmatics + register
-│   │   ├── evaluator.py    # QA + conflict resolution
-│   │   └── transfer.py     # Cross-language cognates
-│   ├── memory/             # Persistence layer
-│   │   ├── vector_store.py # ChromaDB wrapper
-│   │   ├── vocabulary_db.py# SQLite vocabulary store
-│   │   └── analytics.py    # Learning metrics
-│   ├── scenarios/          # YAML scenario engine
-│   │   ├── engine.py
-│   │   └── definitions/    # es/, pl/, it/
-│   ├── llm/                # Multi-provider LLM clients
-│   ├── speech/             # STT/TTS integration
-│   └── api/                # FastAPI endpoints
-├── tests/                  # pytest test suite
-├── docs/                   # Design docs + ADRs
-├── data/                   # Frequency lists, grammar rules
-└── frontend/               # Gradio MVP + React v2
+```bash
+cp .env.example .env
+docker compose up                       # API (:8000) + Gradio UI (:7860)
+docker compose --profile local-llm up   # also start an Ollama container (:11434)
 ```
 
-## How It Works
+## How the learning loop works
 
-### The Learning Loop
+1. You send a message (text or voice) in your target language.
+2. The **conversation** agent replies in character; **grammar**, **vocabulary**, and **cultural** agents analyze your input in parallel without interrupting.
+3. The **evaluator/verifier** QAs those outputs — accepting, revising, or abstaining on each correction, and reconciling grammar-vs-culture conflicts.
+4. Kept observations become structured **evidence**, which updates the **learner model** (per-skill mastery + uncertainty).
+5. At session end you get a report; new vocabulary is scheduled with **FSRS**, and your **CEFR profile** is recomputed.
+6. Next session, the **curriculum planner** uses the model to choose what's worth practicing, and FSRS surfaces due reviews in context.
 
-1. **You speak** (text or voice) in your target language
-2. **Conversation Agent** responds naturally in character
-3. **Grammar Agent** silently detects errors (doesn't interrupt!)
-4. **Vocabulary Agent** logs new/used words
-5. **Evaluator Agent** quality-checks all outputs
-6. **At session end**: error report + new words → FSRS scheduler
-7. **Next session**: FSRS serves optimally-timed reviews in context
+## Languages
 
-### Why FSRS > SM-2 (Anki)?
+The generic agents work with **any language you name** — just pass it to `chat` or the API. Three languages additionally ship a **language pack** (Spanish, Polish, Italian) with a grammar-construction taxonomy, frequency list, collocations, register notes, and cross-language transfer data. Adding resources for a new language is data, not code — see [`docs/language-packs.md`](docs/language-packs.md).
 
-FSRS uses a 17-parameter memory model that learns YOUR personal forgetting patterns:
+Fifteen scenarios ship across the three packs (restaurant, pharmacy, job interview, and more).
 
-| Metric | SM-2 (Anki) | FSRS |
-|--------|:-----------:|:----:|
-| Retention accuracy | 85% | 92% |
-| Reviews needed | Baseline | 20-40% fewer |
-| Personalization | Fixed formula | Adapts to you |
-| Research backing | 1987 | 2023 (ongoing) |
+## Documentation
 
-## Configuration
+Grounded in the actual implementation:
+[architecture](docs/architecture.md) · [learner model](docs/learner-model.md) ·
+[evaluation](docs/evaluation.md) · [language packs](docs/language-packs.md) ·
+[LLM providers](docs/providers.md) · [privacy](docs/privacy.md) ·
+[deployment](docs/deployment.md) · [measured results](docs/results.md) ·
+[ADR log](docs/adr/README.md).
 
-```yaml
-# config.yaml
-languages:
-  - code: es
-    name: Spanish
-    dialect: castellano
-    
-llm:
-  primary: claude-sonnet    # Quality conversations
-  fast: gemini-flash        # Quick grammar checks
-  local: ollama/llama3.1    # Privacy mode
+`docs/DESIGN.md` and `docs/RESEARCH.md` are the original product research and vision — kept for history, not a spec.
 
-fsrs:
-  desired_retention: 0.9    # Target 90% recall
-  max_interval: 365         # Cap at 1 year
+## Development
 
-scenarios:
-  difficulty_scaling: true
-  auto_advance: true        # Move to harder scenarios as level improves
+The `Makefile` is the single source of truth for build/test/quality gates; CI runs the same targets.
+
+```bash
+make check       # lint + format-check + typecheck + test (the full local gate)
+make test        # pytest, deterministic + offline (no API keys, no network)
+make benchmark   # component benchmarks
+make eval        # evaluation suites (grammar/vocabulary/assessment/curriculum/regression)
+make results     # regenerate docs/results.md
 ```
 
-## Roadmap
+The test suite runs fully offline in deterministic mode (`POLYGLOT_DETERMINISTIC=1`), which routes every LLM call to a reproducible fake provider — no keys or network required.
 
-- [x] 📐 System design + architecture
-- [ ] 🏗️ Phase 1: Core agents (Conversation + Grammar + Vocabulary + FSRS)
-- [ ] 🎭 Phase 2: Scenario engine + 15 scenarios (5 per language)
-- [ ] 🎤 Phase 3: Voice (Whisper STT + LiveKit)
-- [ ] 📊 Phase 4: Progress dashboard + analytics
-- [ ] 🌐 Phase 5: Community scenarios + additional languages
-
-## Contributing
-
-Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-**Easy first contributions:**
-- Add a new scenario YAML for any supported language
-- Improve grammar rules for Polish/Spanish/Italian
-- Add frequency list data
-- Write tests for the SRS scheduler
-
-## Tech Stack
+## Tech stack
 
 | Component | Technology |
 |-----------|-----------|
-| Orchestration | LangGraph |
-| LLM | Claude / Gemini Flash / Ollama |
-| Vector DB | ChromaDB |
-| SRS Algorithm | FSRS (py-fsrs) |
+| Orchestration | LangGraph (SQLite checkpointer) |
+| LLM providers | Claude / Gemini / OpenAI / Ollama, tiered routing with retry + circuit breaker |
+| Relational store | SQLite (source of truth) |
+| Vector store | ChromaDB (semantic memory) |
+| Spaced repetition | FSRS (`py-fsrs`) |
 | API | FastAPI |
-| Speech | Whisper + LiveKit |
-| Frontend | Gradio (MVP) → Next.js (v2) |
-| Testing | pytest + hypothesis |
+| Voice | Whisper (STT) + Edge TTS, optional LiveKit transport |
+| Frontends | Gradio (MVP) + Next.js / React (dashboard) |
+| Tooling | ruff, mypy (strict), pytest |
 
-## Research & Inspiration
+## Contributing
 
-This project builds on research from:
-- [WikiHowAgent](https://arxiv.org/abs/2309.12345) — Teacher+Learner+Manager+Evaluator pattern
-- [LECTOR](https://arxiv.org/abs/2308.xxxxx) — LLM-enhanced spaced repetition
-- [FSRS](https://github.com/open-spaced-repetition/fsrs4anki) — State-of-the-art scheduling
-- [OpenMAIC](https://github.com/THU-MAIC/OpenMAIC) — Multi-agent classroom architecture
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow,
+[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for community expectations, and
+[SECURITY.md](SECURITY.md) to report a vulnerability privately. Structural changes
+should come with an [ADR](docs/adr/README.md).
+
+Good first contributions: add a scenario YAML, extend a language pack's grammar/frequency data, or add tests.
 
 ## License
 
-MIT License — see [LICENSE](LICENSE) for details.
+MIT — see [LICENSE](LICENSE).
 
 ---
 
-**Built with ❤️ for language learners who want more than gamified drills.**
+**Built for language learners who want a tutor that remembers, not a chatbot that forgets.**

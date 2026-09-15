@@ -38,6 +38,25 @@ scenario:
     grammar_error_rate_max: 0.2
     target_vocabulary_used_min: 0.6
 
+  # Phase 13: this scenario is designed to elicit these skills.
+  target_grammar:
+    - por_vs_para
+    - gender_agreement
+  target_functions:
+    - make a polite request
+    - ask for a recommendation
+    - handle a misunderstanding
+    - express a preference
+  constraints:
+    - "Stay in the restaurant setting; do not break character."
+    - "Keep the learner speaking Spanish."
+  failure_conditions:
+    - "The learner switched to English for a whole turn."
+    - "The learner gave up before ordering."
+  transfer_opportunities:
+    - "Spanish 'restaurante' -> Italian 'ristorante' (cognate)."
+    - "Beware 'propina' has no close English cognate."
+
   cultural_notes:
     - "In Spain, lunch is the main meal (2-4 PM). Dinner is light and late (9-11 PM)."
     - "Tipping is not obligatory in Spain. Rounding up or leaving 5-10% is appreciated."

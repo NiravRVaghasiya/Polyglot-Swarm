@@ -87,8 +87,17 @@ class TestNoDirectSdkImports:
             elif isinstance(node, ast.Import):
                 imported.update(alias.name for alias in node.names)
 
-        forbidden = {"langchain_anthropic", "langchain_google_genai", "langchain_community"}
-        assert not (imported & forbidden), f"{module_file} imports a vendor SDK: {imported & forbidden}"
+        forbidden = {
+            "langchain_anthropic",
+            "langchain_google_genai",
+            "langchain_community",
+            "langchain_openai",
+            "openai",
+            "anthropic",
+        }
+        assert not (imported & forbidden), (
+            f"{module_file} imports a vendor SDK: {imported & forbidden}"
+        )
         # And it should depend on the factory.
         assert "src.llm.factory" in imported
 
@@ -126,7 +135,7 @@ class TestGrammarAgent:
         monkeypatch.setattr(
             grammar,
             "get_provider",
-            lambda tier: (captured.update(tier=tier) or fake),
+            lambda tier: captured.update(tier=tier) or fake,
         )
 
         result = await grammar.grammar_node(_base_state())
@@ -171,7 +180,7 @@ class TestVocabularyAgent:
         monkeypatch.setattr(
             vocabulary,
             "get_provider",
-            lambda tier: (captured.update(tier=tier) or fake),
+            lambda tier: captured.update(tier=tier) or fake,
         )
 
         result = await vocabulary.vocabulary_node(

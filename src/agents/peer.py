@@ -13,7 +13,7 @@ import logging
 from typing import Any
 
 from src.llm.factory import get_provider
-from src.llm.prompts import render
+from src.llm.prompts import render_prompt
 from src.llm.provider import Message
 
 logger = logging.getLogger("polyglot.peer")
@@ -33,14 +33,16 @@ async def generate_peer_dialogue(
     Returns ``{"dialogue": [{"speaker", "text"}], "comprehension": {"question",
     "answer"}}``. Returns empty structures on parse/LLM failure.
     """
-    prompt = render(
-        "peer.jinja2",
-        language=language,
-        cefr_level=cefr_level,
-        topic=topic,
-        speaker_a=speaker_a,
-        speaker_b=speaker_b,
-        turns=turns,
+    prompt = str(
+        render_prompt(
+            "peer",
+            language=language,
+            cefr_level=cefr_level,
+            topic=topic,
+            speaker_a=speaker_a,
+            speaker_b=speaker_b,
+            turns=turns,
+        )
     )
 
     provider = get_provider("primary")

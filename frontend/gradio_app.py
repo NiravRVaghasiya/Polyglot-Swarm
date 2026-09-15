@@ -109,7 +109,9 @@ def build_ui() -> gr.Blocks:
                 info="Used when no scenario is selected",
             )
             scenario = gr.Dropdown(
-                choices=scenario_choices, value="", label="Scenario",
+                choices=scenario_choices,
+                value="",
+                label="Scenario",
                 info="Pick a scenario, or leave blank for free conversation",
             )
 

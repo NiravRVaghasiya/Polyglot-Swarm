@@ -14,8 +14,7 @@ from src.speech.stt import SpeechDependencyError, language_to_whisper_code
 class TestLanguageMapping:
     @pytest.mark.parametrize(
         "name,code",
-        [("Spanish", "es"), ("polish", "pl"), ("Italian", "it"),
-         ("es", "es"), ("English", "en")],
+        [("Spanish", "es"), ("polish", "pl"), ("Italian", "it"), ("es", "es"), ("English", "en")],
     )
     def test_maps(self, name, code):
         assert language_to_whisper_code(name) == code

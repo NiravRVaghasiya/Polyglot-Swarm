@@ -27,7 +27,9 @@ class TestRecordTurn:
 class TestRecordTurns:
     def test_batch_records_in_order(self, temp_storage):
         added = sh.record_turns(
-            "s1", "u1", "Spanish",
+            "s1",
+            "u1",
+            "Spanish",
             [
                 {"role": "user", "content": "Hola"},
                 {"role": "assistant", "content": "¿Qué tal?"},
@@ -38,11 +40,13 @@ class TestRecordTurns:
 
     def test_skips_incomplete_messages(self, temp_storage):
         added = sh.record_turns(
-            "s1", "u1", "Spanish",
+            "s1",
+            "u1",
+            "Spanish",
             [
                 {"role": "user", "content": "ok"},
-                {"role": "user"},          # missing content
-                {"content": "no role"},    # missing role
+                {"role": "user"},  # missing content
+                {"content": "no role"},  # missing role
             ],
         )
         assert added == 1

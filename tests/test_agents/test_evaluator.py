@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from src.agents import evaluator
 from src.llm.provider import LLMProvider
 

@@ -1,0 +1,17 @@
+# Polish collocations — fixed multi-word units.
+collocations:
+  - phrase: podjąć decyzję
+    translation: to make a decision
+    pattern: verb + noun (accusative)
+    cefr: B1
+    register: neutral
+  - phrase: zadać pytanie
+    translation: to ask a question
+    pattern: verb + noun (accusative)
+    cefr: A2
+    register: neutral
+  - phrase: mieć ochotę na
+    translation: to feel like (something)
+    pattern: verb + noun + prep
+    cefr: B1
+    register: neutral

@@ -52,9 +52,7 @@ def assess_pronunciation(target: str, transcript: str) -> dict[str, Any]:
         if tag == "equal":
             for offset in range(i2 - i1):
                 word = target_words[i1 + offset]
-                per_word.append(
-                    {"target": word, "heard": word, "similarity": 1.0, "ok": True}
-                )
+                per_word.append({"target": word, "heard": word, "similarity": 1.0, "ok": True})
         elif tag == "replace":
             # Align replaced spans positionally; score by char similarity.
             for offset in range(i2 - i1):
@@ -100,6 +98,5 @@ def feedback_note(target: str, transcript: str) -> str | None:
         return f"🎤 Pronunciation: excellent ({int(result['accuracy'] * 100)}% clear)."
     words = ", ".join(result["problem_words"][:5])
     return (
-        f"🎤 Pronunciation: {int(result['accuracy'] * 100)}% clear. "
-        f"Practice these words: {words}."
+        f"🎤 Pronunciation: {int(result['accuracy'] * 100)}% clear. Practice these words: {words}."
     )

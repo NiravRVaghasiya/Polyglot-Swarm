@@ -61,22 +61,40 @@ def default_profile(user_id: str) -> UserProfile:
 
 
 def profile_exists(user_id: str) -> bool:
-    """Return whether a profile file exists for ``user_id``."""
+    """Return whether a profile exists for ``user_id`` (SQLite or JSON mirror)."""
+    from src.memory import profiles_db
+
+    if profiles_db.exists(user_id):
+        return True
     return _profile_path(user_id).exists()
 
 
 def load_profile(user_id: str) -> UserProfile:
     """Load a user's profile, returning a default if none exists yet.
 
+    SQLite is the source of truth (Phase 2): if a row exists it wins. Otherwise
+    the JSON mirror is used (and back-filled into SQLite for consistency).
     Loading a missing profile never raises — it returns a sensible default so
     first-time users get a working session without a separate signup step.
     """
+    from src.memory import profiles_db
+
+    stored = profiles_db.get(user_id)
+    if stored is not None:
+        return UserProfile.model_validate(stored)
+
     path = _profile_path(user_id)
     if not path.exists():
         return default_profile(user_id)
 
     data = json.loads(path.read_text(encoding="utf-8"))
-    return UserProfile.model_validate(data)
+    profile = UserProfile.model_validate(data)
+    # Back-fill the SQLite source of truth from the legacy JSON mirror.
+    try:
+        profiles_db.save(profile.model_dump())
+    except Exception:  # noqa: BLE001 - JSON remains the fallback if DB is unavailable
+        pass
+    return profile
 
 
 def save_profile(profile: UserProfile) -> UserProfile:
@@ -100,6 +118,12 @@ def save_profile(profile: UserProfile) -> UserProfile:
             os.unlink(tmp_name)
         raise
 
+    # Write through to the SQLite source of truth. The JSON file remains a
+    # human-readable mirror; SQLite is authoritative for reads.
+    from src.memory import profiles_db
+
+    profiles_db.save(profile.model_dump())
+
     return profile
 
 
@@ -116,3 +140,18 @@ def update_profile(user_id: str, **fields: object) -> UserProfile:
     profile = load_profile(user_id)
     updated = profile.model_copy(update=fields)
     return save_profile(updated)
+
+
+def delete_profile(user_id: str) -> None:
+    """Delete a user's profile: the SQLite row and its JSON mirror (Phase 21).
+
+    Both stores are written on every save (see :func:`save_profile`), so both
+    must be removed for a complete deletion; a no-op (not an error) if either
+    is already absent.
+    """
+    from src.memory import profiles_db
+
+    profiles_db.delete(user_id)
+    path = _profile_path(user_id)
+    if path.exists():
+        path.unlink()

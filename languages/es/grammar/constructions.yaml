@@ -1,0 +1,67 @@
+# Spanish grammar taxonomy — seed constructions.
+# Each construction is a teachable unit (a grammar_item): a stable id, its CEFR
+# level, an explanation, examples, prerequisite constructions, and common
+# cross-language interferences that trigger learner errors.
+language: Spanish
+constructions:
+  - construction: ser_vs_estar
+    cefr: A2
+    explanation: >
+      Spanish has two verbs for "to be": ser for essential/permanent qualities
+      and identity, estar for states, locations, and conditions.
+    examples:
+      - "Soy profesor. (ser — identity)"
+      - "Estoy cansado. (estar — temporary state)"
+    prerequisites: []
+    common_interferences:
+      - "English uses a single verb 'to be' for both."
+
+  - construction: gender_agreement
+    cefr: A1
+    explanation: >
+      Adjectives and articles agree in gender (masculine/feminine) and number
+      with the noun they modify.
+    examples:
+      - "la casa blanca"
+      - "los coches rojos"
+    prerequisites: []
+    common_interferences:
+      - "English adjectives do not inflect for gender or number."
+
+  - construction: preterite_vs_imperfect
+    cefr: B1
+    explanation: >
+      The preterite marks completed past actions; the imperfect marks ongoing,
+      habitual, or background past states.
+    examples:
+      - "Comí a las dos. (preterite — completed)"
+      - "Comía todos los días. (imperfect — habitual)"
+    prerequisites:
+      - gender_agreement
+    common_interferences:
+      - "English simple past does not distinguish these aspects."
+
+  - construction: subjunctive_present
+    cefr: B2
+    explanation: >
+      The present subjunctive expresses doubt, desire, emotion, and
+      hypotheticals, typically in subordinate clauses after certain triggers.
+    examples:
+      - "Espero que vengas."
+      - "No creo que sea verdad."
+    prerequisites:
+      - ser_vs_estar
+    common_interferences:
+      - "English rarely uses an explicit subjunctive form."
+
+  - construction: por_vs_para
+    cefr: B1
+    explanation: >
+      por expresses cause, exchange, duration, and means; para expresses
+      purpose, destination, and deadlines.
+    examples:
+      - "Gracias por la ayuda. (por — cause)"
+      - "Es para ti. (para — recipient/purpose)"
+    prerequisites: []
+    common_interferences:
+      - "English 'for' collapses both meanings."

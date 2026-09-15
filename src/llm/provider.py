@@ -16,12 +16,29 @@ Design notes:
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, TypeVar
+
+if TYPE_CHECKING:
+    from pydantic import BaseModel
 
 Role = Literal["system", "user", "assistant"]
 
-Tier = Literal["primary", "fast", "local"]
+# Routing tiers. The original three describe *capability* (primary/fast/local);
+# Phase 1 adds task-oriented aliases (see src/llm/router.py) that map onto them
+# so callers can route by task without breaking existing tier names.
+Tier = Literal[
+    "primary",
+    "fast",
+    "local",
+    "critical_reasoning",
+    "fast_extraction",
+    "cheap_classification",
+    "local_private",
+]
+
+_ModelT = TypeVar("_ModelT", bound="BaseModel")
 
 
 @dataclass(frozen=True)
@@ -73,6 +90,68 @@ class LLMProvider(ABC):
             The model's completion as plain text.
         """
         ...
+
+    async def generate_structured(
+        self,
+        messages: list[Message],
+        schema: type[_ModelT],
+        *,
+        temperature: float = 0.0,
+        max_tokens: int = 512,
+    ) -> _ModelT | None:
+        """Generate a completion and validate it against a Pydantic ``schema``.
+
+        Default implementation calls :meth:`generate` with ``json_mode=True``
+        and parses the result with :func:`src.llm.schemas.parse_structured`,
+        returning ``None`` if the output is not valid for the schema. Providers
+        with native structured-output support may override for reliability.
+        """
+        from src.llm.schemas import parse_structured
+
+        raw = await self.generate(
+            messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            json_mode=True,
+        )
+        return parse_structured(raw, schema)
+
+    async def stream(
+        self,
+        messages: list[Message],
+        *,
+        temperature: float = 0.7,
+        max_tokens: int = 512,
+    ) -> AsyncIterator[str]:
+        """Yield the completion incrementally.
+
+        The default implementation is non-streaming: it awaits :meth:`generate`
+        and yields the whole result once, so every provider supports the
+        streaming interface even if the underlying SDK call is not incremental.
+        Providers with real token streaming override this.
+        """
+        text = await self.generate(messages, temperature=temperature, max_tokens=max_tokens)
+        yield text
+
+    def count_tokens(self, messages: list[Message]) -> int:
+        """Estimate the number of input tokens for ``messages``.
+
+        The default is a cheap, provider-agnostic heuristic (~4 characters per
+        token) so telemetry and budget checks work without a tokenizer
+        dependency. Providers may override with an exact tokenizer.
+        """
+        chars = sum(len(m.content) for m in messages)
+        return max(1, chars // 4)
+
+    def health(self) -> dict[str, object]:
+        """Return a cheap, non-network health snapshot for this provider.
+
+        Reports whether the provider is *configured* (per :meth:`is_available`)
+        without making a model call, so it is safe to invoke frequently (e.g.
+        from the ``polyglot health`` command or an API readiness probe). A
+        provider may override this to perform a real reachability check.
+        """
+        return {"provider": self.name, "available": self.is_available()}
 
     def __repr__(self) -> str:  # pragma: no cover - trivial
         return f"<{self.__class__.__name__} name={self.name!r}>"
@@ -131,7 +210,6 @@ def normalize_content(content: Any) -> str:
     """
     if isinstance(content, list):
         return "".join(
-            block.get("text", "") if isinstance(block, dict) else str(block)
-            for block in content
+            block.get("text", "") if isinstance(block, dict) else str(block) for block in content
         )
     return str(content)

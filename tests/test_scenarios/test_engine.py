@@ -49,7 +49,10 @@ class TestBuildContext:
         assert ctx["location"] == "Madrid"
 
     def test_difficulty_guidance_by_level(self):
-        assert engine.build_scenario_context(_scenario(), "A2")["difficulty_guidance"] == "Speak slowly"
+        assert (
+            engine.build_scenario_context(_scenario(), "A2")["difficulty_guidance"]
+            == "Speak slowly"
+        )
         assert "idioms" in engine.build_scenario_context(_scenario(), "B2")["difficulty_guidance"]
 
     def test_unknown_level_empty_guidance(self):
@@ -84,9 +87,7 @@ class TestCoverage:
         assert coverage == 0.5
 
     def test_full_coverage(self):
-        coverage = engine.target_vocab_coverage(
-            _scenario(), _msgs("hola mesa plato bebida")
-        )
+        coverage = engine.target_vocab_coverage(_scenario(), _msgs("hola mesa plato bebida"))
         assert coverage == 1.0
 
 

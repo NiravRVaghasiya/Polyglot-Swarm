@@ -31,7 +31,5 @@ def submit(
     user_id: str = Depends(get_current_user),
 ) -> dict[str, str]:
     """Record the outcome of a review for a word."""
-    vocabulary_db.record_review_outcome(
-        user_id, language, req.word, correct=req.correct
-    )
+    vocabulary_db.record_review_outcome(user_id, language, req.word, correct=req.correct)
     return {"status": "recorded"}

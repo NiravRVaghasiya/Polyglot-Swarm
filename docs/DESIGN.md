@@ -198,13 +198,13 @@ persona:
 **Error taxonomy:**
 ```python
 class GrammarError:
-    original: str           # "Yo soy tiene hambre"
-    correction: str         # "Yo tengo hambre"
-    rule: str              # "ser_vs_tener"
-    explanation: str       # "Use 'tener' for physical states (hunger, thirst, cold)"
+    original: str  # "Yo soy tiene hambre"
+    correction: str  # "Yo tengo hambre"
+    rule: str  # "ser_vs_tener"
+    explanation: str  # "Use 'tener' for physical states (hunger, thirst, cold)"
     severity: Literal["minor", "moderate", "critical"]
-    frequency: int         # how many times user has made this error
-    cefr_level: str        # at which level this should be mastered
+    frequency: int  # how many times user has made this error
+    cefr_level: str  # at which level this should be mastered
 ```
 
 ### 4.3 Vocabulary Agent
@@ -219,19 +219,19 @@ class GrammarError:
 **Data model:**
 ```python
 class VocabularyEntry:
-    word: str                    # "restaurante"
-    language: str                # "es"
-    translation: str             # "restaurant"
-    pos: str                     # "noun"
-    cefr_level: str              # "A1"
-    contexts: list[str]          # sentences where user encountered it
+    word: str  # "restaurante"
+    language: str  # "es"
+    translation: str  # "restaurant"
+    pos: str  # "noun"
+    cefr_level: str  # "A1"
+    contexts: list[str]  # sentences where user encountered it
     times_seen: int
     times_used_correctly: int
     times_used_incorrectly: int
     last_reviewed: datetime
-    next_review: datetime        # SM-2 scheduled
-    related_words: list[str]     # cognates in other target languages
-    embedding: list[float]       # for semantic similarity search
+    next_review: datetime  # SM-2 scheduled
+    related_words: list[str]  # cognates in other target languages
+    embedding: list[float]  # for semantic similarity search
 ```
 
 ### 4.4 Spaced Repetition (SRS) Agent
@@ -256,10 +256,11 @@ from fsrs import FSRS, Card, Rating
 
 scheduler = FSRS()
 
+
 def review_card(card: Card, rating: Rating) -> Card:
     """
     rating: Rating.Again (1), Hard (2), Good (3), Easy (4)
-    
+
     FSRS internally tracks:
     - difficulty: inherent difficulty of the material
     - stability: memory stability (how long until forgetting)
@@ -270,12 +271,13 @@ def review_card(card: Card, rating: Rating) -> Card:
     review_log = scheduling_cards[rating].review_log
     return updated_card
 
+
 # Enhanced: LLM-generated contextual review (from LECTOR paper insight)
 def generate_contextual_review(word: str, language: str, user_context: dict) -> str:
     """
     Instead of flashcard: "restaurante = restaurant"
     Generate: "Complete: Ayer fui al ___ con mi familia" (contextual sentence)
-    
+
     Also detects semantically confusable pairs:
     e.g., "ser" vs "estar" — schedules them in alternation to build distinction
     """
@@ -362,33 +364,35 @@ from typing import TypedDict, Annotated
 from langgraph.graph import StateGraph, END
 from operator import add
 
+
 class LearnerState(TypedDict):
     """Shared state across all agent nodes"""
+
     # Session
     session_id: str
     language: str
     mode: str  # "conversation", "review", "drill", "assessment"
-    
+
     # Conversation
     messages: Annotated[list[dict], add]  # chat history (appended)
     current_scenario: dict | None
-    
+
     # Agent outputs (updated per turn)
-    grammar_errors: list[dict]         # from Grammar Agent
-    new_vocabulary: list[dict]         # from Vocabulary Agent
-    cultural_notes: list[str]          # from Cultural Agent
-    evaluation: dict | None            # from Evaluator Agent
-    
+    grammar_errors: list[dict]  # from Grammar Agent
+    new_vocabulary: list[dict]  # from Vocabulary Agent
+    cultural_notes: list[str]  # from Cultural Agent
+    evaluation: dict | None  # from Evaluator Agent
+
     # Persistent learner profile (loaded from DB at session start)
     cefr_level: str
     vocabulary_known: int
     grammar_weaknesses: list[str]
     interests: list[str]
-    
+
     # Control flow
     turn_count: int
     should_end_session: bool
-    pending_reviews: list[dict]        # FSRS due items
+    pending_reviews: list[dict]  # FSRS due items
 ```
 
 ### 5.2 Graph Topology
@@ -397,22 +401,22 @@ class LearnerState(TypedDict):
 graph = StateGraph(LearnerState)
 
 # Define nodes (agents)
-graph.add_node("router", router_node)              # Intent → mode dispatch
+graph.add_node("router", router_node)  # Intent → mode dispatch
 graph.add_node("conversation", conversation_node)  # Generate response
-graph.add_node("grammar", grammar_node)            # Analyze user input
-graph.add_node("vocabulary", vocabulary_node)       # Track words
-graph.add_node("cultural", cultural_node)          # Add cultural notes
-graph.add_node("evaluator", evaluator_node)        # QA all outputs
-graph.add_node("review", review_node)              # FSRS review session
-graph.add_node("session_end", session_end_node)    # Compile report
+graph.add_node("grammar", grammar_node)  # Analyze user input
+graph.add_node("vocabulary", vocabulary_node)  # Track words
+graph.add_node("cultural", cultural_node)  # Add cultural notes
+graph.add_node("evaluator", evaluator_node)  # QA all outputs
+graph.add_node("review", review_node)  # FSRS review session
+graph.add_node("session_end", session_end_node)  # Compile report
 
 # Edges
 graph.set_entry_point("router")
-graph.add_conditional_edges("router", route_by_mode, {
-    "conversation": "conversation",
-    "review": "review",
-    "end": "session_end"
-})
+graph.add_conditional_edges(
+    "router",
+    route_by_mode,
+    {"conversation": "conversation", "review": "review", "end": "session_end"},
+)
 
 # After conversation response, fan out to analysis agents (parallel)
 graph.add_edge("conversation", "grammar")
@@ -459,20 +463,20 @@ collections = {
     "vocabulary": {
         "documents": ["word + definition + example sentence"],
         "metadata": {"language", "cefr_level", "pos", "user_id"},
-        "embeddings": "all-MiniLM-L6-v2"  # multilingual
+        "embeddings": "all-MiniLM-L6-v2",  # multilingual
     },
     "grammar_rules": {
         "documents": ["rule explanation + examples"],
-        "metadata": {"language", "category", "cefr_level"}
+        "metadata": {"language", "category", "cefr_level"},
     },
     "conversations": {
         "documents": ["conversation turns with context"],
-        "metadata": {"scenario", "language", "date", "cefr_at_time"}
+        "metadata": {"scenario", "language", "date", "cefr_at_time"},
     },
     "cultural_notes": {
         "documents": ["cultural insight + when to apply"],
-        "metadata": {"language", "region", "topic"}
-    }
+        "metadata": {"language", "region", "topic"},
+    },
 }
 ```
 
@@ -566,32 +570,32 @@ scenario:
 # FastAPI application structure
 
 # --- Session Management ---
-POST   /api/v1/sessions/start          # Start new learning session
-GET    /api/v1/sessions/{id}/state      # Get current session state
-POST   /api/v1/sessions/{id}/end        # End session, trigger reports
+POST / api / v1 / sessions / start  # Start new learning session
+GET / api / v1 / sessions / {id} / state  # Get current session state
+POST / api / v1 / sessions / {id} / end  # End session, trigger reports
 
 # --- Conversation ---
-POST   /api/v1/chat                     # Send message, get agent response
+POST / api / v1 / chat  # Send message, get agent response
 # Request: { session_id, message, language, mode }
 # Response: { reply, hidden_feedback: {grammar, vocab, cultural} }
 
 # --- Review & Drills ---
-GET    /api/v1/review/due               # Get cards due for review
-POST   /api/v1/review/submit            # Submit review answer
-GET    /api/v1/drills/generate           # Generate targeted drill
+GET / api / v1 / review / due  # Get cards due for review
+POST / api / v1 / review / submit  # Submit review answer
+GET / api / v1 / drills / generate  # Generate targeted drill
 
 # --- Progress ---
-GET    /api/v1/progress/overview         # CEFR estimates, streaks, stats
-GET    /api/v1/progress/vocabulary       # Vocabulary growth over time
-GET    /api/v1/progress/weaknesses       # Top grammar/vocab gaps
+GET / api / v1 / progress / overview  # CEFR estimates, streaks, stats
+GET / api / v1 / progress / vocabulary  # Vocabulary growth over time
+GET / api / v1 / progress / weaknesses  # Top grammar/vocab gaps
 
 # --- Scenarios ---
-GET    /api/v1/scenarios                 # List available scenarios
-POST   /api/v1/scenarios/{id}/start      # Start a scenario session
+GET / api / v1 / scenarios  # List available scenarios
+POST / api / v1 / scenarios / {id} / start  # Start a scenario session
 
 # --- User Profile ---
-GET    /api/v1/profile                   # User settings, goals, languages
-PUT    /api/v1/profile                   # Update preferences
+GET / api / v1 / profile  # User settings, goals, languages
+PUT / api / v1 / profile  # Update preferences
 ```
 
 ### 7.2 Internal Agent Communication Protocol
@@ -600,29 +604,33 @@ PUT    /api/v1/profile                   # Update preferences
 from pydantic import BaseModel
 from typing import Literal
 
+
 class AgentMessage(BaseModel):
     """Internal message format between agents"""
-    source_agent: str               # "grammar_agent"
-    target_agent: str               # "orchestrator" or "broadcast"
+
+    source_agent: str  # "grammar_agent"
+    target_agent: str  # "orchestrator" or "broadcast"
     message_type: Literal[
         "error_detected",
         "new_vocabulary",
         "level_change",
         "scenario_objective_met",
         "review_scheduled",
-        "cultural_note"
+        "cultural_note",
     ]
-    payload: dict                   # agent-specific data
+    payload: dict  # agent-specific data
     priority: Literal["low", "medium", "high"]
     timestamp: datetime
     session_id: str
 
+
 class AgentResponse(BaseModel):
     """What each agent returns to the orchestrator"""
+
     agent_name: str
     user_facing_output: str | None  # None = silent processing
-    internal_state_update: dict     # what to persist
-    triggers: list[AgentMessage]    # messages to other agents
+    internal_state_update: dict  # what to persist
+    triggers: list[AgentMessage]  # messages to other agents
 ```
 
 ---
@@ -701,20 +709,20 @@ Session ends
 ```python
 class CEFRMetrics:
     # Vocabulary
-    unique_words_used: int           # A1:500, A2:1000, B1:2000, B2:4000
-    avg_word_frequency_rank: float   # lower = more advanced words
-    
+    unique_words_used: int  # A1:500, A2:1000, B1:2000, B2:4000
+    avg_word_frequency_rank: float  # lower = more advanced words
+
     # Grammar
-    clause_complexity: float         # subordinate clauses per sentence
-    tense_variety: set[str]         # {"present", "past", "subjunctive", ...}
-    error_rate: float               # errors per 100 words
-    
+    clause_complexity: float  # subordinate clauses per sentence
+    tense_variety: set[str]  # {"present", "past", "subjunctive", ...}
+    error_rate: float  # errors per 100 words
+
     # Fluency
-    avg_response_length: float      # words per turn
-    hesitation_markers: float       # "um", "eh" in speech
-    
+    avg_response_length: float  # words per turn
+    hesitation_markers: float  # "um", "eh" in speech
+
     # Comprehension
-    comprehension_accuracy: float   # on reading/listening tasks
+    comprehension_accuracy: float  # on reading/listening tasks
 ```
 
 ### 10.2 Level Thresholds

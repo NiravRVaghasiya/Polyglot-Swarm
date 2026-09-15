@@ -34,6 +34,20 @@ CREATE TABLE IF NOT EXISTS vocabulary (
     times_incorrect INTEGER DEFAULT 0,
     card_state     TEXT,                -- JSON serialized FSRS card
     next_review    TEXT,                -- ISO8601 datetime
+    -- Phase 5: multi-dimensional mastery (0.0 .. 1.0 each). A word is not
+    -- simply known/unknown; recognition/production/listening/spelling are
+    -- tracked separately.
+    recognition    REAL DEFAULT 0.0,
+    production     REAL DEFAULT 0.0,
+    listening      REAL DEFAULT 0.0,
+    spelling       REAL DEFAULT 0.0,
+    -- Phase 5: lexical metadata + production history.
+    register       TEXT DEFAULT '',     -- neutral | formal | informal | slang | ...
+    frequency_rank INTEGER,             -- corpus frequency rank (lower = commoner)
+    first_seen     TEXT,                -- ISO8601: first time encountered
+    first_produced TEXT,                -- ISO8601: first time the learner produced it
+    successful_productions INTEGER DEFAULT 0,
+    failed_productions     INTEGER DEFAULT 0,
     created_at     TEXT NOT NULL,
     updated_at     TEXT NOT NULL,
     UNIQUE(user_id, language, word)
@@ -41,6 +55,24 @@ CREATE TABLE IF NOT EXISTS vocabulary (
 CREATE INDEX IF NOT EXISTS idx_vocab_user_lang ON vocabulary(user_id, language);
 CREATE INDEX IF NOT EXISTS idx_vocab_due ON vocabulary(user_id, next_review);
 """
+
+# The multi-dimensional mastery dimensions tracked per word (Phase 5).
+VOCAB_DIMENSIONS = ("recognition", "production", "listening", "spelling")
+
+# Columns added by the v3 migration, for existing databases. Kept in sync with
+# the _SCHEMA above; the migration adds any that are missing.
+_PHASE5_COLUMNS: dict[str, str] = {
+    "recognition": "REAL DEFAULT 0.0",
+    "production": "REAL DEFAULT 0.0",
+    "listening": "REAL DEFAULT 0.0",
+    "spelling": "REAL DEFAULT 0.0",
+    "register": "TEXT DEFAULT ''",
+    "frequency_rank": "INTEGER",
+    "first_seen": "TEXT",
+    "first_produced": "TEXT",
+    "successful_productions": "INTEGER DEFAULT 0",
+    "failed_productions": "INTEGER DEFAULT 0",
+}
 
 
 def init_db() -> None:
@@ -102,10 +134,18 @@ def upsert_word(
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    user_id, language, word, translation, pos, cefr_level,
-                    json.dumps(contexts), 1 if seen else 0,
+                    user_id,
+                    language,
+                    word,
+                    translation,
+                    pos,
+                    cefr_level,
+                    json.dumps(contexts),
+                    1 if seen else 0,
                     json.dumps(card_state) if card_state else None,
-                    next_review, now, now,
+                    next_review,
+                    now,
+                    now,
                 ),
             )
         else:
@@ -127,11 +167,17 @@ def upsert_word(
                 WHERE user_id=? AND language=? AND word=?
                 """,
                 (
-                    translation, pos, cefr_level,
-                    json.dumps(contexts), 1 if seen else 0,
+                    translation,
+                    pos,
+                    cefr_level,
+                    json.dumps(contexts),
+                    1 if seen else 0,
                     json.dumps(card_state) if card_state else None,
-                    next_review, now,
-                    user_id, language, word,
+                    next_review,
+                    now,
+                    user_id,
+                    language,
+                    word,
                 ),
             )
 
@@ -167,9 +213,116 @@ def record_review_outcome(
             """,
             (
                 json.dumps(card_state) if card_state else None,
-                next_review, _now(), user_id, language, word,
+                next_review,
+                _now(),
+                user_id,
+                language,
+                word,
             ),
         )
+
+
+def record_dimension(
+    user_id: str,
+    language: str,
+    word: str,
+    dimension: str,
+    *,
+    success: bool,
+    weight: float = 0.3,
+    at: str | None = None,
+) -> dict[str, Any] | None:
+    """Update one mastery dimension for a word from an observation.
+
+    ``dimension`` is one of :data:`VOCAB_DIMENSIONS`. The new score is an
+    exponential moving average toward 1.0 (success) or 0.0 (failure) with the
+    given ``weight`` — a simple, transparent update that is monotonic in
+    evidence and bounded to [0, 1]. Production observations also bump the
+    ``successful_productions``/``failed_productions`` counters and stamp
+    ``first_produced`` on the first success.
+
+    Returns the updated row, or ``None`` if the word is not stored yet (the
+    caller should upsert it first).
+    """
+    if dimension not in VOCAB_DIMENSIONS:
+        raise ValueError(f"unknown vocabulary dimension: {dimension!r}")
+    init_db()
+    when = at or _now()
+    target = 1.0 if success else 0.0
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT * FROM vocabulary WHERE user_id=? AND language=? AND word=?",
+            (user_id, language, word),
+        ).fetchone()
+        if row is None:
+            return None
+
+        current = row[dimension] if row[dimension] is not None else 0.0
+        updated = round(current + weight * (target - current), 4)
+        updated = max(0.0, min(1.0, updated))
+
+        sets = [f"{dimension} = ?", "updated_at = ?"]
+        params: list[Any] = [updated, when]
+
+        if dimension == "production":
+            if success:
+                sets.append("successful_productions = successful_productions + 1")
+                if row["first_produced"] is None:
+                    sets.append("first_produced = ?")
+                    params.append(when)
+            else:
+                sets.append("failed_productions = failed_productions + 1")
+
+        conn.execute(
+            f"UPDATE vocabulary SET {', '.join(sets)} WHERE user_id=? AND language=? AND word=?",
+            (*params, user_id, language, word),
+        )
+        out = conn.execute(
+            "SELECT * FROM vocabulary WHERE user_id=? AND language=? AND word=?",
+            (user_id, language, word),
+        ).fetchone()
+    return _row_to_dict(out)
+
+
+def set_metadata(
+    user_id: str,
+    language: str,
+    word: str,
+    *,
+    register: str | None = None,
+    frequency_rank: int | None = None,
+    first_seen: str | None = None,
+) -> None:
+    """Set lexical metadata (register, frequency rank, first_seen) if provided.
+
+    Only non-``None`` fields are written; ``first_seen`` is set only if not
+    already present, so the earliest observation wins.
+    """
+    init_db()
+    sets: list[str] = ["updated_at = ?"]
+    params: list[Any] = [_now()]
+    if register is not None:
+        sets.append("register = ?")
+        params.append(register)
+    if frequency_rank is not None:
+        sets.append("frequency_rank = ?")
+        params.append(frequency_rank)
+    with get_connection() as conn:
+        conn.execute(
+            f"UPDATE vocabulary SET {', '.join(sets)} WHERE user_id=? AND language=? AND word=?",
+            (*params, user_id, language, word),
+        )
+        if first_seen is not None:
+            conn.execute(
+                "UPDATE vocabulary SET first_seen = COALESCE(first_seen, ?) "
+                "WHERE user_id=? AND language=? AND word=?",
+                (first_seen, user_id, language, word),
+            )
+
+
+def mastery_summary(row: dict[str, Any]) -> dict[str, float]:
+    """Return the per-dimension mastery scores for a vocabulary row."""
+    return {dim: float(row.get(dim) or 0.0) for dim in VOCAB_DIMENSIONS}
 
 
 def get_all_for_user(user_id: str, language: str | None = None) -> list[dict[str, Any]]:
@@ -230,3 +383,14 @@ def count_for_user(user_id: str, language: str | None = None) -> int:
                 (user_id, language),
             ).fetchone()
     return int(row["n"])
+
+
+def delete_for_user(user_id: str) -> int:
+    """Delete every vocabulary row for ``user_id`` (Phase 21 data deletion).
+
+    Returns the number of rows removed.
+    """
+    init_db()
+    with get_connection() as conn:
+        cursor = conn.execute("DELETE FROM vocabulary WHERE user_id=?", (user_id,))
+        return cursor.rowcount

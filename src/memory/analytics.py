@@ -68,6 +68,7 @@ def _now() -> str:
 # Grammar error patterns
 # --------------------------------------------------------------------------- #
 
+
 def record_error(
     user_id: str,
     language: str,
@@ -99,8 +100,7 @@ def record_error(
             (user_id, language, error_type, when),
         )
         row = conn.execute(
-            "SELECT * FROM error_patterns "
-            "WHERE user_id=? AND language=? AND error_type=?",
+            "SELECT * FROM error_patterns WHERE user_id=? AND language=? AND error_type=?",
             (user_id, language, error_type),
         ).fetchone()
     return dict(row)
@@ -168,6 +168,7 @@ def top_weaknesses(
 # Learning sessions
 # --------------------------------------------------------------------------- #
 
+
 def log_session(
     user_id: str,
     language: str,
@@ -194,9 +195,16 @@ def log_session(
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                user_id, language, session_type, duration_minutes,
-                words_practiced, new_words_learned, grammar_errors,
-                grammar_errors_corrected, cefr_estimate, when,
+                user_id,
+                language,
+                session_type,
+                duration_minutes,
+                words_practiced,
+                new_words_learned,
+                grammar_errors,
+                grammar_errors_corrected,
+                cefr_estimate,
+                when,
             ),
         )
         row_id = cursor.lastrowid
@@ -215,8 +223,7 @@ def get_sessions(
     with get_connection() as conn:
         if language is None:
             rows = conn.execute(
-                "SELECT * FROM learning_sessions WHERE user_id=? "
-                "ORDER BY timestamp DESC LIMIT ?",
+                "SELECT * FROM learning_sessions WHERE user_id=? ORDER BY timestamp DESC LIMIT ?",
                 (user_id, limit),
             ).fetchall()
         else:
@@ -226,3 +233,15 @@ def get_sessions(
                 (user_id, language, limit),
             ).fetchall()
     return [dict(r) for r in rows]
+
+
+def delete_for_user(user_id: str) -> dict[str, int]:
+    """Delete every ``error_patterns`` and ``learning_sessions`` row for
+    ``user_id`` (Phase 21 data deletion). Returns counts per table."""
+    init_db()
+    with get_connection() as conn:
+        errors = conn.execute("DELETE FROM error_patterns WHERE user_id=?", (user_id,)).rowcount
+        sessions = conn.execute(
+            "DELETE FROM learning_sessions WHERE user_id=?", (user_id,)
+        ).rowcount
+    return {"error_patterns": errors, "learning_sessions": sessions}

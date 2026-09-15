@@ -117,8 +117,7 @@ def get_recent_turns_for_user(
     with get_connection() as conn:
         if language is None:
             rows = conn.execute(
-                "SELECT * FROM conversation_turns WHERE user_id=? "
-                "ORDER BY id DESC LIMIT ?",
+                "SELECT * FROM conversation_turns WHERE user_id=? ORDER BY id DESC LIMIT ?",
                 (user_id, limit),
             ).fetchall()
         else:
@@ -128,3 +127,11 @@ def get_recent_turns_for_user(
                 (user_id, language, limit),
             ).fetchall()
     return [dict(r) for r in rows]
+
+
+def delete_for_user(user_id: str) -> int:
+    """Delete every conversation-turn row for ``user_id`` (Phase 21 deletion)."""
+    init_db()
+    with get_connection() as conn:
+        cursor = conn.execute("DELETE FROM conversation_turns WHERE user_id=?", (user_id,))
+        return cursor.rowcount

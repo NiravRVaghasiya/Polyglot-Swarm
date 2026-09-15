@@ -1,0 +1,9 @@
+language: Italian
+code: it
+family: Romance
+dialect: Standard Italian
+writing_system: Latin
+notes: >
+  Second Romance validation language. Very high lexical similarity with Spanish
+  (~82% cognates), making it the primary target for cross-language transfer
+  (positive transfer + false friends).

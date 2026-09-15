@@ -35,6 +35,22 @@ scenario:
     grammar_error_rate_max: 0.25
     target_vocabulary_used_min: 0.5
 
+  # Phase 13: pedagogical targets.
+  target_grammar:
+    - preposition_articulation
+    - gender_agreement
+  target_functions:
+    - order at a counter
+    - specify a preference
+    - ask the price
+  constraints:
+    - "Stay at the café counter; keep exchanges short and brisk."
+  failure_conditions:
+    - "The learner switched to English."
+  transfer_opportunities:
+    - "Italian 'caffè' vs Spanish 'café' (near-cognate)."
+    - "Beware: Italian 'burro' = butter, Spanish 'burro' = donkey (false friend)."
+
   cultural_notes:
     - "In Italy you often pay at the cassa first, then take the scontrino to the banco."
     - "A cappuccino is usually a morning drink; ordering one after lunch is unusual."

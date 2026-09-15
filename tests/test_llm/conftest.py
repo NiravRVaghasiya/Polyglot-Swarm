@@ -31,7 +31,7 @@ class RecordingChatModel:
     then returns a canned response so tests can assert on both sides.
     """
 
-    last_instance: "RecordingChatModel | None" = None
+    last_instance: RecordingChatModel | None = None
 
     def __init__(self, **kwargs):
         self.init_kwargs = kwargs
@@ -65,6 +65,38 @@ def _install_fake_langchain_core() -> None:
     core.messages = messages_mod
     sys.modules["langchain_core"] = core
     sys.modules["langchain_core.messages"] = messages_mod
+
+
+@pytest.fixture(autouse=True)
+def _reset_circuit_breaker():
+    """Reset the module-level default circuit breaker around every test.
+
+    src.llm.factory.RoutingProvider instances share one breaker (keyed by
+    provider *name*) by default so a real deployment remembers a failing
+    provider across the many separate RoutingProvider instances
+    ``get_provider`` builds over a session's lifetime (Phase 23). Tests in
+    this package construct providers named "x", "primary", "bad", etc. across
+    many independent test functions — without a reset, failures recorded by
+    one test could open the breaker for a name reused by a later, unrelated
+    test.
+    """
+    from src.llm.reliability import default_circuit_breaker
+
+    default_circuit_breaker.reset()
+    yield
+    default_circuit_breaker.reset()
+
+
+@pytest.fixture
+def real_providers(monkeypatch):
+    """Disable global deterministic mode so real tier routing is exercised.
+
+    The root ``tests/conftest.py`` turns on ``POLYGLOT_DETERMINISTIC`` for the
+    whole suite, which makes ``get_provider`` collapse to the fake provider.
+    Tests that assert on the *real* claude/gemini/ollama chain opt out via this
+    fixture.
+    """
+    monkeypatch.delenv("POLYGLOT_DETERMINISTIC", raising=False)
 
 
 @pytest.fixture

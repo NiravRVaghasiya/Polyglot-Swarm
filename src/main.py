@@ -30,6 +30,7 @@ def _available_scenarios() -> list[Scenario]:
     except Exception:  # noqa: BLE001 - UI should still load without scenarios
         return []
 
+
 # Compile the LangGraph once (in-memory checkpointer is fine for the MVP UI;
 # durable persistence happens via persist_session at session end).
 app = compile_graph()

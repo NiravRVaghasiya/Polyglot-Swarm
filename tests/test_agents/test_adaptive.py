@@ -68,4 +68,6 @@ class TestAdaptiveNode:
 
     def test_guidance_matches_new_level(self):
         result = adaptive_node(self._state("A2", "too_easy"))
-        assert result["current_scenario"]["difficulty_guidance"] == adaptive.guidance_for_level("B1")
+        assert result["current_scenario"]["difficulty_guidance"] == (
+            adaptive.guidance_for_level("B1")
+        )

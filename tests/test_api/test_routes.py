@@ -92,8 +92,7 @@ class TestProgress:
         client, headers, user_id = auth_client
         from src.memory import analytics
 
-        analytics.log_session(user_id, "Spanish", new_words_learned=3,
-                              cefr_estimate="A2")
+        analytics.log_session(user_id, "Spanish", new_words_learned=3, cefr_estimate="A2")
         resp = client.get("/api/v1/progress/overview?language=Spanish", headers=headers)
         assert resp.status_code == 200
         body = resp.json()

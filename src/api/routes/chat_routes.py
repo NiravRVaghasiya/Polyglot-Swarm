@@ -82,9 +82,7 @@ async def end_session(
 
 
 @router.post("/chat", response_model=ChatResponse)
-async def chat(
-    req: ChatRequest, user_id: str = Depends(get_current_user)
-) -> ChatResponse:
+async def chat(req: ChatRequest, user_id: str = Depends(get_current_user)) -> ChatResponse:
     """Send a message in an active session and get the reply + hidden feedback."""
     state = sessions.get_session(user_id, req.session_id)
     if state is None:

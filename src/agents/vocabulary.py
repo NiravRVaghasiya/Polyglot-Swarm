@@ -10,36 +10,9 @@ This agent:
 from typing import Any
 
 from src.llm.factory import get_provider
+from src.llm.prompts import render_prompt
 from src.llm.provider import Message
 from src.orchestrator.state import LearnerState, VocabularyItem
-
-VOCABULARY_PROMPT = """You are a vocabulary extraction assistant for {language} learners.
-
-Given this conversation exchange, identify words that a {cefr_level}-level learner
-might not know yet.
-
-For each word, provide:
-1. word: the word in {language}
-2. translation: English translation
-3. pos: part of speech (noun, verb, adjective, adverb, etc.)
-4. context_sentence: the sentence where it appeared
-
-Focus on:
-- Words above the learner's current CEFR level
-- Idiomatic expressions
-- Words used in a new/unusual way
-
-Do NOT include:
-- Basic words (A1 level for a {cefr_level} learner)
-- Proper nouns
-- Numbers
-
-User said: "{user_text}"
-Agent replied: "{agent_text}"
-
-Respond in JSON: {{"words": [{{"word": "...", "translation": "...", "pos": "...",
-"context_sentence": "..."}}]}}
-"""
 
 
 async def vocabulary_node(state: LearnerState) -> dict[str, Any]:
@@ -59,11 +32,14 @@ async def vocabulary_node(state: LearnerState) -> dict[str, Any]:
 
     language_name = state["language"]  # User provides full language name
 
-    prompt = VOCABULARY_PROMPT.format(
-        language=language_name,
-        cefr_level=state.get("cefr_level", "A2"),
-        user_text=user_input,
-        agent_text=agent_response,
+    prompt = str(
+        render_prompt(
+            "vocabulary",
+            language=language_name,
+            cefr_level=state.get("cefr_level", "A2"),
+            user_text=user_input,
+            agent_text=agent_response,
+        )
     )
 
     # Use fast LLM tier for vocabulary extraction (latency-sensitive), with failover.

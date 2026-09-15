@@ -7,8 +7,6 @@ call served by a mocked provider (no network, no API keys).
 
 from __future__ import annotations
 
-import pytest
-
 from src.agents import conversation, cultural, evaluator, grammar, vocabulary
 from src.llm.provider import LLMProvider
 from src.orchestrator.graph import compile_graph
@@ -77,9 +75,7 @@ async def test_single_turn_uses_provider(monkeypatch):
     # boundary yet, so stream node updates and stop once the conversation
     # node has produced its reply. This proves the provider is in the hot path.
     seen_conversation = False
-    async for update in app.astream(
-        _initial_state(), {**config, "recursion_limit": 8}
-    ):
+    async for update in app.astream(_initial_state(), {**config, "recursion_limit": 8}):
         if "conversation" in update:
             node_out = update["conversation"]
             assert node_out.get("agent_response") == "¡Hola! ¿En qué puedo ayudarle?"

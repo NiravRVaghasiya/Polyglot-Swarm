@@ -1,0 +1,18 @@
+# Spanish -> Polish transfer resource.
+# Distant languages (Romance vs Slavic): few cognates, mostly interference from
+# Spanish habits that misfire in Polish.
+target_language: Polish
+cognates:
+  - source: restaurante
+    target: restauracja
+    note: restaurant — a shared Latin/French borrowing
+interference:
+  - source: mesa
+    note: >
+      Polish nouns take case endings; a Spanish learner may leave the noun in
+      its base (nominative) form when the case should change (e.g. after a
+      preposition or as a direct object).
+  - source: ser
+    note: >
+      Spanish ser/estar has no Polish equivalent; być (to be) is often dropped
+      in present-tense predicate sentences, which Spanish speakers overuse.

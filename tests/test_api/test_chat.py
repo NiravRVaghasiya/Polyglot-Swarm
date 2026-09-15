@@ -9,9 +9,7 @@ class TestStartSession:
 
     def test_start_free_conversation(self, auth_client):
         client, headers, _ = auth_client
-        resp = client.post(
-            "/api/v1/sessions/start", json={"language": "Spanish"}, headers=headers
-        )
+        resp = client.post("/api/v1/sessions/start", json={"language": "Spanish"}, headers=headers)
         assert resp.status_code == 200
         body = resp.json()
         assert body["session_id"]
@@ -70,9 +68,7 @@ class TestChat:
         assert resp.status_code == 404
 
     def test_chat_requires_auth(self, client):
-        resp = client.post(
-            "/api/v1/chat", json={"session_id": "x", "message": "hi"}
-        )
+        resp = client.post("/api/v1/chat", json={"session_id": "x", "message": "hi"})
         assert resp.status_code == 401
 
     def test_session_isolated_between_users(self, client, mock_llm):

@@ -90,10 +90,10 @@ class TestVoiceDegradation:
         assert transcribe_audio(None, "Spanish") == ""
 
     def test_transcribe_missing_voice_dep_degrades(self, monkeypatch):
-        from frontend.gradio_app import transcribe_audio
-
         # Force the STT import to fail -> message, not crash.
         import builtins
+
+        from frontend.gradio_app import transcribe_audio
 
         real_import = builtins.__import__
 
@@ -107,9 +107,9 @@ class TestVoiceDegradation:
         assert result.startswith("[voice unavailable")
 
     def test_synthesize_reply_none_when_unavailable(self, monkeypatch):
-        from frontend.gradio_app import synthesize_reply
-
         import builtins
+
+        from frontend.gradio_app import synthesize_reply
 
         real_import = builtins.__import__
 

@@ -1,0 +1,18 @@
+# Spanish register / formality notes.
+notes:
+  - topic: tú vs usted
+    note: >
+      Use tú with friends, family, peers, and children; usted with strangers,
+      elders, and in formal/professional settings. Latin American usage skews
+      more formal (usted) than peninsular Spanish.
+    register: neutral
+  - topic: vosotros vs ustedes
+    note: >
+      Peninsular Spanish uses vosotros for informal plural "you"; Latin America
+      uses ustedes for all plural "you".
+    register: neutral
+  - topic: voseo
+    note: >
+      In Argentina, Uruguay, and parts of Central America, vos replaces tú
+      (¿vos querés?). Valid regional usage, not an error.
+    register: informal

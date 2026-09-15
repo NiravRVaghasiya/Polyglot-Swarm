@@ -1,0 +1,27 @@
+# Spanish collocations — fixed multi-word units learned as single objects.
+collocations:
+  - phrase: tomar una decisión
+    translation: to make a decision
+    pattern: verb + noun
+    cefr: B1
+    register: neutral
+  - phrase: hacer una pregunta
+    translation: to ask a question
+    pattern: verb + noun
+    cefr: A2
+    register: neutral
+  - phrase: tener ganas de
+    translation: to feel like (doing something)
+    pattern: verb + noun + prep
+    cefr: B1
+    register: neutral
+  - phrase: dar un paseo
+    translation: to take a walk
+    pattern: verb + noun
+    cefr: A2
+    register: neutral
+  - phrase: echar de menos
+    translation: to miss (someone/something)
+    pattern: idiom
+    cefr: B1
+    register: neutral

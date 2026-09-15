@@ -44,6 +44,14 @@ def build_scenario_context(scenario: Scenario, cefr_level: str) -> dict[str, Any
             for o in scenario.objectives
         ],
         "success_criteria": scenario.success_criteria.model_dump(),
+        # Phase 13: pedagogical targets the persona should create opportunities
+        # for. These steer the Conversation Agent (see conversation.py).
+        "target_grammar": list(scenario.target_grammar),
+        "target_vocabulary": scenario.all_target_vocabulary(),
+        "target_functions": list(scenario.target_functions),
+        "constraints": list(scenario.constraints),
+        "failure_conditions": list(scenario.failure_conditions),
+        "transfer_opportunities": list(scenario.transfer_opportunities),
     }
 
 
@@ -59,9 +67,7 @@ def _conversation_tokens(messages: list[dict[str, Any]]) -> set[str]:
     return tokens
 
 
-def objective_status(
-    scenario: Scenario, messages: list[dict[str, Any]]
-) -> list[dict[str, Any]]:
+def objective_status(scenario: Scenario, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Return each objective with a completion flag.
 
     An objective is complete when every word in its ``required_vocab`` has
@@ -84,13 +90,9 @@ def objective_status(
     return status
 
 
-def target_vocab_coverage(
-    scenario: Scenario, messages: list[dict[str, Any]]
-) -> float:
+def target_vocab_coverage(scenario: Scenario, messages: list[dict[str, Any]]) -> float:
     """Fraction of all objectives' required vocab that appeared in conversation."""
-    all_required = {
-        v.lower() for obj in scenario.objectives for v in obj.required_vocab
-    }
+    all_required = {v.lower() for obj in scenario.objectives for v in obj.required_vocab}
     if not all_required:
         return 1.0
     used = all_required & _conversation_tokens(messages)
@@ -116,6 +118,8 @@ def evaluate_success(
     coverage_ok = coverage >= criteria.target_vocabulary_used_min
     grammar_ok = grammar_error_rate <= criteria.grammar_error_rate_max
 
+    failed, failure_reasons = _evaluate_failure(scenario, messages)
+
     return {
         "objectives_completed": all_done,
         "objectives_ok": objectives_ok,
@@ -123,5 +127,56 @@ def evaluate_success(
         "vocab_coverage_ok": coverage_ok,
         "grammar_error_rate": grammar_error_rate,
         "grammar_ok": grammar_ok,
-        "passed": objectives_ok and coverage_ok and grammar_ok,
+        "failed": failed,
+        "failure_reasons": failure_reasons,
+        # A scenario passes only if criteria are met AND no failure condition hit.
+        "passed": objectives_ok and coverage_ok and grammar_ok and not failed,
     }
+
+
+def _evaluate_failure(scenario: Scenario, messages: list[dict[str, Any]]) -> tuple[bool, list[str]]:
+    """Check the scenario's ``failure_conditions`` against the conversation.
+
+    Deterministic heuristics for the built-in conditions; unknown/free-text
+    conditions are ignored here (a future LLM check can handle them). Returns
+    ``(failed, reasons)``.
+    """
+    reasons: list[str] = []
+    user_text = " ".join(
+        str(m.get("content", "")) for m in messages if m.get("role") == "user"
+    ).lower()
+
+    for condition in scenario.failure_conditions:
+        cond = condition.lower()
+        # "switched to English" / "used English" — crude English detection.
+        if ("english" in cond) and _looks_like_english(user_text):
+            reasons.append(condition)
+        # "gave up" / "abandoned" — an explicit give-up phrase.
+        elif ("gave up" in cond or "abandon" in cond) and any(
+            p in user_text for p in ("i give up", "no puedo", "nie mogę", "non riesco")
+        ):
+            reasons.append(condition)
+    return (bool(reasons), reasons)
+
+
+# Common English function words used only for a crude "switched to English" check.
+_ENGLISH_MARKERS = {
+    "the",
+    "and",
+    "you",
+    "what",
+    "where",
+    "please",
+    "thank",
+    "yes",
+    "no",
+    "want",
+    "have",
+}
+
+
+def _looks_like_english(text: str) -> bool:
+    """Very rough check: several common English function words present."""
+    tokens = _tokenize(text)
+    hits = len(tokens & _ENGLISH_MARKERS)
+    return hits >= 3

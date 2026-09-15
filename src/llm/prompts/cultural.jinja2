@@ -17,6 +17,11 @@ For each note, provide:
 2. category: one of "register", "idiom", "custom"
 3. severity: "info" (nice to know), "suggestion" (would sound more natural), or
    "important" (could cause offense or confusion)
+4. confidence: your confidence 0.0-1.0 that this claim is accurate and
+   well-established (not a guess or overgeneralization about the culture)
+
+Be conservative: only note something you are genuinely confident is true and
+relevant. A confidently wrong cultural claim is worse than no note at all.
 
 If there are NO cultural issues worth noting, return an empty list.
 
@@ -24,4 +29,4 @@ Learner's message:
 "{{ user_text }}"
 
 Respond in valid JSON:
-{"notes": [{"note": "...", "category": "...", "severity": "..."}]}
+{"notes": [{"note": "...", "category": "...", "severity": "...", "confidence": 0.0}]}

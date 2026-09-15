@@ -40,7 +40,8 @@ class TransferProvider(LLMProvider):
 
 def _completed_state(temp_storage):
     user_profile.create_profile(
-        "learner", target_languages=["Spanish", "Italian"],
+        "learner",
+        target_languages=["Spanish", "Italian"],
         cefr_by_language={"Spanish": "A2"},
     )
     state = build_initial_state("learner", "Spanish")
@@ -49,12 +50,21 @@ def _completed_state(temp_storage):
         {"role": "assistant", "content": "¡Claro! Síganme."},
     ]
     state["new_vocabulary"] = [
-        {"word": "restaurante", "translation": "restaurant", "pos": "noun",
-         "context_sentence": "una mesa en el restaurante"},
+        {
+            "word": "restaurante",
+            "translation": "restaurant",
+            "pos": "noun",
+            "context_sentence": "una mesa en el restaurante",
+        },
     ]
     state["grammar_errors"] = [
-        {"original": "quiero una mesa", "correction": "quisiera una mesa",
-         "rule": "politeness", "explanation": "", "severity": "minor"},
+        {
+            "original": "quiero una mesa",
+            "correction": "quisiera una mesa",
+            "rule": "politeness",
+            "explanation": "",
+            "severity": "minor",
+        },
     ]
     state["cultural_notes"] = ["In Spain, 'quisiera' is more polite than 'quiero'."]
     return state
@@ -84,8 +94,13 @@ class TestFinalizeSession:
 
         report = result["report"]
         # All five sections present.
-        for marker in ("Grammar", "New vocabulary", "Cultural notes",
-                       "Level estimate", "Cross-language transfer"):
+        for marker in (
+            "Grammar",
+            "New vocabulary",
+            "Cultural notes",
+            "Level estimate",
+            "Cross-language transfer",
+        ):
             assert marker in report
         # Transfer produced a cognate.
         assert "ristorante" in report

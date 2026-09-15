@@ -21,10 +21,16 @@ def temp_storage(tmp_path, monkeypatch):
 
 @pytest.fixture
 def client(temp_storage):
-    from src.api import sessions
+    from src.api import auth, sessions
     from src.api.app import create_app
 
     sessions.reset()
+    # The auth rate limiters are process-global (Phase 21) so every test gets
+    # a clean budget instead of inheriting counters from earlier tests that
+    # happened to share a client key (TestClient requests all appear to come
+    # from the same synthetic host).
+    auth.login_rate_limiter.reset()
+    auth.register_rate_limiter.reset()
     return TestClient(create_app())
 
 

@@ -48,8 +48,7 @@ def _load_model(model_size: str) -> Any:
         import whisper  # type: ignore[import-not-found]
     except ImportError as exc:  # pragma: no cover - depends on optional extra
         raise SpeechDependencyError(
-            "Whisper is not installed. Install the voice extra: "
-            "pip install 'polyglot-swarm[voice]'"
+            "Whisper is not installed. Install the voice extra: pip install 'polyglot-swarm[voice]'"
         ) from exc
     return whisper.load_model(model_size)
 

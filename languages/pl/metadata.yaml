@@ -1,0 +1,9 @@
+language: Polish
+code: pl
+family: West Slavic
+dialect: Standard Polish
+writing_system: "Latin (with diacritics)"
+notes: >
+  High-morphology validation language: seven cases, verb aspect pairs, complex
+  consonant clusters. Deliberately different from the Romance languages to
+  stress-test the multilingual architecture.

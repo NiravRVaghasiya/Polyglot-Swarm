@@ -1,13 +1,11 @@
 """Tests for the FSRS Spaced Repetition Agent."""
 
-from datetime import datetime, timezone, timedelta
-
-import pytest
+from datetime import UTC, datetime, timedelta
 
 from src.agents.srs import (
-    schedule_new_items,
-    process_review_response,
     get_due_items,
+    process_review_response,
+    schedule_new_items,
 )
 
 
@@ -76,8 +74,8 @@ class TestGetDueItems:
     """Test retrieving items due for review."""
 
     def test_returns_overdue_items(self):
-        past = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
-        future = (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
+        past = (datetime.now(UTC) - timedelta(hours=1)).isoformat()
+        future = (datetime.now(UTC) + timedelta(days=1)).isoformat()
 
         items = [
             {"word": "mesa", "next_review": past},
@@ -89,14 +87,14 @@ class TestGetDueItems:
         assert due[0]["word"] == "mesa"
 
     def test_respects_limit(self):
-        past = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+        past = (datetime.now(UTC) - timedelta(hours=1)).isoformat()
         items = [{"word": f"word_{i}", "next_review": past} for i in range(20)]
 
         due = get_due_items(items, limit=5)
         assert len(due) == 5
 
     def test_empty_when_nothing_due(self):
-        future = (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
+        future = (datetime.now(UTC) + timedelta(days=1)).isoformat()
         items = [{"word": "mesa", "next_review": future}]
 
         due = get_due_items(items)
