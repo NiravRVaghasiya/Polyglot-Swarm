@@ -49,6 +49,17 @@ class TestEnvExampleSync:
             f".env.example documents keys with no matching Settings field: {unknown}"
         )
 
+    def test_env_example_ships_no_placeholder_secrets(self):
+        # Any non-empty value counts as "configured" (see
+        # Settings.configured_backends), so a placeholder like ``sk-...``
+        # copied into .env would make the app route to a provider it cannot use.
+        filled = [
+            line.split("=", 1)[0]
+            for line in _ENV_EXAMPLE.read_text(encoding="utf-8").splitlines()
+            if re.match(r"[A-Z0-9_]*(KEY|SECRET)=\S", line.strip())
+        ]
+        assert not filled, f".env.example must leave secrets blank: {filled}"
+
 
 class TestValidation:
     def test_no_backend_is_a_problem_outside_deterministic(self, monkeypatch):

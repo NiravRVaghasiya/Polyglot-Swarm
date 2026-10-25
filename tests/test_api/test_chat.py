@@ -103,6 +103,49 @@ class TestSessionState:
         assert resp.json()["turn_count"] >= 1
 
 
+class TestConversationHistory:
+    def test_history_sent_to_model_has_each_turn_once(self, auth_client, mock_llm, monkeypatch):
+        # Regression: the graph's checkpointer used to merge the resent session
+        # state into its own copy, so the ``messages`` add-reducer appended the
+        # whole history again on every turn and the model saw repeated turns.
+        from src.agents import conversation
+        from src.llm.provider import LLMProvider
+
+        class Recording(LLMProvider):
+            name = "recording"
+
+            def __init__(self) -> None:
+                self.prompts: list[list[tuple[str, str]]] = []
+
+            def is_available(self) -> bool:
+                return True
+
+            async def generate(self, messages, *, temperature=0.7, max_tokens=512, json_mode=False):
+                self.prompts.append([(m.role, m.content) for m in messages if m.role != "system"])
+                return f"reply {len(self.prompts)}"
+
+        recorder = Recording()
+        monkeypatch.setattr(conversation, "get_provider", lambda tier: recorder)
+
+        client, headers, _ = auth_client
+        sid = client.post(
+            "/api/v1/sessions/start", json={"language": "Spanish"}, headers=headers
+        ).json()["session_id"]
+        for message in ("Hola", "Quiero un café", "Gracias"):
+            resp = client.post(
+                "/api/v1/chat", json={"session_id": sid, "message": message}, headers=headers
+            )
+            assert resp.status_code == 200
+
+        assert recorder.prompts[-1] == [
+            ("user", "Hola"),
+            ("assistant", "reply 1"),
+            ("user", "Quiero un café"),
+            ("assistant", "reply 2"),
+            ("user", "Gracias"),
+        ]
+
+
 class TestEndSession:
     def test_end_returns_report(self, auth_client, mock_llm):
         client, headers, _ = auth_client
