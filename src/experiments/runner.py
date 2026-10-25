@@ -223,11 +223,11 @@ async def _run_one_session(
     so a stripped-down arm (no analysis / no review) genuinely exercises a
     different topology.
     """
-    from langgraph.checkpoint.memory import MemorySaver
-
     # Typed as Any to match src.api.sessions' use of the compiled graph — the
-    # streaming/merge loop below relies on the same dynamic update dicts.
-    graph: Any = build_ablation_graph(arm).compile(checkpointer=MemorySaver())
+    # streaming/merge loop below relies on the same dynamic update dicts. No
+    # checkpointer, for the same reason as compile_turn_graph: this loop owns
+    # the state and resends it every turn.
+    graph: Any = build_ablation_graph(arm).compile()
     has_analysis = "analysis" in ABLATION_ARMS[arm]
 
     state = build_initial_state(user_id, language, session_id=f"{arm}-{user_id}")

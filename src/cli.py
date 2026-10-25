@@ -18,7 +18,7 @@ from rich.console import Console
 from rich.table import Table
 
 from src.observability.logging_config import ensure_configured
-from src.orchestrator.graph import compile_graph
+from src.orchestrator.graph import compile_turn_graph
 from src.orchestrator.lifecycle import build_initial_state, finalize_session
 from src.orchestrator.state import LearnerState
 from src.scenarios.loader import ScenarioError, list_scenarios
@@ -315,7 +315,7 @@ def chat(
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1) from exc
 
-    graph = compile_graph()
+    graph = compile_turn_graph()
 
     scenario_ctx = state.get("current_scenario", {}) or {}
     persona = scenario_ctx.get("persona", {})
