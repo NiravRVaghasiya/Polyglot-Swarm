@@ -136,9 +136,11 @@ class TestConfigureLogging:
 
     def test_http_client_request_logs_are_quieted(self):
         # One INFO line per LLM HTTP call would flood the interactive CLI chat.
+        # Current Anthropic/OpenAI SDKs use the httpx2 client; google-genai logs
+        # an "AFC is enabled" line per call.
         configure_logging(level="INFO", fmt="text")
-        assert logging.getLogger("httpx").getEffectiveLevel() == logging.WARNING
-        assert logging.getLogger("httpcore").getEffectiveLevel() == logging.WARNING
+        for name in ("httpx", "httpcore", "httpx2", "google_genai"):
+            assert logging.getLogger(name).getEffectiveLevel() == logging.WARNING, name
 
 
 class TestEnsureConfigured:

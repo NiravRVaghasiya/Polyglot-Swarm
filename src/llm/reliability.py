@@ -125,10 +125,29 @@ def is_retryable(exc: BaseException) -> bool:
     """
     if isinstance(exc, ImportError):
         return False
-    status = getattr(exc, "status_code", None)
-    if isinstance(status, int) and 400 <= status < 500:
+    status = _http_status(exc)
+    if status is not None and 400 <= status < 500:
         return status in _RETRYABLE_CLIENT_STATUSES
     return True
+
+
+def _http_status(exc: BaseException) -> int | None:
+    """The HTTP status an SDK error carries, looking through wrapped causes.
+
+    Anthropic, OpenAI and Ollama errors expose ``status_code``; LangChain's
+    Gemini wrapper carries none itself but is raised ``from`` a google.genai
+    error whose status is an int ``code``.
+    """
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        for attr in ("status_code", "code"):
+            value = getattr(current, attr, None)
+            if isinstance(value, int) and not isinstance(value, bool) and 100 <= value < 600:
+                return value
+        current = current.__cause__
+    return None
 
 
 #: Shared breaker instance for the real (non-deterministic) provider chain.

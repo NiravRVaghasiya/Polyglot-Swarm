@@ -16,6 +16,7 @@ from typing import Any, TextIO
 
 import typer
 from rich.console import Console
+from rich.markup import escape
 from rich.table import Table
 
 from src.observability.logging_config import ensure_configured
@@ -353,13 +354,16 @@ def chat(
 
     scenario_ctx = state.get("current_scenario", {}) or {}
     persona = scenario_ctx.get("persona", {})
+    # Model output and scenario text are printed verbatim, never as Rich markup:
+    # otherwise "[ser]" in a reply (or the fake provider's "[fake:...]") vanishes.
+    speaker = escape(persona.get("name", "Tutor"))
     console.print(
         f"[bold green]🌍 Polyglot Swarm[/bold green] — {state['language']} | "
         f"Level: {state['cefr_level']}"
     )
     opening = scenario_ctx.get("opening_line")
     if opening:
-        console.print(f"[bold]{persona.get('name', 'Tutor')}:[/bold] {opening}")
+        console.print(f"[bold]{speaker}:[/bold] {escape(opening)}")
     console.print("[dim](type 'quit' to end and see your report)[/dim]\n")
 
     while True:
@@ -370,7 +374,7 @@ def chat(
         if user_input.strip().lower() in {"quit", "exit"}:
             break
         reply = asyncio.run(_run_turn(state, user_input))
-        console.print(f"[bold]{persona.get('name', 'Tutor')}:[/bold] {reply}\n")
+        console.print(f"[bold]{speaker}:[/bold] {escape(reply)}\n")
 
     console.print("\n[dim]Ending session...[/dim]")
     result = asyncio.run(finalize_session(state))

@@ -472,6 +472,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   but only installed transitively).
 - The React app's `npm run lint` (an interactive ESLint setup prompt) is
   replaced by `npm run typecheck`.
+- The grammar, vocabulary and cultural agents return no findings on a total
+  LLM outage instead of raising, which crashed the CLI chat (and failed the
+  API `/chat` turn) when no backend answered, e.g. with invalid API keys.
+- Gemini's 4xx errors (such as an invalid key) are recognised as permanent
+  and no longer retried; the status is read from the wrapped SDK error.
+- `polyglot chat` prints replies verbatim: Rich treated `[word]` in a reply
+  (and the offline demo's `[fake:...]` prefix) as markup and dropped it.
+- The `httpx2` client used by current Anthropic/OpenAI SDKs and
+  `google_genai` no longer log a line per request into the chat.
 
 ## [0.1.0] — Initial
 

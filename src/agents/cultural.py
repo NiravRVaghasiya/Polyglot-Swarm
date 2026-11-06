@@ -58,16 +58,22 @@ async def cultural_node(state: LearnerState) -> dict[str, Any]:
         )
     )
 
+    # Best-effort like the other analysis agents: a total provider outage
+    # means no notes this turn, not a crashed session.
     provider = get_provider("fast")
-    response_text = await provider.generate(
-        [
-            Message("system", "You are a cultural language coach. Respond only in JSON."),
-            Message("user", prompt),
-        ],
-        temperature=0.2,
-        max_tokens=500,
-        json_mode=True,
-    )
+    try:
+        response_text = await provider.generate(
+            [
+                Message("system", "You are a cultural language coach. Respond only in JSON."),
+                Message("user", prompt),
+            ],
+            temperature=0.2,
+            max_tokens=500,
+            json_mode=True,
+        )
+    except Exception as exc:  # noqa: BLE001 - analysis must never break the turn
+        logger.warning("Cultural analysis skipped, no LLM provider answered: %s", exc)
+        return {"cultural_notes": existing}
 
     notes = _select_confident_notes(_parse_cultural_response(response_text))
     if not notes:
