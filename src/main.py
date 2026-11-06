@@ -17,7 +17,7 @@ from typing import Any
 import gradio as gr
 
 from src.config import settings
-from src.orchestrator.graph import compile_graph
+from src.orchestrator.graph import compile_turn_graph
 from src.orchestrator.lifecycle import build_initial_state, finalize_session
 from src.orchestrator.state import LearnerState
 from src.scenarios.loader import Scenario, list_scenarios
@@ -31,9 +31,10 @@ def _available_scenarios() -> list[Scenario]:
         return []
 
 
-# Compile the LangGraph once (in-memory checkpointer is fine for the MVP UI;
-# durable persistence happens via persist_session at session end).
-app = compile_graph()
+# Compile the LangGraph once. No checkpointer: the Gradio session state owns
+# the LearnerState and resends it every turn (see compile_turn_graph); durable
+# persistence happens via persist_session at session end.
+app = compile_turn_graph()
 
 
 async def _run_turn(state: LearnerState, user_input: str) -> str:

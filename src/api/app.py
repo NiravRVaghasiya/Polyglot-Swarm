@@ -12,6 +12,7 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from src import __version__
@@ -111,6 +112,18 @@ def create_app() -> FastAPI:
         description="Multi-agent AI language learning — REST API.",
         lifespan=_lifespan,
     )
+
+    from src.config import settings
+
+    origins = settings.cors_origin_list()
+    if origins:
+        # Auth is a bearer header, not cookies, so credentials stay disallowed.
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=origins,
+            allow_methods=["*"],
+            allow_headers=["Authorization", "Content-Type"],
+        )
 
     @app.get("/health", tags=["health"])
     def health() -> dict[str, str]:

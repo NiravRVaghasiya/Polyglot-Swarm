@@ -98,6 +98,10 @@ class Settings(BaseSettings):
     api_host: str = "0.0.0.0"
     api_port: int = 8000
     gradio_server_port: int = 7860
+    #: Comma-separated browser origins allowed to call the API (CORS). The
+    #: React app is served from its own origin, so without this the browser
+    #: blocks its requests. Empty disables CORS entirely.
+    cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
@@ -108,6 +112,10 @@ class Settings(BaseSettings):
     def has_local_provider(self) -> bool:
         """Whether a local Ollama endpoint is configured."""
         return bool(self.ollama_base_url)
+
+    def cors_origin_list(self) -> list[str]:
+        """The configured CORS origins, parsed from the comma-separated setting."""
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
     def configured_backends(self) -> list[str]:
         """Names of the LLM backends this configuration can reach."""

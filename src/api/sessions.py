@@ -12,13 +12,14 @@ import logging
 
 from src.agents.adaptive import adaptive_node
 from src.observability.context import interaction_scope
-from src.orchestrator.graph import compile_graph
+from src.orchestrator.graph import compile_turn_graph
 from src.orchestrator.state import LearnerState
 
 logger = logging.getLogger("polyglot.api.sessions")
 
-# Compiled once and reused across requests.
-_graph = compile_graph()
+# Compiled once and reused across requests. No checkpointer: this registry owns
+# each session's state and resends it every turn (see compile_turn_graph).
+_graph = compile_turn_graph()
 
 # (user_id, session_id) -> LearnerState
 _active: dict[tuple[str, str], LearnerState] = {}

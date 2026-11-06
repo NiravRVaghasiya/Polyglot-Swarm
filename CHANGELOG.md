@@ -428,6 +428,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `CONTRIBUTING.md`, and `pyproject.toml` with the real repository.
 - Corrected documented CLI commands so they are executable (scenario ids such
   as `es_restaurant_ordering`, language-by-name usage).
+- Conversation history no longer repeats in the model's prompt on every turn.
+  The API, CLI, Gradio, and ablation turn runners resend the whole session
+  state each turn, and the graph's checkpointer merged it into its saved copy
+  via the `messages` add-reducer; they now use `compile_turn_graph()`, which
+  has no checkpointer.
+- The React app can now call the API from its own origin: new `CORS_ORIGINS`
+  setting (defaults to the local Next.js dev server; empty disables CORS).
+- `.env.example` no longer ships placeholder API keys (`sk-...`, `AIza...`),
+  which a copied `.env` treated as configured providers.
 
 ## [0.1.0] — Initial
 

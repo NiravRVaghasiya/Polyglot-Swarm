@@ -58,7 +58,8 @@ Notable groups:
 - **Logging**: `LOG_LEVEL` (default `INFO`), `LOG_FORMAT` (`text` for local
   dev, `json` for a log aggregator).
 - **Storage**: `DATA_DIR`, `DB_PATH`, `CHROMA_PATH`, `PROFILES_DIR`.
-- **Server**: `API_HOST`, `API_PORT`, `GRADIO_SERVER_PORT`.
+- **Server**: `API_HOST`, `API_PORT`, `GRADIO_SERVER_PORT`, `CORS_ORIGINS`
+  (browser origins allowed to call the API; defaults to the React dev server).
 - **Security**: `TOKEN_TTL_HOURS`, `TELEMETRY_ENABLED`.
 - **Voice** (optional): `LIVEKIT_URL`, `LIVEKIT_API_KEY`,
   `LIVEKIT_API_SECRET`.

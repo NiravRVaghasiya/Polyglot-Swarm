@@ -185,6 +185,25 @@ def compile_graph(
     return graph.compile(checkpointer=checkpointer)
 
 
+def compile_turn_graph(components: frozenset[AblationComponent] | None = None) -> Any:
+    """Compile the graph *without* a checkpointer, for callers that own the state.
+
+    The turn runners (API, CLI, Gradio, ablation harness) keep the session's
+    ``LearnerState`` themselves and resend all of it on every turn. With a
+    checkpointer on the same ``thread_id``, LangGraph would merge that input
+    into the checkpointed state, and the ``messages`` add-reducer would append
+    the resent history onto the history already saved there — so the
+    conversation model would see every earlier turn repeated, compounding
+    each turn. Without a checkpointer each run starts from exactly the state
+    passed in.
+
+    Args:
+        components: Forwarded to :func:`build_graph` (Phase 19 ablation
+            studies); ``None`` builds the full production graph.
+    """
+    return build_graph(components).compile()
+
+
 async def compile_graph_async() -> Any:
     """Compile the graph with a durable SQLite checkpointer.
 
