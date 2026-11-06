@@ -47,12 +47,43 @@ def test_assign_unknown_experiment_fails_gracefully(temp_storage):
     assert "unknown experiment" in result.stdout
 
 
+def _seed_two_skills(user: str) -> None:
+    from src.learner import get_knowledge_model
+
+    for skill in ("vocabulary", "grammar"):
+        get_knowledge_model().update_from_events(
+            user,
+            "Spanish",
+            [
+                {"skill": skill, "assessment": "correct", "confidence": 0.9, "item_id": f"i{i}"}
+                for i in range(4)
+            ],
+        )
+
+
+def test_measure_refuses_without_evidence(temp_storage):
+    # ADR-0031: a learner with no evidence has no level; the command used to
+    # record the default "A2" as the pre-test outcome.
+    from src.cli import app
+    from src.memory import experiments
+
+    CliRunner().invoke(app, ["experiment", "create", "demo", "--variants", "control,treatment"])
+    CliRunner().invoke(app, ["experiment", "assign", "demo", "--user", "u1"])
+    result = CliRunner().invoke(
+        app, ["experiment", "measure", "demo", "--user", "u1", "--point", "pre_test"]
+    )
+    assert result.exit_code == 1
+    assert "No overall CEFR level" in result.stdout
+    assert experiments.get_outcomes("demo", user_id="u1") == []
+
+
 def test_measure_records_an_outcome(temp_storage):
     from src.cli import app
     from src.memory import experiments
 
     CliRunner().invoke(app, ["experiment", "create", "demo", "--variants", "control,treatment"])
     CliRunner().invoke(app, ["experiment", "assign", "demo", "--user", "u1"])
+    _seed_two_skills("u1")
     result = CliRunner().invoke(
         app,
         ["experiment", "measure", "demo", "--user", "u1", "--point", "pre_test"],
@@ -90,6 +121,7 @@ def test_report_shows_recorded_outcomes(temp_storage):
 
     CliRunner().invoke(app, ["experiment", "create", "demo", "--variants", "control"])
     CliRunner().invoke(app, ["experiment", "assign", "demo", "--user", "u1"])
+    _seed_two_skills("u1")  # a measurable level (no default is recorded since ADR-0031)
     CliRunner().invoke(
         app, ["experiment", "measure", "demo", "--user", "u1", "--point", "pre_test"]
     )

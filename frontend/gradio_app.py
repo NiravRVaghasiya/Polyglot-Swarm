@@ -6,6 +6,8 @@ Upgrades the basic chat UI with:
 - Optional voice: microphone input (Whisper STT) and spoken replies (Edge TTS),
   degrading gracefully to text-only when the voice extra is not installed.
 - An end-of-session report showing every agent's contribution.
+- A "My level" panel with the evidence-backed CEFR profile (nullable bands
+  with their evidence status, ADR-0031).
 
 Run: python -m frontend.gradio_app
 """
@@ -91,6 +93,43 @@ def end_session(state_box: dict[str, Any]) -> str:
     return str(result["report"])
 
 
+def learner_level_markdown(state_box: dict[str, Any], language: str) -> str:
+    """Render the evidence-backed CEFR profile (ADR-0031) as Markdown.
+
+    Bands are ``None`` until the evidence supports them, so this says
+    "not yet assessed" rather than showing a default level.
+    """
+    from src.assessment import build_cefr_profile
+
+    user_id = state_box.get("user_id")
+    if not user_id:
+        return "Start a conversation first — there is no evidence about you yet."
+    profile = build_cefr_profile(user_id, language)
+    overall = profile.overall or "not yet assessed"
+    lines = [
+        f"**Overall level:** {overall} — _{profile.overall_status.replace('_', ' ')}_",
+        "",
+        "| Skill | Level | Evidence | Mastery range |",
+        "|---|---|---|---|",
+    ]
+    for skill, a in sorted(profile.skills.items()):
+        span = (
+            f"{a.mastery_low:.0%}–{a.mastery_high:.0%}"
+            if a.mastery_low is not None and a.mastery_high is not None
+            else "—"
+        )
+        lines.append(
+            f"| {skill} | {a.cefr or '—'} | {a.status.replace('_', ' ')} "
+            f"({a.independent_count} independent obs) | {span} |"
+        )
+    if profile.unassessed_skills:
+        lines.append("")
+        lines.append(f"_Not yet assessed:_ {', '.join(profile.unassessed_skills)}")
+    lines.append("")
+    lines.append("_Evidence labels describe how much the model has seen, not calibrated odds._")
+    return "\n".join(lines)
+
+
 def build_ui() -> gr.Blocks:
     """Build the Gradio Blocks app."""
     scenario_choices = [("(free conversation)", "")] + [
@@ -124,9 +163,11 @@ def build_ui() -> gr.Blocks:
         with gr.Row():
             send_btn = gr.Button("Send", variant="primary")
             end_btn = gr.Button("End session & save")
+            level_btn = gr.Button("My level")
 
         reply_audio = gr.Audio(label="Spoken reply", autoplay=True)
         report_out = gr.Markdown()
+        level_out = gr.Markdown()
 
         def _on_send(
             message: str,
@@ -156,6 +197,7 @@ def build_ui() -> gr.Blocks:
             outputs=[chatbot, reply_audio, msg],
         )
         end_btn.click(end_session, inputs=[state_box], outputs=[report_out])
+        level_btn.click(learner_level_markdown, inputs=[state_box, language], outputs=[level_out])
 
     assert isinstance(demo, gr.Blocks)
     return demo

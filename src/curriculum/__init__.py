@@ -17,11 +17,12 @@ The division of labour with FSRS is deliberate (Phase 8):
 - FSRS decides **when** an item is due for review.
 """
 
-from src.curriculum.actions import ActionType, LearningAction
+from src.curriculum.actions import ActionIntent, ActionType, LearningAction
 from src.curriculum.constraints import PlanConstraints
 from src.curriculum.planner import plan_next_actions, plan_next_best
 
 __all__ = [
+    "ActionIntent",
     "ActionType",
     "LearningAction",
     "PlanConstraints",

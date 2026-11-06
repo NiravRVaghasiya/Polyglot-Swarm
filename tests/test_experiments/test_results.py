@@ -32,10 +32,18 @@ class TestGenerate:
 
     async def test_ablation_arms_appear_with_gain_direction(self, tmp_path):
         markdown = await results_mod.generate(output=tmp_path / "r.md", learners_per_arm=1)
-        # The analysis arms (D/E) show a positive gain; the artifact renders it.
-        assert "+0.333" in markdown or "+0.3" in markdown
-        for arm in ("A", "B", "C", "D", "E"):
-            assert f"| {arm} |" in markdown
+        # The analysis arms (D/E) show a positive gain and the others none; the
+        # artifact renders it. (The exact value depends on the learner-model
+        # engine — it was +0.333 under the pre-ADR-0031 engine — so the test
+        # checks the direction, which is what the ablation is about.)
+        gains = {}
+        for line in markdown.splitlines():
+            cells = [c.strip() for c in line.strip().strip("|").split("|")]
+            if len(cells) == 6 and cells[0] in ("A", "B", "C", "D", "E"):
+                gains[cells[0]] = float(cells[5])
+        assert set(gains) == {"A", "B", "C", "D", "E"}
+        assert gains["D"] > 0 and gains["E"] > 0
+        assert gains["A"] == gains["B"] == gains["C"] == 0.0
 
     async def test_stdout_only_does_not_write(self, tmp_path):
         out = tmp_path / "nope.md"

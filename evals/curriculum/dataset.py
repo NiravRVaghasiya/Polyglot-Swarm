@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 #: Bump when cases are added/changed/removed.
-DATASET_VERSION = "2026.09.0"
+DATASET_VERSION = "2026.11.0"
 
 
 @dataclass(frozen=True)
@@ -64,12 +64,13 @@ class SkillBalanceCase:
     """A learner whose weakest skill (via seeded evidence) should drive the plan.
 
     ``events`` are ``(skill, assessment, count)`` triples applied through the
-    knowledge model, mirroring how real evidence accumulates skill beliefs.
-    Every skill the planner proposes must be "ready" per
-    :func:`src.learner.skill_graph.is_ready` (its prerequisites at or above
-    0.4 mastery) or it is filtered out before scoring — so each case also
-    seeds a passing score for its skill's prerequisites, not just the target
-    skill itself. ``time_available_minutes`` is generous (60 rather than the
+    knowledge model as ``count`` observations of *distinct* items, mirroring
+    how real evidence accumulates skill beliefs (ADR-0031: repeats of one
+    identical observation count once).
+    A skill is skipped when the evidence shows one of its prerequisites is
+    weak (unassessed prerequisites no longer block, ADR-0031), so each case
+    also seeds passing evidence for its skill's prerequisites, not just the
+    target skill itself. ``time_available_minutes`` is generous (60 rather than the
     15-minute default) so a lower-priority but still-relevant action for the
     target skill isn't squeezed out of the plan purely by the time budget.
     """

@@ -8,16 +8,31 @@ planner (what to do next).
 Modules:
 - :mod:`uncertainty`    — confidence/uncertainty helpers.
 - :mod:`skill_graph`    — skill/construction prerequisite relations.
-- :mod:`mastery_engine` — prior belief + new evidence -> posterior belief +
-  uncertainty (a robust weighted-evidence model for MVP; the interface is
-  designed so BKT/IRT/DKT can be swapped in later).
+- :mod:`estimation`     — the evidence-driven engine (ADR-0031): difficulty-
+  aware, duplicate/correlation-aware ability estimates with uncertainty,
+  evidence quality, coverage, and explicit evidence states.
+- :mod:`mastery_engine` — the original incremental weighted-evidence rule,
+  kept as the comparison baseline.
 - :mod:`knowledge_model`— the top-level facade: read the current model, update
   it from a batch of events, and snapshot it.
 
 The important part is the **interface**, not premature algorithmic complexity.
 """
 
+from src.learner.estimation import (
+    EvidenceMasteryEngine,
+    EvidenceStatus,
+    SkillEstimate,
+)
 from src.learner.knowledge_model import KnowledgeModel, get_knowledge_model
 from src.learner.mastery_engine import MasteryEngine, SkillBelief
 
-__all__ = ["KnowledgeModel", "MasteryEngine", "SkillBelief", "get_knowledge_model"]
+__all__ = [
+    "EvidenceMasteryEngine",
+    "EvidenceStatus",
+    "KnowledgeModel",
+    "MasteryEngine",
+    "SkillBelief",
+    "SkillEstimate",
+    "get_knowledge_model",
+]

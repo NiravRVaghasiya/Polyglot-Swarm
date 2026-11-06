@@ -34,7 +34,7 @@ from src.memory.db import get_connection
 logger = logging.getLogger("polyglot.memory.schema")
 
 # The schema version this code expects. Bump when you add a migration.
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 
 
 # --------------------------------------------------------------------------- #
@@ -351,6 +351,126 @@ def _migration_0006_security(conn: Connection) -> None:
     conn.executescript(_AUDIT_LOG_SCHEMA)
 
 
+# ADR-0031 (evidence-driven learner knowledge model). Every column is nullable
+# or defaulted so existing rows remain valid without being rewritten: a legacy
+# evidence row reads back as schema_version 1 with an unknown difficulty, and a
+# legacy skill_states row has a NULL ``method`` until the model is replayed.
+_EVIDENCE_V2_COLUMNS: dict[str, str] = {
+    "subskill": "TEXT",
+    "objective_id": "TEXT",
+    "task_type": "TEXT",
+    "difficulty": "REAL",  # 0..1, NULL = unknown
+    "difficulty_basis": "TEXT NOT NULL DEFAULT 'unknown'",
+    "model_version": "TEXT",
+    "rubric_version": "TEXT",
+    "prompt_version": "TEXT",
+    "correlation_id": "TEXT",
+    "supersedes": "TEXT",
+    "fingerprint": "TEXT",
+    "schema_version": "INTEGER NOT NULL DEFAULT 1",
+    "recorded_at": "TEXT",
+}
+
+_SKILL_STATE_V2_COLUMNS: dict[str, str] = {
+    "method": "TEXT",  # e.g. "lkm-evidence-v2"; NULL = legacy incremental row
+    "status": "TEXT",  # insufficient_evidence | provisional | estimated | validated
+    "mastery_low": "REAL",
+    "mastery_high": "REAL",
+    "evidence_index": "REAL",
+    "independent_n": "REAL",
+    "effective_n": "REAL",
+    "evidence_quality": "REAL",
+    "baseline_mastery": "REAL",  # the legacy engine's value, for comparison
+    "coverage": "TEXT",  # JSON
+    "last_evidence_at": "TEXT",
+    "evidence_digest": "TEXT",
+}
+
+_LKM_V2_SCHEMA = (
+    # Append-only corrections: an evidence row is never edited; instead a row
+    # here marks it superseded (optionally by a replacement event).
+    """
+    CREATE TABLE IF NOT EXISTS evidence_supersessions (
+        id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id             TEXT NOT NULL,
+        superseded_event_id TEXT NOT NULL,
+        superseding_event_id TEXT,
+        reason              TEXT NOT NULL DEFAULT '',
+        created_at          TEXT NOT NULL,
+        UNIQUE(superseded_event_id, superseding_event_id)
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_supersessions_user ON evidence_supersessions(user_id)",
+    "CREATE INDEX IF NOT EXISTS idx_evidence_user_lang_time "
+    "ON evidence(user_id, language, created_at, event_id)",
+    "CREATE INDEX IF NOT EXISTS idx_evidence_fingerprint ON evidence(fingerprint)",
+    # One row per recompute of a learner's model that changed something.
+    """
+    CREATE TABLE IF NOT EXISTS lkm_processing_runs (
+        id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id                TEXT NOT NULL,
+        language               TEXT NOT NULL,
+        method                 TEXT NOT NULL,
+        trigger                TEXT NOT NULL,
+        evidence_digest        TEXT NOT NULL,
+        evidence_count         INTEGER NOT NULL,
+        evidence_high_water    INTEGER NOT NULL,
+        supersession_high_water INTEGER NOT NULL,
+        created_at             TEXT NOT NULL
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_lkm_runs_user_lang ON lkm_processing_runs(user_id, language)",
+    # Per-skill before/after history, each row tied to the run that caused it.
+    """
+    CREATE TABLE IF NOT EXISTS mastery_updates (
+        id               INTEGER PRIMARY KEY AUTOINCREMENT,
+        run_id           INTEGER NOT NULL,
+        user_id          TEXT NOT NULL,
+        language         TEXT NOT NULL,
+        skill            TEXT NOT NULL,
+        method           TEXT NOT NULL,
+        evidence_digest  TEXT NOT NULL,
+        mastery_before   REAL,
+        mastery_after    REAL,
+        uncertainty_after REAL,
+        status_before    TEXT,
+        status_after     TEXT,
+        baseline_mastery REAL,
+        independent_n    REAL,
+        new_event_ids    TEXT NOT NULL DEFAULT '[]',
+        removed_event_ids TEXT NOT NULL DEFAULT '[]',
+        created_at       TEXT NOT NULL
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_mastery_updates_user "
+    "ON mastery_updates(user_id, language, skill)",
+)
+
+
+def _migration_0007_evidence_lkm_v2(conn: Connection) -> None:
+    """ADR-0031: evidence provenance/difficulty columns, supersession, LKM history.
+
+    Additive and idempotent. Adds nullable/defaulted columns to ``evidence``,
+    ``skill_states`` and ``assessments`` (only those missing), and creates the
+    supersession and history tables. Existing rows are preserved untouched;
+    derived skill beliefs are recomputed from evidence by the knowledge model,
+    not by this migration. Statements run one by one through ``execute`` (not
+    ``executescript``, which would commit early) so a failure rolls back the
+    whole step.
+    """
+    for table, columns in (
+        ("evidence", _EVIDENCE_V2_COLUMNS),
+        ("skill_states", _SKILL_STATE_V2_COLUMNS),
+        ("assessments", {"status": "TEXT"}),
+    ):
+        existing = _existing_columns(conn, table)
+        for column, ddl in columns.items():
+            if column not in existing:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
+    for statement in _LKM_V2_SCHEMA:
+        conn.execute(statement)
+
+
 # Ordered migrations. Index i (1-based) upgrades user_version from i-1 to i.
 _MIGRATIONS: list[Migration] = [
     _migration_0001_baseline,
@@ -359,6 +479,7 @@ _MIGRATIONS: list[Migration] = [
     _migration_0004_session_interactions,
     _migration_0005_outcomes,
     _migration_0006_security,
+    _migration_0007_evidence_lkm_v2,
 ]
 
 

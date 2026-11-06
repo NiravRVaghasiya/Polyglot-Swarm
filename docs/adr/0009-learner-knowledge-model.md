@@ -3,6 +3,8 @@
 - Status: Accepted
 - Date: 2026-09-14
 
+> **Amended by [ADR-0031](0031-evidence-driven-learner-knowledge-model.md)** (2026-11-06): the incremental `MasteryEngine` is now only a comparison baseline; beliefs are a deterministic, idempotent projection of the evidence through the difficulty- and duplicate-aware `EvidenceMasteryEngine`, with history and replay.
+
 ## Context
 
 Phases 2-3 gave us persistent skill-state storage and an evidence stream, but

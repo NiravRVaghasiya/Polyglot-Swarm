@@ -3,6 +3,8 @@
 - Status: Accepted
 - Date: 2026-09-14
 
+> **Amended by [ADR-0031](0031-evidence-driven-learner-knowledge-model.md)** (2026-11-06): CEFR is nullable with explicit evidence states, there is no fallback/default level, the overall band needs two assessed skills, and `confidence` is an ordinal evidence index (method `cefr-profile-v2`).
+
 ## Context
 
 Assessment produced a single overall CEFR band per language (stored in the

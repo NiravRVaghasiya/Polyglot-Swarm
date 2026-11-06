@@ -3,6 +3,8 @@
 - Status: Accepted
 - Date: 2026-09-14
 
+> **Amended by [ADR-0031](0031-evidence-driven-learner-knowledge-model.md)** (2026-11-06): actions carry an intent (assessment/remediation/reinforcement/advancement); insufficient evidence leads to assessment, not remediation; unknown beliefs are never scored as zero.
+
 ## Context
 
 The system could model the learner (Phase 6) but every interaction was still an

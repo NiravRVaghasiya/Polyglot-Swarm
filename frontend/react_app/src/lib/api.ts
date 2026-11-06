@@ -65,7 +65,18 @@ export interface VocabPoint {
   cumulative: number;
 }
 
-// --- Learner model (Phase 16) ---
+// --- Learner model (Phase 16; nullable CEFR + evidence states, ADR-0031) ---
+// A CEFR band or mastery is `null` until the evidence supports it — never a
+// default level and never zero. `confidence` is an ordinal evidence index,
+// not a calibrated probability.
+export type EvidenceStatus =
+  | "insufficient_evidence"
+  | "provisional"
+  | "estimated"
+  | "validated";
+
+export type ActionIntent = "assessment" | "remediation" | "reinforcement" | "advancement" | "";
+
 export interface PlanAction {
   type: string;
   target: string;
@@ -73,6 +84,7 @@ export interface PlanAction {
   reason: string;
   priority: number;
   estimated_minutes: number;
+  intent?: ActionIntent;
 }
 
 export interface PlanResponse {
@@ -83,33 +95,72 @@ export interface PlanResponse {
 
 export interface SkillAssessment {
   skill?: string | null;
-  cefr: string;
-  mastery: number;
+  cefr: string | null;
+  status?: EvidenceStatus;
+  mastery: number | null;
+  mastery_low?: number | null;
+  mastery_high?: number | null;
+  uncertainty?: number;
   confidence: number;
+  confidence_label?: "none" | "low" | "medium" | "high";
   sample_size: number;
+  independent_count?: number;
+  distinct_items?: number;
+  coverage?: Record<string, unknown>;
+  baseline_mastery?: number | null;
 }
 
 export interface CEFRProfile {
   language: string;
-  overall: string;
+  overall: string | null;
+  overall_status?: EvidenceStatus;
+  overall_basis?: string[];
+  unassessed_skills?: string[];
+  method?: string;
   skills: Record<string, SkillAssessment>;
 }
 
 export interface SkillBelief {
   skill: string;
-  mastery: number;
+  mastery: number | null;
   uncertainty: number;
   sample_size: number;
+  status?: EvidenceStatus;
+  mastery_low?: number | null;
+  mastery_high?: number | null;
+  independent_count?: number;
+  effective_n?: number;
+  evidence_index?: number;
+  evidence_quality?: number;
+  coverage?: Record<string, unknown>;
+  last_evidence_at?: string | null;
 }
 
 export interface Insights {
   language: string;
+  /** The tutor's working level from session logs — not an assessment. */
   current_cefr: string | null;
-  overall_cefr: string;
+  overall_cefr: string | null;
+  overall_status?: EvidenceStatus;
   weakest_skills: string[];
+  needs_assessment?: string[];
   top_weaknesses: { error_type: string; occurrences: number }[];
   recommended_focus: string[];
   streak: number;
+}
+
+/** Human-readable label for an evidence status. */
+export function statusLabel(status: EvidenceStatus | undefined): string {
+  switch (status) {
+    case "provisional":
+      return "provisional";
+    case "estimated":
+      return "estimated";
+    case "validated":
+      return "validated";
+    default:
+      return "not enough evidence";
+  }
 }
 
 export interface UserProfile {

@@ -85,10 +85,20 @@ async def eval_skill_balance() -> EvalResult:
         misses: list[str] = []
         for case in SKILL_BALANCE_CASES:
             for skill, assessment, count in case.events:
+                # Distinct items: identical dicts are one observation since
+                # ADR-0031 (duplicates no longer count as independent evidence).
                 get_knowledge_model().update_from_events(
                     case.user_id,
                     "Spanish",
-                    [{"skill": skill, "assessment": assessment, "confidence": 0.9}] * count,
+                    [
+                        {
+                            "skill": skill,
+                            "assessment": assessment,
+                            "confidence": 0.9,
+                            "item_id": f"{skill}-{i}",
+                        }
+                        for i in range(count)
+                    ],
                 )
             constraints = PlanConstraints(
                 time_available_minutes=case.time_available_minutes,

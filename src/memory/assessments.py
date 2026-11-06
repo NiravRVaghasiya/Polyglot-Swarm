@@ -30,18 +30,23 @@ def record_assessment(
     sample_size: int = 0,
     method: str | None = None,
     created_at: str | None = None,
+    status: str | None = None,
 ) -> int:
-    """Persist one assessment. Returns the new row id."""
+    """Persist one assessment. Returns the new row id.
+
+    ``cefr`` may be ``None`` (no level could be supported by the evidence);
+    ``status`` records the evidence state (ADR-0031), ``None`` for legacy rows.
+    """
     init_all()
     when = created_at or _now()
     with get_connection() as conn:
         cursor = conn.execute(
             """
             INSERT INTO assessments (user_id, language, skill, cefr, score,
-                                     confidence, sample_size, method, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                     confidence, sample_size, method, created_at, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (user_id, language, skill, cefr, score, confidence, sample_size, method, when),
+            (user_id, language, skill, cefr, score, confidence, sample_size, method, when, status),
         )
         row_id = cursor.lastrowid
     assert row_id is not None

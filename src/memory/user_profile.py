@@ -23,6 +23,13 @@ from src.config import settings
 # CEFR levels, ordered. Used as the value type for per-language proficiency.
 CEFR_LEVELS = ("A1", "A2", "B1", "B2", "C1", "C2")
 
+#: The band the tutor pitches its language at before anything is known about
+#: the learner. It is an *instructional* default for prompts only: it is never
+#: stored in a profile, logged as an estimate, or shown as the learner's level
+#: (ADR-0031). The learner's assessed level comes from the evidence-backed
+#: CEFR profile, which is ``None`` until there is enough evidence.
+DEFAULT_WORKING_LEVEL = "A2"
+
 
 class UserProfile(BaseModel):
     """A learner's persistent profile."""
@@ -30,16 +37,26 @@ class UserProfile(BaseModel):
     user_id: str
     native_language: str = "English"
     target_languages: list[str] = Field(default_factory=lambda: ["Spanish"])
-    # Per-language CEFR estimate, e.g. {"Spanish": "A2"}.
+    # Per-language *working level* the tutor pitches at, e.g. {"Spanish": "A2"}:
+    # set by onboarding (self-report) or the session heuristic, never seeded.
+    # It is not the assessed level (see src.assessment.cefr_profile).
     cefr_by_language: dict[str, str] = Field(default_factory=dict)
     goals: list[str] = Field(default_factory=list)
     interests: list[str] = Field(default_factory=list)
     # Free-form preferences (voice on/off, preferred dialect, etc.).
     preferences: dict[str, object] = Field(default_factory=dict)
 
-    def cefr_for(self, language: str, default: str = "A2") -> str:
-        """Return the CEFR level for ``language``, or ``default`` if unknown."""
+    def cefr_for(self, language: str, default: str = DEFAULT_WORKING_LEVEL) -> str:
+        """Return the tutor's working level for ``language`` (``default`` if unset).
+
+        For pitching prompts only; use :meth:`has_working_level` to tell a
+        recorded level from the instructional default.
+        """
         return self.cefr_by_language.get(language, default)
+
+    def has_working_level(self, language: str) -> bool:
+        """Whether a working level was ever recorded for ``language``."""
+        return language in self.cefr_by_language
 
 
 def _profiles_dir() -> Path:
@@ -53,11 +70,11 @@ def _profile_path(user_id: str) -> Path:
 
 
 def default_profile(user_id: str) -> UserProfile:
-    """Build a fresh default profile for a new user."""
-    return UserProfile(
-        user_id=user_id,
-        cefr_by_language={"Spanish": "A2"},
-    )
+    """Build a fresh default profile for a new user.
+
+    No CEFR level is seeded: nothing is known about a new learner yet.
+    """
+    return UserProfile(user_id=user_id)
 
 
 def profile_exists(user_id: str) -> bool:

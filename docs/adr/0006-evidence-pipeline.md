@@ -3,6 +3,8 @@
 - Status: Accepted
 - Date: 2026-09-14
 
+> **Amended by [ADR-0031](0031-evidence-driven-learner-knowledge-model.md)** (2026-11-06): events gain objective/task/difficulty/prompt/rubric provenance, a content fingerprint and correlation id; corrections are append-only supersessions; tutor-reply vocabulary is exposure (`VOCAB_OBSERVED`), not production.
+
 ## Context
 
 The system updated its beliefs directly from raw LLM output: `persist_session`

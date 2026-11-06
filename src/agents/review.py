@@ -141,13 +141,24 @@ def grade_review(
     )
     vocabulary_db.record_dimension(user_id, language, word, "recognition", success=correct)
 
-    # Evidence: a graded review is strong, demonstrated recall evidence.
+    # Evidence: a graded review is strong, demonstrated recall evidence. The
+    # card's FSRS difficulty *before* this review is the task difficulty
+    # (basis fsrs_card); a brand-new card has none, so it stays unknown.
+    from src.evidence.difficulty import fsrs_to_difficulty
+    from src.evidence.events import DifficultyBasis
+
+    task_difficulty = fsrs_to_difficulty(card_state.get("difficulty"))
     event = LearningEvent.create(
         EventType.REVIEW_RESULT,
         user_id,
         language,
-        provenance=Provenance(source="review-v1", session_id=session_id),
+        provenance=Provenance(source="review-v2", session_id=session_id),
         item_id=word,
+        subskill="recognition",
+        objective_id="vocabulary.recognition",
+        task_type="review_recall",
+        difficulty=task_difficulty,
+        difficulty_basis=DifficultyBasis.FSRS_CARD if task_difficulty is not None else None,
         observed=word,
         assessment="correct" if correct else "incorrect",
         confidence=0.95,
