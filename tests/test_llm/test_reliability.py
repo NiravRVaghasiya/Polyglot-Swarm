@@ -123,6 +123,32 @@ class TestIsRetryable:
     def test_timeouts_rate_limits_and_server_errors_are_transient(self, status):
         assert is_retryable(_StatusError(status)) is True
 
+    @pytest.mark.parametrize(("status", "expected"), [(400, False), (403, False), (503, True)])
+    def test_status_on_the_wrapped_cause_is_used(self, status, expected):
+        # langchain-google-genai raises its own error ``from`` a google.genai
+        # ClientError whose HTTP status is an int ``code`` attribute.
+        class ClientError(Exception):
+            def __init__(self, code: int) -> None:
+                super().__init__(f"{code} API key not valid")
+                self.code = code
+
+        class ChatGoogleGenerativeAIError(Exception):
+            pass
+
+        try:
+            try:
+                raise ClientError(status)
+            except ClientError as cause:
+                raise ChatGoogleGenerativeAIError("Error calling model") from cause
+        except ChatGoogleGenerativeAIError as exc:
+            assert is_retryable(exc) is expected
+
+    def test_non_http_code_attribute_is_ignored(self):
+        class AppError(Exception):
+            code = 7  # an application error code, not an HTTP status
+
+        assert is_retryable(AppError()) is True
+
     def test_missing_package_is_permanent(self):
         assert is_retryable(ImportError("cannot import name 'ChatOllama'")) is False
 

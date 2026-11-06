@@ -12,6 +12,15 @@ from src.llm.preflight import BackendCheck
 
 
 @pytest.fixture
+def temp_storage(tmp_path, monkeypatch):
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    monkeypatch.setattr(settings, "db_path", str(data_dir / "polyglot.db"), raising=False)
+    monkeypatch.setattr(settings, "profiles_dir", str(data_dir / "profiles"), raising=False)
+    return data_dir
+
+
+@pytest.fixture
 def no_backend(monkeypatch):
     """Live mode with nothing that can answer: no keys and Ollama not running."""
     from src.llm import preflight
@@ -57,6 +66,22 @@ def test_chat_refuses_to_start_without_a_backend(no_backend, monkeypatch):
 
     assert result.exit_code == 1
     assert "No working LLM backend" in result.stdout
+
+
+def test_chat_prints_bracketed_reply_text_verbatim(temp_storage):
+    # Rich parsed replies as markup, so "[fake:ab12]" (and any "[word]" in a
+    # real model's reply) vanished from the terminal.
+    from src.cli import app
+
+    result = CliRunner().invoke(
+        app,
+        ["chat", "--language", "Spanish", "--user", "u-cli-markup"],
+        input="Usa [ser] aquí\nquit\n",
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "[fake:" in result.stdout
+    assert "Usa [ser] aquí" in result.stdout
 
 
 def test_non_utf8_console_is_switched_to_utf8():

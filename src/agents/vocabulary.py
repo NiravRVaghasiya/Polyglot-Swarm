@@ -7,12 +7,15 @@ This agent:
 - Feeds new items into the FSRS scheduling system
 """
 
+import logging
 from typing import Any
 
 from src.llm.factory import get_provider
 from src.llm.prompts import render_prompt
 from src.llm.provider import Message
 from src.orchestrator.state import LearnerState, VocabularyItem
+
+logger = logging.getLogger("polyglot.vocabulary")
 
 
 async def vocabulary_node(state: LearnerState) -> dict[str, Any]:
@@ -43,16 +46,22 @@ async def vocabulary_node(state: LearnerState) -> dict[str, Any]:
     )
 
     # Use fast LLM tier for vocabulary extraction (latency-sensitive), with failover.
+    # Best-effort like the other analysis agents: a total provider outage
+    # means no new words this turn, not a crashed session.
     provider = get_provider("fast")
-    response_text = await provider.generate(
-        [
-            Message("system", "You extract vocabulary. Respond only in JSON."),
-            Message("user", prompt),
-        ],
-        temperature=0.0,
-        max_tokens=500,
-        json_mode=True,
-    )
+    try:
+        response_text = await provider.generate(
+            [
+                Message("system", "You extract vocabulary. Respond only in JSON."),
+                Message("user", prompt),
+            ],
+            temperature=0.0,
+            max_tokens=500,
+            json_mode=True,
+        )
+    except Exception as exc:  # noqa: BLE001 - analysis must never break the turn
+        logger.warning("Vocabulary extraction skipped, no LLM provider answered: %s", exc)
+        return {"new_vocabulary": state.get("new_vocabulary", [])}
 
     words = _parse_vocabulary_response(response_text)
 

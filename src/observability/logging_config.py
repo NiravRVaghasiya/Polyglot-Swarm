@@ -88,9 +88,10 @@ def configure_logging(*, level: str | None = None, fmt: str | None = None) -> No
     root.handlers.clear()  # idempotent: replace, don't stack, on repeated calls
     root.addHandler(handler)
     root.setLevel(resolved_level)
-    # httpx/httpcore log every request at INFO, which floods the interactive
-    # CLI chat with one line per LLM call; their warnings still come through.
-    for noisy in ("httpx", "httpcore"):
+    # The HTTP clients (httpx, and httpx2 used by current Anthropic/OpenAI SDKs)
+    # log every request at INFO and google-genai logs a line per call, which
+    # floods the interactive CLI chat; their warnings still come through.
+    for noisy in ("httpx", "httpcore", "httpx2", "google_genai"):
         logging.getLogger(noisy).setLevel(max(logging.WARNING, root.level))
 
     global _configured

@@ -13,6 +13,7 @@ This agent:
 - Surfaces corrections at the end of the session.
 """
 
+import logging
 from typing import Any
 
 from src.llm.factory import get_provider
@@ -20,6 +21,8 @@ from src.llm.prompts import render_prompt
 from src.llm.provider import Message
 from src.llm.schemas import GrammarAnalysis, GrammarErrorModel
 from src.orchestrator.state import GrammarError, LearnerState
+
+logger = logging.getLogger("polyglot.grammar")
 
 #: Minimum confidence for a genuine error to be surfaced. Below this the agent
 #: abstains (drops it) rather than risk a false correction.
@@ -50,16 +53,22 @@ async def grammar_node(state: LearnerState) -> dict[str, Any]:
     )
 
     # Fast tier, deterministic, structured output validated against a schema.
+    # Analysis is silent and best-effort: a total provider outage means no
+    # findings this turn, not a crashed session.
     provider = get_provider("fast")
-    analysis = await provider.generate_structured(
-        [
-            Message("system", "You are a precise grammar analysis tool. Respond only in JSON."),
-            Message("user", prompt),
-        ],
-        GrammarAnalysis,
-        temperature=0.0,
-        max_tokens=700,
-    )
+    try:
+        analysis = await provider.generate_structured(
+            [
+                Message("system", "You are a precise grammar analysis tool. Respond only in JSON."),
+                Message("user", prompt),
+            ],
+            GrammarAnalysis,
+            temperature=0.0,
+            max_tokens=700,
+        )
+    except Exception as exc:  # noqa: BLE001 - analysis must never break the turn
+        logger.warning("Grammar analysis skipped, no LLM provider answered: %s", exc)
+        return {"grammar_errors": state.get("grammar_errors", [])}
 
     errors = _select_errors(analysis)
 
