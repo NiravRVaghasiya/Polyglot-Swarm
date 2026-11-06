@@ -437,6 +437,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   setting (defaults to the local Next.js dev server; empty disables CORS).
 - `.env.example` no longer ships placeholder API keys (`sk-...`, `AIza...`),
   which a copied `.env` treated as configured providers.
+- Local Ollama mode works on a fresh install: `langchain-ollama` is now a
+  declared dependency (`langchain-community` no longer ships `ChatOllama`, so
+  every local call failed), and the provider caps the context window
+  (`OLLAMA_NUM_CTX`, default 8192) instead of letting Ollama reserve Llama
+  3.1's full 128k context and run out of memory.
+- Default models updated: `gemini-2.0-flash` was shut down on 2026-06-01
+  (now `gemini-3.6-flash`) and `claude-sonnet-4-20250514` is deprecated (now
+  `claude-sonnet-5-5`). The Claude provider no longer sends `temperature`,
+  which current models and API version `2026-10-21` reject.
+- `POLYGLOT_DETERMINISTIC=1` in `.env` now enables the offline demo; it was
+  only read from the shell environment.
+- Terminal chat (`polyglot chat`) now records learning evidence: it stopped
+  each turn as soon as the reply arrived, so grammar/vocabulary analysis never
+  ran and every CLI session reported no errors and no new words. The CLI and
+  `src.main` now use the API's turn runner, which also applies adaptive
+  difficulty.
+- `polyglot health` now checks that a backend can actually answer (Ollama
+  running, configured model pulled) and prints a `fix:` line, instead of
+  reporting "Configuration OK" for an Ollama that isn't there. `polyglot chat`
+  refuses to start without a working backend, and the Gradio app warns at
+  launch.
+- Errors that can't succeed on a retry (missing package, unknown model, bad
+  key) fail over immediately instead of being retried.
+- The CLI no longer crashes with `UnicodeEncodeError` on Windows consoles that
+  aren't UTF-8, and httpx no longer logs every request into the chat.
+- API: passwords over bcrypt's 72-byte limit return 400 instead of 500;
+  usernames are trimmed and blank ones rejected; blank or over-2000-character
+  chat messages are rejected before running an LLM turn.
+- Docker: the Gradio UI listens on `0.0.0.0` so it is reachable from the host;
+  the app containers reach the `local-llm` Ollama container; a `web` profile
+  runs the React dashboard.
+- `bcrypt` and `cryptography` are declared dependencies (they were imported
+  but only installed transitively).
+- The React app's `npm run lint` (an interactive ESLint setup prompt) is
+  replaced by `npm run typecheck`.
 
 ## [0.1.0] — Initial
 

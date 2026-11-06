@@ -61,6 +61,41 @@ class TestEnvExampleSync:
         assert not filled, f".env.example must leave secrets blank: {filled}"
 
 
+class TestDeterministicFromDotenv:
+    def test_flag_from_dotenv_is_exported(self, tmp_path, monkeypatch):
+        from src.config import export_deterministic_mode
+        from src.llm.fake import is_deterministic
+
+        env_file = tmp_path / ".env"
+        env_file.write_text("POLYGLOT_DETERMINISTIC=1\n", encoding="utf-8")
+        monkeypatch.delenv("POLYGLOT_DETERMINISTIC", raising=False)
+
+        export_deterministic_mode(Settings(_env_file=env_file))
+
+        assert is_deterministic()
+
+    def test_shell_value_wins_over_dotenv(self, tmp_path, monkeypatch):
+        from src.config import export_deterministic_mode
+        from src.llm.fake import is_deterministic
+
+        env_file = tmp_path / ".env"
+        env_file.write_text("POLYGLOT_DETERMINISTIC=1\n", encoding="utf-8")
+        monkeypatch.setenv("POLYGLOT_DETERMINISTIC", "0")
+
+        export_deterministic_mode(Settings(_env_file=env_file))
+
+        assert not is_deterministic()
+
+
+class TestDefaultModels:
+    def test_defaults_are_not_retired_models(self):
+        # gemini-2.0-flash was shut down on 2026-06-01 and
+        # claude-sonnet-4-20250514 is deprecated.
+        s = Settings(_env_file=None)
+        assert s.llm_primary == "claude-sonnet-5-5"
+        assert s.llm_fast == "gemini-3.6-flash"
+
+
 class TestValidation:
     def test_no_backend_is_a_problem_outside_deterministic(self, monkeypatch):
         monkeypatch.delenv("POLYGLOT_DETERMINISTIC", raising=False)

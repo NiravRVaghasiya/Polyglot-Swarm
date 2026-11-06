@@ -2,29 +2,32 @@
 
 ## Running locally without Docker
 
-```bash
-git clone https://github.com/NiravRVaghasiya/Polyglot-Swarm.git
-cd Polyglot-Swarm
-pip install -e ".[all]"          # or ".[dev]" without the voice extra
-cp .env.example .env              # set at least one LLM key, or OLLAMA_BASE_URL,
-                                   # or POLYGLOT_DETERMINISTIC=1 for offline mode
+The README's [Quick start](../README.md#quick-start) has the full
+step-by-step setup for Windows, macOS and Linux, including choosing an LLM
+backend and a troubleshooting table. In short:
 
-python -m src.main                 # Gradio chat + voice UI, port 7860
-# or
-uvicorn src.api.app:app --reload --port 8000   # the REST API
+```bash
+python3.12 -m venv .venv && source .venv/bin/activate   # Windows: py -3.12 -m venv .venv; .venv\Scripts\Activate.ps1
+python -m pip install -e ".[all]"   # or ".[dev]" without the voice extra
+cp .env.example .env                # then choose option A, B or C inside it
+polyglot health                     # checks the backend actually answers
+
+python -m src.main                  # Gradio chat + voice UI, port 7860
+uvicorn src.api.app:app --reload --port 8000   # or the REST API
 ```
 
-`polyglot health` (installed as a console script via `pyproject.toml`'s
-`[project.scripts]`) reports configuration and provider health, and exits
-non-zero on a real misconfiguration — useful in CI or a deploy script as a
-pre-flight check.
+`polyglot health` asks Ollama which models it has, reports hosted keys as set,
+and exits non-zero when no backend can answer — useful in CI or a deploy
+script as a pre-flight check.
 
 ## Docker Compose
 
 ```bash
-cp .env.example .env    # set your LLM key(s) first
-docker compose up                       # API (:8000) + Gradio UI (:7860)
-docker compose --profile local-llm up   # also start an Ollama container (:11434)
+cp .env.example .env    # choose option A, B or C inside it first
+docker compose up --build                       # API (:8000) + Gradio UI (:7860)
+docker compose --profile web up --build         # also the React dashboard (:3000)
+docker compose --profile local-llm up --build   # also an Ollama container (:11434)
+docker compose exec ollama ollama pull llama3.1:8b   # once, with local-llm running
 ```
 
 `docker-compose.yml` builds one image (`Dockerfile`) and runs it twice with
@@ -33,7 +36,16 @@ different commands: the `api` service runs
 `python -m src.main` (Gradio). Both share a named volume (`polyglot-data`,
 mounted at `/data`) so the API and UI see the same SQLite database and
 ChromaDB directory. The `ui` service waits on the API's Docker healthcheck
-(`GET /health`) before starting.
+(`GET /health`) before starting, and sets `GRADIO_SERVER_NAME=0.0.0.0` so the
+UI is reachable from outside its container.
+
+Both services override `OLLAMA_BASE_URL` to `http://ollama:11434` (the
+`local-llm` container), because `localhost` inside a container is the
+container itself. To use an Ollama running on the host instead, change it to
+`http://host.docker.internal:11434` at the top of `docker-compose.yml`.
+
+The `web` service (`profiles: ["web"]`) runs the React dashboard from a
+`node:20-alpine` image, installing and building on first start.
 
 The `ollama` service is opt-in (`profiles: ["local-llm"]`) — it is not
 started by a plain `docker compose up`, since most self-hosters either use a
@@ -82,8 +94,8 @@ connection should not receive traffic.
 
 ## The React frontend
 
-`frontend/react_app/` is a separate Next.js app, not built or served by the
-Dockerfile/Compose stack. Run it independently:
+`frontend/react_app/` is a separate Next.js app (Compose runs it only with
+`--profile web`). Run it independently with Node.js 20+:
 
 ```bash
 cd frontend/react_app
@@ -110,7 +122,7 @@ The web app includes:
   goal and writes them to their profile, shown until a goal is set.
 
 Frontend quality gates (type-check + vitest) run in CI; run them locally with
-`npm run lint`, `npx tsc --noEmit`, and `npm test`.
+`npm run typecheck` and `npm test`.
 
 ## CI and local quality gates
 

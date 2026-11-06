@@ -74,3 +74,13 @@ class TestOllamaGenerate:
         assert model.init_kwargs["temperature"] == 0.2
         assert model.init_kwargs["num_predict"] == 32
         assert [m.content for m in model.invoked_with] == ["sys", "cześć"]
+
+    async def test_caps_context_window_from_settings(self, fake_langchain, monkeypatch):
+        # Without num_ctx Ollama may reserve the model's full 128k context and
+        # run out of memory, so the provider always sends the configured cap.
+        from src.config import settings
+
+        monkeypatch.setattr(settings, "ollama_num_ctx", 4096, raising=False)
+        await OllamaProvider(base_url="http://localhost:11434").generate([Message("user", "hi")])
+
+        assert fake_langchain.last_instance.init_kwargs["num_ctx"] == 4096

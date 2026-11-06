@@ -51,7 +51,9 @@ On `generate()`:
    `settings.llm_max_retries` times with exponential backoff
    (`settings.llm_retry_base_delay` → `llm_retry_max_delay`) before giving up
    on it. A transient blip is worth retrying in place; a genuinely dead
-   provider is not worth retrying forever.
+   provider is not worth retrying forever. Errors that cannot succeed on a
+   retry (`reliability.is_retryable`: a missing SDK package, or a 4xx such as
+   a bad key or an Ollama model that was never pulled) skip the retries.
 3. If retries are exhausted, record a circuit-breaker failure for that
    provider and fail over to the next candidate.
 4. If the whole chain fails, raise `NoProviderAvailableError`.
@@ -79,15 +81,25 @@ Set any combination of these in `.env` (see `.env.example`):
 
 | Variable | Effect |
 |---|---|
-| `ANTHROPIC_API_KEY` | Enables Claude (primary tier) |
-| `GOOGLE_API_KEY` | Enables Gemini (fast tier) |
+| `ANTHROPIC_API_KEY` | Enables Claude (primary tier, model `LLM_PRIMARY`, default `claude-sonnet-5-5`) |
+| `GOOGLE_API_KEY` | Enables Gemini (fast tier, model `LLM_FAST`, default `gemini-3.6-flash`) |
 | `OPENAI_API_KEY` | Enables OpenAI as an extra fallback |
-| `OLLAMA_BASE_URL` | Enables local Ollama (local tier); default `http://localhost:11434` |
+| `OLLAMA_BASE_URL` | Enables local Ollama (local tier, model `LLM_LOCAL`, default `ollama/llama3.1:8b`); default `http://localhost:11434` |
+| `OLLAMA_NUM_CTX` | Context window requested from Ollama (default `8192`). Without a cap Ollama may reserve the model's full context — 128k tokens for Llama 3.1, a ~16 GB KV cache — and fail with out-of-memory. |
 
-At least one of a hosted key, `OLLAMA_BASE_URL`, or
-`POLYGLOT_DETERMINISTIC=1` must be set — `src.config.validate_settings()`
-fails fast at startup otherwise, and `polyglot health` reports the same
-check.
+For Ollama, pull the configured model once (`ollama pull llama3.1:8b`); a
+model that isn't pulled answers 404 on every call.
+
+The Claude provider never sends `temperature`: current Claude models reject
+non-default sampling parameters, and API version `2026-10-21` rejects them on
+every model.
+
+`OLLAMA_BASE_URL` has a non-empty default, so configuration alone can't tell
+whether a backend works. `polyglot health` (`src/llm/preflight.py`) asks
+Ollama which models it actually has and reports hosted keys as set (not
+verified, since that would cost a request); it exits non-zero and prints a
+`fix:` line when nothing can answer. `polyglot chat` runs the same check
+before starting, and `python -m src.main` warns at launch.
 
 **Local-only mode** (`settings.local_only`, or `LOCAL_ONLY=true`): every
 hosted provider (`claude`, `gemini`, `openai`) is excluded from every tier's

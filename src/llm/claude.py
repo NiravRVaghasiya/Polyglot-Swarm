@@ -35,10 +35,12 @@ class ClaudeProvider(LLMProvider):
         # Lazy import so the module loads without langchain-anthropic installed.
         from langchain_anthropic import ChatAnthropic
 
+        # ``temperature`` is deliberately not forwarded: current Claude models
+        # reject non-default sampling parameters, and API version 2026-10-21
+        # rejects them on every model.
         kwargs: dict[str, Any] = {
             "model": self.model,
             "api_key": self.api_key,
-            "temperature": temperature,
             "max_tokens": max_tokens,
         }
         return ChatAnthropic(**kwargs)

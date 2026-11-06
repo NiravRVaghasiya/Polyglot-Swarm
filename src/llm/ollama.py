@@ -1,13 +1,12 @@
 """Ollama (local) LLM provider.
 
-Wraps ``langchain_community.chat_models.ChatOllama`` behind the
-:class:`LLMProvider` interface. This is the "local" / privacy tier — runs a
-model such as Llama 3.1 on the user's own machine, so no data leaves the
-device. Availability is determined by a configured base URL rather than an
-API key.
+Wraps ``langchain_ollama.ChatOllama`` behind the :class:`LLMProvider`
+interface. This is the "local" / privacy tier — runs a model such as Llama 3.1
+on the user's own machine, so no data leaves the device. Availability is
+determined by a configured base URL rather than an API key.
 
-The SDK is imported lazily so this module loads without
-``langchain-community`` installed unless the provider is actually used.
+The SDK is imported lazily so this module loads without ``langchain-ollama``
+installed unless the provider is actually used.
 """
 
 from __future__ import annotations
@@ -39,27 +38,31 @@ class OllamaProvider(LLMProvider):
 
     name = "ollama"
 
-    def __init__(self, model: str | None = None, base_url: str | None = None) -> None:
+    def __init__(
+        self,
+        model: str | None = None,
+        base_url: str | None = None,
+        num_ctx: int | None = None,
+    ) -> None:
         self.model = _strip_provider_prefix(model or settings.llm_local)
         self.base_url = base_url if base_url is not None else settings.ollama_base_url
+        self.num_ctx = num_ctx if num_ctx is not None else settings.ollama_num_ctx
 
     def is_available(self) -> bool:
         # No API key needed; a configured base URL is enough to attempt use.
         return bool(self.base_url)
 
     def _build_client(self, *, temperature: float, max_tokens: int) -> Any:
-        # Prefer the standalone langchain-ollama package; fall back to the
-        # (deprecated) langchain-community location for older environments.
-        try:
-            from langchain_ollama import ChatOllama  # type: ignore[import-not-found]
-        except ImportError:
-            from langchain_community.chat_models import ChatOllama  # type: ignore[no-redef]
+        # langchain-community no longer ships ChatOllama, so this needs the
+        # standalone langchain-ollama package (a declared dependency).
+        from langchain_ollama import ChatOllama
 
         return ChatOllama(
             model=self.model,
             base_url=self.base_url,
             temperature=temperature,
             num_predict=max_tokens,
+            num_ctx=self.num_ctx,
         )
 
     async def generate(

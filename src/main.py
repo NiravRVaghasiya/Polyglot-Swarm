@@ -17,7 +17,6 @@ from typing import Any
 import gradio as gr
 
 from src.config import settings
-from src.orchestrator.graph import compile_turn_graph
 from src.orchestrator.lifecycle import build_initial_state, finalize_session
 from src.orchestrator.state import LearnerState
 from src.scenarios.loader import Scenario, list_scenarios
@@ -31,42 +30,17 @@ def _available_scenarios() -> list[Scenario]:
         return []
 
 
-# Compile the LangGraph once. No checkpointer: the Gradio session state owns
-# the LearnerState and resends it every turn (see compile_turn_graph); durable
-# persistence happens via persist_session at session end.
-app = compile_turn_graph()
-
-
 async def _run_turn(state: LearnerState, user_input: str) -> str:
-    """Run a single conversation turn through the graph and return the reply.
+    """Run a single conversation turn and return the reply.
 
-    The graph loops (conversation -> analysis -> evaluator -> router), so we
-    stream updates and stop once the conversation node has produced its reply
-    for this turn, merging every node's state update back into ``state``.
+    Uses the API's turn runner, which waits for the analysis agents and the
+    evaluator, so this UI records learning evidence like the API does.
+    Durable persistence happens via persist_session at session end.
     """
-    state["last_user_input"] = user_input
-    config = {
-        "configurable": {"thread_id": state["session_id"]},
-        "recursion_limit": 8,
-    }
+    from src.api.sessions import run_turn
 
-    reply = ""
-    async for update in app.astream(state, config):
-        for node_update in update.values():
-            if not isinstance(node_update, dict):
-                continue
-            for key, value in node_update.items():
-                if key == "messages":
-                    state["messages"] = state.get("messages", []) + value
-                else:
-                    state[key] = value  # type: ignore[literal-required]
-            if node_update.get("agent_response"):
-                reply = node_update["agent_response"]
-        # One conversation reply per user message is enough for the UI.
-        if "conversation" in update:
-            break
-
-    return reply or "Lo siento, algo salió mal."
+    reply = await run_turn(state, user_input)
+    return reply if reply != "..." else "Lo siento, algo salió mal."
 
 
 def chat(
@@ -150,6 +124,17 @@ def build_ui() -> gr.Blocks:
 
 
 if __name__ == "__main__":
+    from src.llm.preflight import check_backends, has_usable_backend
+
+    # The UI still starts, but every reply would be a canned fallback, so say
+    # why up front.
+    checks = check_backends()
+    if not has_usable_backend(checks):
+        print("WARNING: no working LLM backend - replies will be canned fallbacks.")
+        for check in checks:
+            print(f"  {check.name}: {check.detail}" + (f" (fix: {check.fix})" if check.fix else ""))
+        print("Run `polyglot health` for setup steps.")
+
     # Launch the upgraded Gradio MVP (chat + voice + persistent sessions).
     from frontend.gradio_app import build_ui as build_voice_ui
 

@@ -26,6 +26,10 @@ from src.scenarios.loader import ScenarioError
 
 router = APIRouter(prefix="/api/v1", tags=["chat"])
 
+#: Longest learner message accepted per turn; far beyond a conversational turn,
+#: but stops one request from filling the model's context.
+MAX_MESSAGE_CHARS = 2000
+
 
 @router.post("/sessions/start", response_model=StartSessionResponse)
 def start_session(
@@ -84,6 +88,13 @@ async def end_session(
 @router.post("/chat", response_model=ChatResponse)
 async def chat(req: ChatRequest, user_id: str = Depends(get_current_user)) -> ChatResponse:
     """Send a message in an active session and get the reply + hidden feedback."""
+    if not req.message.strip():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="message is empty")
+    if len(req.message) > MAX_MESSAGE_CHARS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"message is too long (max {MAX_MESSAGE_CHARS} characters)",
+        )
     state = sessions.get_session(user_id, req.session_id)
     if state is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")

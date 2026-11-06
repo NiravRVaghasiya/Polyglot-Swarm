@@ -226,6 +226,37 @@ class TestRetryWithBackoff:
         assert always_fails.calls == 3  # 1 initial + 2 retries, all failed
         assert fallback.calls == 1
 
+    async def test_permanent_error_fails_over_without_retrying(self, monkeypatch):
+        # A 404 (e.g. an Ollama model that was never pulled) can't succeed on a
+        # retry, so the router moves on at once instead of waiting it out.
+        import src.llm.factory as factory_module
+
+        async def instant_sleep(_delay):
+            return None
+
+        monkeypatch.setattr(factory_module.asyncio, "sleep", instant_sleep)
+
+        class ModelNotFoundError(Exception):
+            status_code = 404
+
+        class NotFoundProvider(StubProvider):
+            async def generate(self, messages, *, temperature=0.7, max_tokens=512, json_mode=False):
+                self.calls += 1
+                raise ModelNotFoundError("model 'llama3.1:8b' not found")
+
+        missing = NotFoundProvider("missing")
+        fallback = StubProvider("fallback")
+        router = RoutingProvider(
+            [missing, fallback],
+            tier="primary",
+            retry_policy=RetryPolicy(max_retries=2, base_delay=0.01, max_delay=0.01),
+        )
+
+        result = await router.generate([Message("user", "hi")])
+
+        assert result == "fallback-reply"
+        assert missing.calls == 1
+
     async def test_zero_retries_preserves_original_immediate_failover(self):
         # Default RetryPolicy() has max_retries=0 -> one attempt, then failover,
         # exactly like the pre-Phase-23 behavior.

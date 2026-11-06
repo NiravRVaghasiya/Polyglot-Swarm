@@ -95,8 +95,16 @@ def real_providers(monkeypatch):
     whole suite, which makes ``get_provider`` collapse to the fake provider.
     Tests that assert on the *real* claude/gemini/ollama chain opt out via this
     fixture.
+
+    Hosted API keys are blanked too, so keys in a developer's own ``.env``
+    (e.g. ``OPENAI_API_KEY`` adding OpenAI to the chain) can't change the
+    result; tests that need a key set it explicitly, as CI has none.
     """
+    from src.config import settings
+
     monkeypatch.delenv("POLYGLOT_DETERMINISTIC", raising=False)
+    for key in ("anthropic_api_key", "google_api_key", "openai_api_key"):
+        monkeypatch.setattr(settings, key, "", raising=False)
 
 
 @pytest.fixture
@@ -118,12 +126,9 @@ def fake_langchain(monkeypatch):
     genai_mod.ChatGoogleGenerativeAI = RecordingChatModel
     monkeypatch.setitem(sys.modules, "langchain_google_genai", genai_mod)
 
-    # langchain_community.chat_models.ChatOllama
-    community_mod = types.ModuleType("langchain_community")
-    chat_models_mod = types.ModuleType("langchain_community.chat_models")
-    chat_models_mod.ChatOllama = RecordingChatModel
-    community_mod.chat_models = chat_models_mod
-    monkeypatch.setitem(sys.modules, "langchain_community", community_mod)
-    monkeypatch.setitem(sys.modules, "langchain_community.chat_models", chat_models_mod)
+    # langchain_ollama.ChatOllama
+    ollama_mod = types.ModuleType("langchain_ollama")
+    ollama_mod.ChatOllama = RecordingChatModel
+    monkeypatch.setitem(sys.modules, "langchain_ollama", ollama_mod)
 
     return RecordingChatModel

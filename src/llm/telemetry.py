@@ -60,6 +60,11 @@ class ModelRun:
 # Keys are matched as a case-insensitive substring of the model name.
 _PRICE_PER_1K: dict[str, tuple[float, float]] = {
     # model-name-substring: (input_per_1k, output_per_1k)
+    # First match wins, so a more specific key goes before its prefix.
+    "claude-opus-5-5": (0.004, 0.02),
+    "claude-opus-5": (0.005, 0.025),
+    "claude-sonnet-5": (0.002, 0.01),  # Sonnet 5 and 5.5
+    "claude-haiku-5-5": (0.0001, 0.0005),
     "claude-3-5-haiku": (0.0008, 0.004),
     "claude-3-5-sonnet": (0.003, 0.015),
     "claude-sonnet-4": (0.003, 0.015),

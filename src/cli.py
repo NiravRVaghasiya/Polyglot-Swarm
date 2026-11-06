@@ -9,16 +9,16 @@ Exposed as the ``polyglot`` console script. Provides:
 from __future__ import annotations
 
 import asyncio
+import sys
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Any, TextIO
 
 import typer
 from rich.console import Console
 from rich.table import Table
 
 from src.observability.logging_config import ensure_configured
-from src.orchestrator.graph import compile_turn_graph
 from src.orchestrator.lifecycle import build_initial_state, finalize_session
 from src.orchestrator.state import LearnerState
 from src.scenarios.loader import ScenarioError, list_scenarios
@@ -28,6 +28,25 @@ from src.scenarios.loader import ScenarioError, list_scenarios
 # controlled by settings.log_level/log_format) rather than being silently
 # dropped by Python's logging "handler of last resort".
 ensure_configured()
+
+
+def _ensure_utf8_output(*streams: TextIO) -> None:
+    """Stop non-UTF-8 consoles (e.g. a Windows cp1252 pipe) from crashing on emoji.
+
+    Rich writes the banner's 🌍 and the report's symbols as-is; on an encoding
+    that can't represent them the whole command dies with UnicodeEncodeError.
+    """
+    for stream in streams:
+        encoding = (getattr(stream, "encoding", None) or "").lower().replace("-", "")
+        reconfigure = getattr(stream, "reconfigure", None)
+        if encoding != "utf8" and reconfigure is not None:
+            try:
+                reconfigure(encoding="utf-8", errors="replace")
+            except (ValueError, OSError):
+                pass  # a stream that can't be reconfigured keeps its encoding
+
+
+_ensure_utf8_output(sys.stdout, sys.stderr)
 
 app = typer.Typer(help="Polyglot Swarm — multi-agent language tutor.")
 console = Console()
@@ -87,36 +106,55 @@ def results(
         console.print(f"[bold green]Wrote[/bold green] {DEFAULT_OUTPUT}")
 
 
+_NO_BACKEND_HELP = (
+    "No working LLM backend. Pick one, then run `polyglot health` again:\n"
+    "  1. Put an API key in .env (ANTHROPIC_API_KEY, GOOGLE_API_KEY or OPENAI_API_KEY)\n"
+    "  2. Run Ollama locally and pull the model (see the fix above)\n"
+    "  3. Set POLYGLOT_DETERMINISTIC=1 in .env for an offline demo with canned replies\n"
+    "Step-by-step setup: README.md -> Quick start."
+)
+
+
+def _print_backend_checks(checks: list[Any]) -> None:
+    for check in checks:
+        mark = "[green]ok  [/green]" if check.ok else "[red]FAIL[/red]"
+        console.print(f"  {mark} {check.name:<13} {check.detail}")
+        if check.fix:
+            console.print(f"       [yellow]fix:[/yellow] {check.fix}")
+
+
 @app.command()
 def health() -> None:
-    """Report version, configuration, and LLM provider health.
+    """Check that setup is complete and an LLM backend can actually answer.
 
-    Exits non-zero if configuration is invalid (e.g. no LLM backend), so it is
-    usable as a readiness check in scripts and CI.
+    Asks a local Ollama which models it has (hosted API keys are reported as
+    set, not verified). Exits non-zero when no backend works, so it is usable
+    as a readiness check in scripts and CI.
     """
     from src import __version__
     from src.config import settings, validate_settings
-    from src.llm.factory import get_provider
-    from src.llm.provider import Tier
+    from src.llm.preflight import check_backends, has_usable_backend
 
     console.print(f"[bold green]Polyglot Swarm[/bold green] v{__version__}")
+    # In a container the settings arrive as environment variables (compose's
+    # env_file), so a missing .env file there is expected.
+    if not Path(".env").exists() and not Path("/.dockerenv").exists():
+        console.print(
+            "  [yellow]No .env file in this folder[/yellow] - copy .env.example to .env "
+            "to configure the app (defaults are used until then)."
+        )
 
-    backends = settings.configured_backends()
-    console.print(f"  Configured backends: {', '.join(backends) or '[red]none[/red]'}")
+    console.print("LLM backends:")
+    checks = check_backends(settings)
+    _print_backend_checks(checks)
 
     problems = validate_settings(settings)
-    tiers: tuple[Tier, ...] = ("primary", "fast", "local")
-    for tier in tiers:
-        provider = get_provider(tier)
-        status = "[green]ok[/green]" if provider.is_available() else "[red]unavailable[/red]"
-        console.print(f"  Tier {tier:<8}: {status}")
-
-    if problems:
-        console.print("[red]Configuration problems:[/red]")
+    if problems or not has_usable_backend(checks):
         for p in problems:
-            console.print(f"    • {p}")
+            console.print(f"[red]Configuration problem:[/red] {p}")
+        console.print(f"[red]{_NO_BACKEND_HELP}[/red]")
         raise typer.Exit(code=1)
-    console.print("[green]Configuration OK[/green]")
+    console.print("[green]Ready - try: polyglot chat --language Spanish[/green]")
 
 
 @app.command()
@@ -133,28 +171,16 @@ def scenarios(language: str | None = typer.Option(None, help="Filter by code (es
     console.print(table)
 
 
-async def _run_turn(app_graph: Any, state: LearnerState, user_input: str) -> str:
-    """Run one conversation turn through the graph, returning the reply."""
-    state["last_user_input"] = user_input
-    config = {
-        "configurable": {"thread_id": state["session_id"]},
-        "recursion_limit": 8,
-    }
-    reply = ""
-    async for update in app_graph.astream(state, config):
-        for node_update in update.values():
-            if not isinstance(node_update, dict):
-                continue
-            for key, value in node_update.items():
-                if key == "messages":
-                    state["messages"] = state.get("messages", []) + value
-                else:
-                    state[key] = value  # type: ignore[literal-required]
-            if node_update.get("agent_response"):
-                reply = node_update["agent_response"]
-        if "conversation" in update:
-            break
-    return reply or "..."
+async def _run_turn(state: LearnerState, user_input: str) -> str:
+    """Run one conversation turn, returning the reply.
+
+    Uses the API's turn runner, which waits for the grammar/vocabulary/cultural
+    analysis and the evaluator, so CLI sessions record learning evidence and
+    adapt difficulty exactly like API sessions.
+    """
+    from src.api.sessions import run_turn
+
+    return await run_turn(state, user_input)
 
 
 @app.command()
@@ -304,6 +330,16 @@ def chat(
     user: str = typer.Option("cli-user", help="User id for persistence."),
 ) -> None:
     """Start an interactive conversation session. Type 'quit' to end and save."""
+    from src.llm.preflight import check_backends, has_usable_backend
+
+    # Without a working backend every turn would get the same canned fallback
+    # reply, which looks like the tutor is broken rather than unconfigured.
+    checks = check_backends()
+    if not has_usable_backend(checks):
+        _print_backend_checks(checks)
+        console.print(f"[red]{_NO_BACKEND_HELP}[/red]")
+        raise typer.Exit(code=1)
+
     try:
         state = build_initial_state(
             user,
@@ -314,8 +350,6 @@ def chat(
     except ScenarioError as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1) from exc
-
-    graph = compile_turn_graph()
 
     scenario_ctx = state.get("current_scenario", {}) or {}
     persona = scenario_ctx.get("persona", {})
@@ -335,7 +369,7 @@ def chat(
             break
         if user_input.strip().lower() in {"quit", "exit"}:
             break
-        reply = asyncio.run(_run_turn(graph, state, user_input))
+        reply = asyncio.run(_run_turn(state, user_input))
         console.print(f"[bold]{persona.get('name', 'Tutor')}:[/bold] {reply}\n")
 
     console.print("\n[dim]Ending session...[/dim]")
