@@ -14,8 +14,13 @@ CEFR band (A1–C2), using the thresholds from the design doc (section 10.2):
 
 The estimate is deterministic (no LLM needed): it maps each metric to a band
 and takes a conservative (minimum) combined level, so a large vocabulary alone
-does not inflate the estimate past what fluency/accuracy support. It updates
-``cefr_level`` on the state and persists it to the user's profile.
+does not inflate the estimate past what fluency/accuracy support.
+
+This heuristic sets the tutor's **working level** (how hard the tutor's own
+language should be), which is an instructional setting, not an assessment. The
+learner's assessed CEFR level is the evidence-backed profile in
+:mod:`src.assessment.cefr_profile`, which has no default and can report
+``insufficient_evidence`` (ADR-0031).
 """
 
 from __future__ import annotations
@@ -117,15 +122,27 @@ def estimate_cefr(metrics: CEFRMetrics, *, current_level: str = "A2") -> str:
     return combined
 
 
-async def assessment_node(state: LearnerState) -> dict[str, str]:
-    """Estimate CEFR from aggregated data and persist it to the profile.
+def has_signal(metrics: CEFRMetrics) -> bool:
+    """Whether the session produced anything to estimate a working level from."""
+    return not (metrics.unique_words_used == 0 and metrics.avg_response_length == 0.0)
 
-    Returns a state update with the (possibly changed) ``cefr_level``.
+
+def update_working_level(state: LearnerState) -> str:
+    """Re-estimate the tutor's *working level* from this session and persist it.
+
+    The working level is the band the tutor pitches its language at — an
+    instructional setting, not an assessment of the learner (ADR-0031; the
+    evidence-backed, nullable assessment is the CEFR profile). It is only
+    written to the profile and to the session log when the session produced
+    a signal, so a learner who has not said anything never gets a recorded
+    level. Returns the (possibly unchanged) working level.
     """
     metrics = compute_metrics(state)
-    new_level = estimate_cefr(metrics, current_level=state.get("cefr_level", "A2"))
+    current = state.get("cefr_level") or user_profile.DEFAULT_WORKING_LEVEL
+    if not has_signal(metrics):
+        return current
+    new_level = estimate_cefr(metrics, current_level=current)
 
-    # Persist the estimate to the learner's profile for future sessions.
     user_id = state["user_id"]
     language = state["language"]
     profile = user_profile.load_profile(user_id)
@@ -133,26 +150,36 @@ async def assessment_node(state: LearnerState) -> dict[str, str]:
     updated_cefr[language] = new_level
     user_profile.update_profile(user_id, cefr_by_language=updated_cefr)
 
-    # Also log a lightweight assessment session for analytics history.
+    # A lightweight session row for the working-level history.
     analytics.log_session(
         user_id,
         language,
         session_type="assessment",
         cefr_estimate=new_level,
     )
+    return new_level
 
-    # Phase 12: build and persist the multidimensional CEFR profile (per-skill
-    # band + confidence + sample size) from the learner knowledge model. This is
-    # additive — the overall ``cefr_level`` above is still the value the rest of
-    # the app reads; the profile enriches it without changing that contract.
+
+def persist_evidence_profile(user_id: str, language: str) -> None:
+    """Build and persist the evidence-backed CEFR profile (best-effort)."""
     try:
         from src.assessment.cefr_profile import build_cefr_profile, persist_profile
 
-        profile_estimate = build_cefr_profile(user_id, language, fallback_cefr=new_level)
-        persist_profile(user_id, profile_estimate)
+        persist_profile(user_id, build_cefr_profile(user_id, language))
     except Exception as exc:  # noqa: BLE001 - profiling must not break assessment
         import logging
 
         logging.getLogger("polyglot.assessment").warning("CEFR profile failed: %s", exc)
 
+
+async def assessment_node(state: LearnerState) -> dict[str, str]:
+    """Update the working level and persist the evidence-backed CEFR profile.
+
+    Returns a state update with the (possibly changed) ``cefr_level`` — the
+    tutor's working level. The multidimensional profile (Phase 12, ADR-0031)
+    is persisted alongside; it has no default level and may report
+    ``insufficient_evidence``.
+    """
+    new_level = update_working_level(state)
+    persist_evidence_profile(state["user_id"], state["language"])
     return {"cefr_level": new_level}

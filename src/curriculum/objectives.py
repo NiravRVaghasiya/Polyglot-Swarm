@@ -65,3 +65,37 @@ def weakness_urgency(occurrences: int, max_occurrences: int) -> float:
     if max_occurrences <= 0:
         return 0.5
     return max(0.3, min(1.0, occurrences / max_occurrences))
+
+
+def assessment_value(
+    *,
+    uncertainty: float,
+    evidence_quality: float,
+    coverage_gap: float,
+    skill: str | None,
+    estimated_minutes: float,
+    constraints: PlanConstraints,
+) -> float:
+    """Value of *gathering evidence* about a target, in [0, 1] (ADR-0031).
+
+    Information value, not learning value: it grows with the model's
+    uncertainty, with how poor the existing evidence is, and with how much of
+    the target's content has never been assessed. It deliberately does not
+    take a mastery input, so an unassessed skill is not scored as weak.
+
+    Args:
+        uncertainty: model uncertainty about the target (1.0 = nothing known).
+        evidence_quality: quality score of existing evidence (0..1).
+        coverage_gap: fraction of the target's known objectives never
+            assessed (0..1; 1.0 when unknown).
+        skill: the skill (for goal weighting).
+        estimated_minutes: the action's time cost.
+        constraints: the plan's constraints.
+    """
+    u = max(0.0, min(1.0, uncertainty))
+    q = max(0.0, min(1.0, evidence_quality))
+    gap = max(0.0, min(1.0, coverage_gap))
+    value = 0.35 + 0.2 * u + 0.05 * (1.0 - q) + 0.05 * gap
+    value *= constraints.skill_weight(skill)
+    value *= constraints.fatigue_penalty(estimated_minutes)
+    return max(0.0, min(1.0, value))

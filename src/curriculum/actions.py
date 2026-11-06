@@ -27,6 +27,25 @@ class ActionType(StrEnum):
     RETRIEVAL_PRACTICE = "retrieval_practice"
     SCENARIO = "scenario"
     TRANSFER_EXERCISE = "transfer_exercise"
+    #: A short, graded check whose purpose is to gather evidence (ADR-0031).
+    DIAGNOSTIC_CHECK = "diagnostic_check"
+
+
+class ActionIntent(StrEnum):
+    """Why an action is proposed (ADR-0031).
+
+    - ``assessment``: the model does not have enough evidence — gather it
+      instead of guessing that the learner is weak;
+    - ``remediation``: the evidence shows a weakness;
+    - ``reinforcement``: consolidate (incl. FSRS-due reviews) in the
+      optimal-challenge zone;
+    - ``advancement``: the evidence shows strength — move to harder content.
+    """
+
+    ASSESSMENT = "assessment"
+    REMEDIATION = "remediation"
+    REINFORCEMENT = "reinforcement"
+    ADVANCEMENT = "advancement"
 
 
 # Rough time cost (minutes) per action type — used to fit a plan into the time
@@ -43,6 +62,7 @@ _ESTIMATED_MINUTES: dict[ActionType, float] = {
     ActionType.RETRIEVAL_PRACTICE: 2.0,
     ActionType.SCENARIO: 10.0,
     ActionType.TRANSFER_EXERCISE: 4.0,
+    ActionType.DIAGNOSTIC_CHECK: 3.0,
 }
 
 
@@ -63,6 +83,8 @@ class LearningAction:
         priority: expected learning value in [0, 1]; higher = more valuable now.
         estimated_minutes: rough time cost.
         payload: extra structured detail (e.g. the due item, the two forms to contrast).
+        intent: why the action is proposed (:class:`ActionIntent`); empty for
+            callers that build actions directly.
     """
 
     type: ActionType
@@ -72,6 +94,7 @@ class LearningAction:
     priority: float = 0.0
     estimated_minutes: float = 0.0
     payload: dict[str, Any] = field(default_factory=dict)
+    intent: str = ""
 
     def __post_init__(self) -> None:
         self.priority = max(0.0, min(1.0, self.priority))
@@ -87,4 +110,5 @@ class LearningAction:
             "priority": round(self.priority, 3),
             "estimated_minutes": self.estimated_minutes,
             "payload": self.payload,
+            "intent": self.intent,
         }

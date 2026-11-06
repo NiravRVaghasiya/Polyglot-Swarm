@@ -26,7 +26,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from src import evidence
-from src.agents.assessment import assessment_node
+from src.agents.assessment import persist_evidence_profile, update_working_level
 from src.agents.srs import schedule_new_items
 from src.agents.transfer import transfer_node
 from src.evidence.events import EventType
@@ -144,7 +144,12 @@ def persist_session(state: LearnerState, *, duration_minutes: float = 0.0) -> di
     # from raw LLM output.
     events = evidence.process_session(dict(state))
     grammar_events = [e for e in events if e.event_type == EventType.GRAMMAR_ERROR]
-    vocab_events = [e for e in events if e.event_type == EventType.VOCAB_PRODUCED]
+    # Both learner-produced words and words met in the tutor's reply join the
+    # lexicon (and the FSRS deck); only produced ones count toward the
+    # production dimension below (ADR-0031: exposure is not mastery).
+    vocab_events = [
+        e for e in events if e.event_type in (EventType.VOCAB_PRODUCED, EventType.VOCAB_OBSERVED)
+    ]
 
     # --- Derive vocabulary belief -> personal lexicon, scheduled via FSRS. ---
     new_vocab: list[dict[str, Any]] = [
@@ -153,6 +158,7 @@ def persist_session(state: LearnerState, *, duration_minutes: float = 0.0) -> di
             "translation": e.payload.get("translation", ""),
             "pos": e.payload.get("pos", ""),
             "context_sentence": e.payload.get("context_sentence", ""),
+            "produced": e.event_type == EventType.VOCAB_PRODUCED,
         }
         for e in vocab_events
         if e.item_id
@@ -175,9 +181,10 @@ def persist_session(state: LearnerState, *, duration_minutes: float = 0.0) -> di
         # Phase 5: a produced word is evidence toward the production dimension,
         # and stamp first_seen. The word row now exists (upserted above).
         vocabulary_db.set_metadata(user_id, language, word, first_seen=now_iso)
-        vocabulary_db.record_dimension(
-            user_id, language, word, "production", success=True, at=now_iso
-        )
+        if item["produced"]:
+            vocabulary_db.record_dimension(
+                user_id, language, word, "production", success=True, at=now_iso
+            )
         vocab_written += 1
 
     # --- Derive grammar belief -> persistent error taxonomy (from events). ---
@@ -205,7 +212,14 @@ def persist_session(state: LearnerState, *, duration_minutes: float = 0.0) -> di
     )
 
     # --- Session metrics -> analytics (best-effort; see note above). ---
+    # Only a *recorded* working level is logged; the instructional default a
+    # brand-new learner starts on is not an estimate (ADR-0031).
     try:
+        working_level = (
+            state.get("cefr_level")
+            if user_profile.load_profile(user_id).has_working_level(language)
+            else None
+        )
         analytics.log_session(
             user_id,
             language,
@@ -214,7 +228,7 @@ def persist_session(state: LearnerState, *, duration_minutes: float = 0.0) -> di
             words_practiced=len(vocab_events),
             new_words_learned=vocab_written,
             grammar_errors=errors_written,
-            cefr_estimate=state.get("cefr_level"),
+            cefr_estimate=working_level,
         )
     except Exception as exc:  # noqa: BLE001 - analytics must never block finalization
         logger.error("analytics.log_session failed for session=%s: %s", state["session_id"], exc)
@@ -259,11 +273,28 @@ def _evaluate_scenario_outcome(state: LearnerState, scenario_id: str) -> dict[st
     return evaluate_success(scenario, messages, grammar_error_rate=error_rate)
 
 
+def _level_line(state: LearnerState) -> str:
+    """The report's level line: the evidence-backed CEFR estimate and its status,
+    kept apart from the tutor's working level (ADR-0031)."""
+    working = state.get("cefr_level", "unknown")
+    try:
+        from src.assessment.cefr_profile import build_cefr_profile
+
+        profile = build_cefr_profile(state["user_id"], state["language"])
+    except Exception:  # noqa: BLE001 - the report must render even if the model can't
+        return f"📈 Level estimate: unavailable · tutor working level {working}"
+    status = profile.overall_status.replace("_", " ")
+    if profile.overall is None:
+        return f"📈 Level estimate: not yet ({status}) · tutor working level {working}"
+    return f"📈 Level estimate: {profile.overall} ({status}) · tutor working level {working}"
+
+
 def build_session_report(state: LearnerState) -> str:
     """Compile the end-of-session report from all agents' outputs.
 
-    Includes grammar corrections, new vocabulary, cultural notes, the CEFR
-    estimate, and cross-language transfer suggestions — one section per agent.
+    Includes grammar corrections, new vocabulary, cultural notes, the
+    evidence-backed CEFR estimate (or "not yet") next to the tutor's working
+    level, and cross-language transfer suggestions — one section per agent.
     """
     grammar_errors = state.get("grammar_errors", [])
     new_vocab = state.get("new_vocabulary", [])
@@ -294,7 +325,7 @@ def build_session_report(state: LearnerState) -> str:
             lines.append(f"   • {note}")
 
     # CEFR
-    lines.append(f"📈 Level estimate: {state.get('cefr_level', 'unknown')}")
+    lines.append(_level_line(state))
 
     # Scenario outcome (Phase 13): did the learner meet the scenario's goals?
     scenario_ctx = state.get("current_scenario") or {}
@@ -334,23 +365,29 @@ async def finalize_session(state: LearnerState, *, duration_minutes: float = 0.0
     """Run end-of-session agents, persist outputs, and build the report.
 
     Order:
-    1. Assessment agent — recompute CEFR and persist to profile.
+    1. Working level — re-estimate the tutor's pitch from this session.
     2. Transfer agent — cognate/false-friend suggestions for new vocab.
-    3. Persist vocabulary, grammar errors, turns, and session metrics.
+    3. Persist evidence, vocabulary, grammar errors, turns, session metrics and
+       the learner model; then persist the evidence-backed CEFR profile.
     4. Compile the enriched report.
 
     Returns ``{"report": str, "persisted": {...counts...}}``.
     """
-    # 1. Assessment (updates cefr_level on state + profile).
-    assessment_update = await assessment_node(state)
-    state["cefr_level"] = assessment_update["cefr_level"]
+    # 1. Working level (updates cefr_level on state + profile when the session
+    #    gave a signal; never records a default).
+    state["cefr_level"] = update_working_level(state)
 
     # 2. Transfer (populates transfer_suggestions).
     transfer_update = await transfer_node(state)
     state["transfer_suggestions"] = transfer_update["transfer_suggestions"]
 
-    # 3. Persist everything.
+    # 3. Persist everything (evidence first, then the learner model).
     counts = persist_session(state, duration_minutes=duration_minutes)
+
+    # 3b. The evidence-backed CEFR profile, built *after* this session's
+    #     evidence reached the learner model (it used to be built before, so
+    #     the persisted profile lagged one session behind).
+    persist_evidence_profile(state["user_id"], state["language"])
 
     # 4. Report.
     report = build_session_report(state)

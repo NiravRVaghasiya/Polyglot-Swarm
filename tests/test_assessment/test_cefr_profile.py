@@ -13,10 +13,23 @@ from src.memory import assessments
 
 
 def _seed_skill(user, language, skill, assessment, n, confidence=0.9):
+    """Seed ``n`` *independent* observations (distinct items).
+
+    ADR-0031: identical bare dicts are one observation (duplicates no longer
+    inflate mastery), so realistic seeding uses distinct items.
+    """
     get_knowledge_model().update_from_events(
         user,
         language,
-        [{"skill": skill, "assessment": assessment, "confidence": confidence} for _ in range(n)],
+        [
+            {
+                "skill": skill,
+                "assessment": assessment,
+                "confidence": confidence,
+                "item_id": f"{skill}-{assessment}-{i}",
+            }
+            for i in range(n)
+        ],
     )
 
 
@@ -48,25 +61,31 @@ class TestConfidence:
 
 
 class TestBuildProfile:
-    def test_empty_learner_no_skills(self, temp_storage):
-        prof = build_cefr_profile("newbie", "Spanish", fallback_cefr="A2")
+    def test_empty_learner_has_no_level(self, temp_storage):
+        # ADR-0031: no default level. (This test used to assert a fallback "A2".)
+        prof = build_cefr_profile("newbie", "Spanish")
         assert prof.skills == {}
-        assert prof.overall == "A2"  # fallback
+        assert prof.overall is None
+        assert prof.overall_status == "insufficient_evidence"
+        assert "grammar" in prof.unassessed_skills
 
     def test_per_skill_bands(self, temp_storage):
         _seed_skill("u1", "Spanish", "vocabulary", "correct", 8)
         _seed_skill("u1", "Spanish", "grammar", "incorrect", 3)
         prof = build_cefr_profile("u1", "Spanish")
         assert "vocabulary" in prof.skills and "grammar" in prof.skills
-        # Strong vocab -> high band; failing grammar -> A1.
+        # Strong vocab -> high band. Three failures are shrunk toward the prior,
+        # so grammar is low (A1/A2) rather than the old hard A1.
         assert prof.skills["vocabulary"].cefr in ("C1", "C2")
-        assert prof.skills["grammar"].cefr == "A1"
+        assert prof.skills["grammar"].cefr in ("A1", "A2")
+        assert prof.skills["grammar"].status == "provisional"
 
     def test_overall_is_conservative_min(self, temp_storage):
         _seed_skill("u1", "Spanish", "vocabulary", "correct", 8)
         _seed_skill("u1", "Spanish", "grammar", "incorrect", 3)
         prof = build_cefr_profile("u1", "Spanish")
-        assert prof.overall == "A1"  # min across skills
+        assert prof.overall == prof.skills["grammar"].cefr  # min across skills
+        assert prof.overall_basis == ["grammar", "vocabulary"]
 
     def test_confidence_and_sample_size_present(self, temp_storage):
         _seed_skill("u1", "Spanish", "vocabulary", "correct", 6)
@@ -93,7 +112,8 @@ class TestPersistProfile:
 
         vocab = assessments.latest_assessment("u1", "Spanish", skill="vocabulary")
         assert vocab is not None
-        assert vocab["method"] == "cefr-profile-v1"
+        assert vocab["method"] == "cefr-profile-v2"
+        assert vocab["status"] == "provisional"
         assert vocab["sample_size"] > 0
 
         overall = assessments.latest_assessment("u1", "Spanish")  # skill=None
@@ -128,7 +148,7 @@ class TestAssessmentNodeUpgrade:
 
         # Phase 12 addition: the multidimensional profile was persisted.
         history = assessments.assessment_history("u3", "Spanish")
-        assert any(row["method"] == "cefr-profile-v1" for row in history)
+        assert any(row["method"] == "cefr-profile-v2" for row in history)
         assert any(row["skill"] == "vocabulary" for row in history)
 
 

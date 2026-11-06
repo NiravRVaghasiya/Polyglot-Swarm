@@ -17,6 +17,7 @@ from src.assessment.cefr_profile import (
     build_cefr_profile,
     mastery_to_cefr,
     persist_profile,
+    profile_from_estimates,
 )
 
 __all__ = [
@@ -25,4 +26,5 @@ __all__ = [
     "build_cefr_profile",
     "mastery_to_cefr",
     "persist_profile",
+    "profile_from_estimates",
 ]

@@ -7,6 +7,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Evidence-driven learner knowledge model (ADR-0031).** The learner model is
+  now a deterministic projection of immutable evidence that accounts for task
+  difficulty and uncertainty.
+  - Evidence records carry the skill, subskill, learning objective and item;
+    the task type; the task difficulty in [0, 1], with an explicit
+    `difficulty_basis` that keeps `unknown` apart from rated or measured
+    values; and the prompt, rubric and model versions. They also carry a
+    content fingerprint, a correlation id, and a `supersedes` link for
+    corrections. Corrections go into a new append-only
+    `evidence_supersessions` table and never edit a row.
+  - New pure engine `src/learner/estimation.py` (`lkm-evidence-v2`): a
+    weighted MAP Rasch-style ability for each skill.
+    - Each observation is weighted by reliability, recency (relative to the
+      skill's newest evidence, not the clock), a per-item repetition
+      discount, and an unknown-difficulty discount.
+    - Duplicate and correlated judgments merge into one observation, and
+      exposure counts toward coverage only.
+    - It reports mastery (`null` without graded evidence), an interval,
+      uncertainty, an ordinal evidence index (explicitly not a probability),
+      evidence quantity and quality, and coverage (practised, assessed,
+      demonstrated, and coverage of the grammar-pack catalog). It also
+      reports an evidence status (`insufficient_evidence` / `provisional` /
+      `estimated` / `validated`), plus the old engine's value as
+      `baseline_mastery`.
+  - `KnowledgeModel.recompute` replays the active evidence in a stable order.
+    It writes `skill_states` plus append-only `lkm_processing_runs` and
+    `mastery_updates` only when the evidence digest changes, so processing is
+    idempotent. `replay(run_id)` reproduces any past run, and `explain(skill)`
+    lists each event's contribution.
+  - The CEFR profile (`cefr-profile-v2`) is nullable and has explicit states:
+    no default level, a band only at `provisional` or better, an overall band
+    only when at least two skills are assessed, and unassessed skills listed
+    rather than treated as weak.
+  - The tutor's prompt level is now an explicit *working level*, separate
+    from the assessed level. It is never seeded, and it is logged only when a
+    session gives a signal. `user_profile.DEFAULT_WORKING_LEVEL` is used for
+    prompts only.
+  - The planner labels every action `assessment`, `remediation`,
+    `reinforcement` or `advancement`, and recommends assessment, not
+    remediation, when evidence is insufficient. Other changes:
+    - Assessments are scored by information value and capped while learning
+      actions still fit.
+    - Readiness is blocked only by a prerequisite the evidence shows is weak.
+    - Grammar coverage drives a `diagnostic_check` of the easiest
+      unassessed construction.
+    - FSRS scheduling is unchanged.
+  - Migration 0007 is additive: new nullable or defaulted columns on
+    `evidence`, `skill_states` and `assessments`, and three new tables.
+    Existing rows are preserved, and legacy evidence replays into the new
+    model.
+  - API: CEFR, band and mastery are nullable; `status`, the interval, counts,
+    coverage and `intent` fields are added; there are new
+    `GET /api/v1/learner/explain/{skill}` and `GET /api/v1/learner/history`
+    routes; and `insights` gains `overall_status` and `needs_assessment`.
+  - Clients: the React types and `TodaysPlan` show "not yet assessed", the
+    status, the mastery range and each action's intent. The dashboard labels
+    the session value "Working level". Gradio has a "My level" panel.
+    `polyglot assess` and `polyglot plan` show the status, interval and
+    intent.
+  - Privacy export now includes evidence, supersessions and the learner-model
+    history, and deletion removes the history.
+
 ### Added
 
 - **10/10 gap closure.** Closed the three gaps a full audit against the plan's
@@ -424,6 +488,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- New learners no longer get an unsupported CEFR level. `default_profile()`
+  seeded "A2", `build_cefr_profile` fell back to "A2", the session log
+  recorded the default as an estimate, and `polyglot experiment measure`
+  recorded it as a pre-test outcome. All four now report "insufficient
+  evidence" instead (ADR-0031).
+- Repeated or duplicated evaluations no longer inflate mastery, and calling
+  `persist_session` twice for the same session no longer double-counts its
+  evidence.
+- Words the vocabulary agent took from the tutor's reply are recorded as
+  exposure, not as positive evidence that the learner can produce them.
+- The CEFR profile persisted at the end of a session now includes that
+  session's evidence. It used to be built before the evidence was recorded.
 - Replaced placeholder `YOUR_USERNAME` repository URLs in `README.md`,
   `CONTRIBUTING.md`, and `pyproject.toml` with the real repository.
 - Corrected documented CLI commands so they are executable (scenario ids such

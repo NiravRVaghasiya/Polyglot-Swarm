@@ -141,3 +141,37 @@ class TestEndSession:
         report = end_session(box)
         assert "Session Report" in report
         assert box["state"] is None
+
+
+class TestLearnerLevelPanel:
+    """ADR-0031: the "My level" panel never shows a default level."""
+
+    def test_without_a_session(self, temp_storage):
+        from frontend.gradio_app import learner_level_markdown
+
+        assert "no evidence" in learner_level_markdown({}, "Spanish")
+
+    def test_new_learner_is_not_yet_assessed(self, temp_storage):
+        from frontend.gradio_app import learner_level_markdown
+
+        text = learner_level_markdown({"user_id": "web-new"}, "Spanish")
+        assert "not yet assessed" in text
+        assert "insufficient evidence" in text
+
+    def test_assessed_skills_show_status(self, temp_storage):
+        from frontend.gradio_app import learner_level_markdown
+        from src.learner import get_knowledge_model
+
+        for skill in ("vocabulary", "reading"):
+            get_knowledge_model().update_from_events(
+                "web-u",
+                "Spanish",
+                [
+                    {"skill": skill, "assessment": "correct", "confidence": 0.9, "item_id": f"i{i}"}
+                    for i in range(5)
+                ],
+            )
+        text = learner_level_markdown({"user_id": "web-u"}, "Spanish")
+        assert "| vocabulary |" in text
+        assert "provisional" in text
+        assert "not yet assessed" not in text.split("\n")[0]

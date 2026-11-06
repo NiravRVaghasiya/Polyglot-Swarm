@@ -111,6 +111,14 @@ class ProfileUpdateRequest(BaseModel):
 
 
 # --- Learner model: plan, CEFR profile, skill map, insights (Phase 16) ---
+# ADR-0031: CEFR bands and mastery are nullable (no evidence -> no level, never
+# a default or a zero), every estimate carries an evidence ``status``, and
+# ``confidence`` is an ordinal evidence index, not a calibrated probability.
+
+#: insufficient_evidence | provisional | estimated | validated
+EvidenceStatusValue = str
+
+
 class PlanAction(BaseModel):
     type: str
     target: str
@@ -118,6 +126,8 @@ class PlanAction(BaseModel):
     reason: str = ""
     priority: float = 0.0
     estimated_minutes: float = 0.0
+    #: assessment | remediation | reinforcement | advancement ("" if unknown)
+    intent: str = ""
 
 
 class PlanResponse(BaseModel):
@@ -130,38 +140,115 @@ class SkillAssessmentResponse(BaseModel):
     # ``skill`` is redundant (it is the dict key in CEFRProfileResponse.skills)
     # so it is optional here.
     skill: str | None = None
-    cefr: str
-    mastery: float
-    confidence: float
-    sample_size: int
+    cefr: str | None = None
+    status: EvidenceStatusValue = "insufficient_evidence"
+    mastery: float | None = None
+    mastery_low: float | None = None
+    mastery_high: float | None = None
+    uncertainty: float = 1.0
+    #: Evidence index in [0, 1] — ordinal, not a probability.
+    confidence: float = 0.0
+    confidence_label: str = "none"
+    #: Raw graded observations (duplicates included).
+    sample_size: int = 0
+    independent_count: int = 0
+    distinct_items: int = 0
+    coverage: dict[str, Any] = {}
+    #: The pre-ADR-0031 engine's mastery over the same evidence, for comparison.
+    baseline_mastery: float | None = None
 
 
 class CEFRProfileResponse(BaseModel):
     language: str
-    overall: str
+    overall: str | None = None
+    overall_status: EvidenceStatusValue = "insufficient_evidence"
+    overall_basis: list[str] = []
+    unassessed_skills: list[str] = []
+    method: str = ""
     skills: dict[str, SkillAssessmentResponse] = {}
 
 
 class SkillBeliefResponse(BaseModel):
     skill: str
-    mastery: float
+    mastery: float | None = None
     uncertainty: float
+    #: Raw graded observations (duplicates included).
     sample_size: int
+    status: EvidenceStatusValue = "insufficient_evidence"
+    mastery_low: float | None = None
+    mastery_high: float | None = None
+    independent_count: int = 0
+    effective_n: float = 0.0
+    evidence_index: float = 0.0
+    evidence_quality: float = 0.0
+    coverage: dict[str, Any] = {}
+    last_evidence_at: str | None = None
 
 
 class SkillMapResponse(BaseModel):
     language: str
+    method: str = ""
     skills: list[SkillBeliefResponse] = []
 
 
 class InsightsResponse(BaseModel):
     language: str
+    #: The tutor's working level from session logs (an instructional setting,
+    #: not an assessment); ``None`` until a session produced a signal.
     current_cefr: str | None = None
-    overall_cefr: str
+    overall_cefr: str | None = None
+    overall_status: EvidenceStatusValue = "insufficient_evidence"
+    #: Lowest-mastery skills among those with provisional-or-better evidence.
     weakest_skills: list[str] = []
+    #: Skills without enough evidence to judge (not assumed weak).
+    needs_assessment: list[str] = []
     top_weaknesses: list[dict[str, Any]] = []
     recommended_focus: list[str] = []
     streak: int = 0
+
+
+class EvidenceContributionResponse(BaseModel):
+    event_id: str
+    role: str  # counted | merged | exposure | ignored
+    group_key: str
+    item_key: str
+    signal: float | None = None
+    reliability: float = 0.0
+    recency: float = 1.0
+    repetition: float = 1.0
+    difficulty_factor: float = 1.0
+    difficulty_logit: float = 0.0
+    weight: float = 0.0
+    merged_into: str | None = None
+
+
+class SkillExplanationResponse(BaseModel):
+    language: str
+    skill: str
+    estimate: dict[str, Any]
+    contributions: list[EvidenceContributionResponse] = []
+
+
+class MasteryUpdateResponse(BaseModel):
+    run_id: int
+    skill: str
+    method: str
+    evidence_digest: str
+    mastery_before: float | None = None
+    mastery_after: float | None = None
+    uncertainty_after: float | None = None
+    status_before: str | None = None
+    status_after: str | None = None
+    baseline_mastery: float | None = None
+    independent_n: float | None = None
+    new_event_ids: list[str] = []
+    removed_event_ids: list[str] = []
+    created_at: str
+
+
+class LearnerHistoryResponse(BaseModel):
+    language: str
+    updates: list[MasteryUpdateResponse] = []
 
 
 # --- Privacy: self-service export/deletion (Phase 21) ---

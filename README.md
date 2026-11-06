@@ -33,7 +33,7 @@ You:  quit
 🔤 Grammar — 1 correction(s):
    • yo soy hambre → yo tengo hambre
 📚 New vocabulary (2): mesa, beber
-📈 Level estimate: A2
+📈 Level estimate: not yet (insufficient evidence) · tutor working level A1
 ```
 
 <sub>An example terminal session. The tutor stays in character during the chat; corrections are saved for the report at the end.</sub>
@@ -44,10 +44,10 @@ You:  quit
 |---|---|
 | 🎭 **Role-play conversations** | Order at a restaurant, see a doctor, do a job interview, or just chat, in any language you name. |
 | 🤫 **Corrections that don't interrupt** | Grammar is checked in the background and only flagged when the tutor is confident. A wrong correction counts as worse than a missed one. |
-| 🧠 **A learner model** | Tracks your grammar, vocabulary, speaking, listening, reading, writing and cultural skills, each with a confidence level. |
+| 🧠 **A learner model** | Tracks your grammar, vocabulary, speaking, listening, reading, writing and cultural skills from recorded evidence. Each skill has a mastery range and says how much evidence backs it. Task difficulty is taken into account, and repeated or duplicate judgments don't inflate the result. |
 | 🗺️ **A plan for what's next** | Ranks what to practice by how much you'd learn from it, fitting in reviews that are due and the areas you're weakest in. |
 | 🔁 **Spaced repetition** | New words from your conversations are scheduled for review with [FSRS](https://github.com/open-spaced-repetition/py-fsrs), so they come back just before you'd forget them. |
-| 📊 **A per-skill CEFR level** | A level (A1–C2) for each skill, with a confidence level, instead of a single number. |
+| 📊 **A per-skill CEFR level** | A level (A1–C2) for each skill once there is enough evidence. Until then the tutor says "not yet assessed" instead of guessing, and it suggests a short check to find out. |
 | 🎙️ **Voice** | Speak to the tutor and hear it reply (Whisper speech recognition + Edge TTS). Optional; text works without it. |
 | 🔒 **Private by design** | Run it entirely on your own machine with Ollama, or set `LOCAL_ONLY=true` so no learning data ever leaves it. |
 
@@ -181,7 +181,7 @@ Adding a language pack is data, not code: see [language packs](docs/language-pac
 | `polyglot health` | Check setup and that an AI backend answers |
 | `polyglot scenarios` | List the role-play scenarios |
 | `polyglot plan` | Today's plan: the next best things to practice, and why |
-| `polyglot assess` | Your CEFR level for each skill, with confidence |
+| `polyglot assess` | Your CEFR level for each skill, with its evidence status (or "not yet assessed") |
 | `polyglot progress` | Streak, words learned, level and top weaknesses |
 | `polyglot drill` | Practice drills from your weaknesses and due words |
 | `polyglot write` | Detailed feedback on a piece of writing |

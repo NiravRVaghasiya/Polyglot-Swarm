@@ -67,6 +67,11 @@ def export_user_data(user_id: str) -> dict[str, Any]:
         "error_patterns": analytics.get_error_patterns(user_id),
         "learning_sessions": analytics.get_sessions(user_id, limit=1_000_000),
         "skill_states": skill_state.get_all_skills_for_user(user_id),
+        # ADR-0031: the evidence the model is derived from, its corrections,
+        # and the per-update history, so the export is a complete audit trail.
+        "evidence": _export_evidence(user_id),
+        "evidence_supersessions": _export_supersessions(user_id),
+        "learner_model_history": _export_lkm_history(user_id),
         "assessments": assessments.all_assessments_for_user(user_id),
         "experiment_assignments": experiments.all_assignments_for_user(user_id),
         "outcomes": experiments.all_outcomes_for_user(user_id),
@@ -120,6 +125,7 @@ def delete_user_data(user_id: str) -> dict[str, Any]:
     result["assessments"] = _safe(lambda: assessments.delete_for_user(user_id))
     result["experiments"] = _safe(lambda: experiments.delete_for_user(user_id))
     result["evidence"] = _safe(lambda: _delete_evidence(user_id))
+    result["learner_model_history"] = _safe(lambda: _delete_lkm_history(user_id))
     result["cultural_notes"] = _safe(lambda: _delete_cultural_notes(user_id))
     result["auth_tokens"] = _safe(lambda: auth.delete_tokens_for_user(user_id))
     result["audit_log_anonymized"] = _safe(lambda: anonymize_for_user(user_id))
@@ -136,6 +142,39 @@ def _safe(fn: Any) -> Any:
         return fn()
     except Exception as exc:  # noqa: BLE001 - reported, not swallowed silently
         return {"error": str(exc)}
+
+
+def _export_evidence(user_id: str) -> list[dict[str, Any]]:
+    from src.evidence.store import get_events
+
+    return get_events(user_id, limit=10_000_000)
+
+
+def _export_supersessions(user_id: str) -> list[dict[str, Any]]:
+    from src.evidence.store import get_supersessions
+
+    return get_supersessions(user_id)
+
+
+def _export_lkm_history(user_id: str) -> dict[str, list[dict[str, Any]]]:
+    from src.memory.db import get_connection
+    from src.memory.schema import init_all
+
+    init_all()
+    with get_connection() as conn:
+        runs = conn.execute(
+            "SELECT * FROM lkm_processing_runs WHERE user_id=? ORDER BY id", (user_id,)
+        ).fetchall()
+        updates = conn.execute(
+            "SELECT * FROM mastery_updates WHERE user_id=? ORDER BY id", (user_id,)
+        ).fetchall()
+    return {"runs": [dict(r) for r in runs], "updates": [dict(u) for u in updates]}
+
+
+def _delete_lkm_history(user_id: str) -> int:
+    from src.memory.lkm_history import delete_for_user
+
+    return delete_for_user(user_id)
 
 
 def _delete_evidence(user_id: str) -> int:

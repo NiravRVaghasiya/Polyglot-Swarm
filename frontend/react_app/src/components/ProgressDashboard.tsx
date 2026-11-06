@@ -29,7 +29,9 @@ export function ProgressDashboard({
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat label="Streak" value={`${overview.current_streak}d`} />
         <Stat label="Words" value={overview.words_learned_total} />
-        <Stat label="CEFR" value={overview.current_cefr ?? "—"} />
+        {/* The session heuristic's working level (how the tutor pitches its
+            language), not an assessment — see the CEFR profile for that. */}
+        <Stat label="Working level" value={overview.current_cefr ?? "—"} />
         <Stat label="Sessions" value={overview.total_sessions} />
       </div>
 

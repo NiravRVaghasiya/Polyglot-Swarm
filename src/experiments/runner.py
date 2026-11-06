@@ -192,9 +192,13 @@ def _measure(user_id: str, language: str) -> tuple[float, dict[str, Any]]:
     Returns ``(mean_skill_mastery, payload)`` where the payload carries the
     per-skill mastery and the overall CEFR band/ordinal for reference. Mean
     mastery is over :data:`_MEASURED_SKILLS`; a skill with no belief yet
-    contributes 0.0 (no evidence = no demonstrated mastery), which is exactly
-    the behavior that makes a conversation-only arm measure lower than an
-    analysis arm.
+    contributes 0.0 to this *outcome metric* ("demonstrated mastery" — what the
+    arm produced evidence of), which is exactly the behavior that makes a
+    conversation-only arm measure lower than an analysis arm. This is a
+    measurement convention for comparing arms, not a belief about the learner:
+    the learner model itself never treats missing evidence as zero (ADR-0031),
+    and the payload's ``unassessed_skills`` says which skills had none. The
+    overall band/ordinal is ``None`` when the evidence does not support one.
     """
     beliefs = get_knowledge_model().current_beliefs(user_id, language)
     masteries = [beliefs[s].mastery if s in beliefs else 0.0 for s in _MEASURED_SKILLS]
@@ -204,7 +208,11 @@ def _measure(user_id: str, language: str) -> tuple[float, dict[str, Any]]:
     payload = {
         "per_skill_mastery": {s: round(m, 4) for s, m in zip(_MEASURED_SKILLS, masteries)},
         "overall_cefr": profile.overall,
-        "overall_cefr_ordinal": CEFR_ORDER.index(profile.overall),
+        "overall_cefr_status": profile.overall_status,
+        "overall_cefr_ordinal": (
+            CEFR_ORDER.index(profile.overall) if profile.overall is not None else None
+        ),
+        "unassessed_skills": [s for s in _MEASURED_SKILLS if s not in beliefs],
     }
     return mean_mastery, payload
 

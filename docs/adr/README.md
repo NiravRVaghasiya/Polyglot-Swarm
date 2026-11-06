@@ -16,16 +16,16 @@ old ADR — we add a new one that supersedes it and mark the old one accordingly
 | [0003](0003-llm-provider-abstraction.md) | LLM provider abstraction with tiered routing | Accepted |
 | [0004](0004-task-tier-routing-and-structured-output.md) | Task-tier routing, structured output, and telemetry (Phase 1) | Accepted |
 | [0005](0005-sqlite-source-of-truth-and-migrations.md) | SQLite as source of truth, with a migration runner (Phase 2) | Accepted |
-| [0006](0006-evidence-pipeline.md) | Evidence pipeline: what happened vs what we believe (Phase 3) | Accepted |
+| [0006](0006-evidence-pipeline.md) | Evidence pipeline: what happened vs what we believe (Phase 3) | Accepted (amended by [0031](0031-evidence-driven-learner-knowledge-model.md)) |
 | [0007](0007-grammar-taxonomy-and-abstention.md) | Grammar taxonomy, classification, and abstention (Phase 4) | Accepted |
 | [0008](0008-multidimensional-vocabulary.md) | Multi-dimensional vocabulary mastery and collocations (Phase 5) | Accepted |
-| [0009](0009-learner-knowledge-model.md) | Learner Knowledge Model & mastery engine (Phase 6) | Accepted |
-| [0010](0010-next-best-learning-action.md) | Next Best Learning Action / curriculum planner (Phase 7) | Accepted |
+| [0009](0009-learner-knowledge-model.md) | Learner Knowledge Model & mastery engine (Phase 6) | Accepted (amended by [0031](0031-evidence-driven-learner-knowledge-model.md)) |
+| [0010](0010-next-best-learning-action.md) | Next Best Learning Action / curriculum planner (Phase 7) | Accepted (amended by [0031](0031-evidence-driven-learner-knowledge-model.md)) |
 | [0011](0011-fsrs-contextual-review.md) | FSRS integration & contextual review with recall measurement (Phase 8) | Accepted |
 | [0012](0012-verifier-and-abstention.md) | Evaluator as verifier: accept/revise/abstain + calibration (Phase 9) | Accepted |
 | [0013](0013-language-packs.md) | Language packs (Phase 10) | Accepted |
 | [0014](0014-transfer-graph.md) | Cross-language transfer graph with verification (Phase 11) | Accepted |
-| [0015](0015-multidimensional-cefr.md) | Multidimensional CEFR assessment (Phase 12) | Accepted |
+| [0015](0015-multidimensional-cefr.md) | Multidimensional CEFR assessment (Phase 12) | Accepted (amended by [0031](0031-evidence-driven-learner-knowledge-model.md)) |
 | [0016](0016-scenarios-as-pedagogical-environments.md) | Scenarios as pedagogical environments (Phase 13) | Accepted |
 | [0017](0017-adaptive-difficulty-controller.md) | Multi-signal adaptive difficulty controller (Phase 14) | Accepted |
 | [0018](0018-voice-vad.md) | Voice activity detection & pronunciation integration (Phase 15) | Accepted |
@@ -41,6 +41,7 @@ old ADR — we add a new one that supersedes it and mark the old one accordingly
 | [0028](0028-experiment-execution-and-published-results.md) | Experiment execution harness and published results (Gate C) | Accepted |
 | [0029](0029-versioned-prompts.md) | Versioned prompt registry (Gate B) | Accepted |
 | [0030](0030-frontend-voice-pwa-onboarding.md) | Frontend voice, PWA, and onboarding (Gate E) | Accepted |
+| [0031](0031-evidence-driven-learner-knowledge-model.md) | Evidence-driven, difficulty- and uncertainty-aware learner knowledge model | Accepted |
 
 ## Creating a new ADR
 

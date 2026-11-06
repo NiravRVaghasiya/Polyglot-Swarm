@@ -235,15 +235,28 @@ def assess(
 
     prof = build_cefr_profile(user, language)
     console.print(f"[bold green]CEFR profile for {user}[/bold green] - {language}")
-    console.print(f"  Overall: [cyan]{prof.overall}[/cyan]")
+    overall = prof.overall or "not yet assessed"
+    console.print(f"  Overall: [cyan]{overall}[/cyan] [dim]({prof.overall_status})[/dim]")
     if not prof.skills:
         console.print("[dim]No skill evidence yet - have a conversation session first.[/dim]")
         return
     for skill, a in sorted(prof.skills.items()):
+        band = a.cefr or "-"
+        if a.mastery_low is not None and a.mastery_high is not None:
+            span = f"mastery {a.mastery_low:.2f}-{a.mastery_high:.2f}, "
+        else:
+            span = ""
         console.print(
-            f"  {skill:<12} [cyan]{a.cefr}[/cyan] "
-            f"[dim](confidence {a.confidence:.2f}, {a.sample_size} obs)[/dim]"
+            f"  {skill:<12} [cyan]{band:<3}[/cyan] {a.status:<22} "
+            f"[dim]({span}{a.independent_count} independent / {a.sample_size} obs, "
+            f"evidence {a.confidence_label})[/dim]"
         )
+    if prof.unassessed_skills:
+        console.print(f"  [dim]Not yet assessed: {', '.join(prof.unassessed_skills)}[/dim]")
+    console.print(
+        "  [dim]Bands come from a fixed mastery curve; evidence labels are not "
+        "calibrated probabilities.[/dim]"
+    )
 
 
 @app.command()
@@ -264,9 +277,10 @@ def plan(
         console.print("[dim]No plan yet — have a conversation session first.[/dim]")
         return
     for i, a in enumerate(actions, 1):
+        intent = f"{a.intent}, " if a.intent else ""
         console.print(
             f"  [cyan]{i}. {a.type.value}[/cyan] "
-            f"[dim]({a.estimated_minutes:g} min, priority {a.priority:.2f})[/dim]"
+            f"[dim]({intent}{a.estimated_minutes:g} min, priority {a.priority:.2f})[/dim]"
         )
         console.print(f"     -> {a.target}  -  {a.reason}")
 
@@ -359,7 +373,7 @@ def chat(
     speaker = escape(persona.get("name", "Tutor"))
     console.print(
         f"[bold green]🌍 Polyglot Swarm[/bold green] — {state['language']} | "
-        f"Level: {state['cefr_level']}"
+        f"Working level: {state['cefr_level']}"
     )
     opening = scenario_ctx.get("opening_line")
     if opening:
@@ -434,7 +448,15 @@ def experiment_measure(
     from src.assessment.cefr_profile import CEFR_ORDER, build_cefr_profile
     from src.memory import experiments
 
+    if experiments.get_assignment(name, user) is None:
+        console.print(f"[red]no variant assignment for {user!r} in {name!r}[/red]")
+        raise typer.Exit(code=1)
     profile = build_cefr_profile(user, language)
+    if profile.overall is None:
+        # ADR-0031: never record a fabricated level as an outcome.
+        console.print(f"[red]No overall CEFR level for {user} ({profile.overall_status}).[/red]")
+        console.print("No outcome recorded - gather more evidence first.")
+        raise typer.Exit(code=1)
     value = float(CEFR_ORDER.index(profile.overall))
     try:
         experiments.record_outcome(name, user, point, metric, value, payload=profile.as_dict())
