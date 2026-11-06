@@ -1,9 +1,19 @@
 # Polyglot Swarm — local-first deployment.
 #
-#   docker compose up            # API (:8000) + Gradio UI (:7860)
-#   docker compose --profile local-llm up   # also start Ollama
+#   docker compose up                          # API (:8000) + Gradio UI (:7860)
+#   docker compose --profile web up            # also the React dashboard (:3000)
+#   docker compose --profile local-llm up      # also an Ollama container (:11434);
+#     then, once:  docker compose exec ollama ollama pull llama3.1:8b
 #
-# Copy .env.example to .env and set your LLM API key(s) first.
+# Copy .env.example to .env first and choose an LLM backend there (API key,
+# Ollama, or POLYGLOT_DETERMINISTIC=1 for an offline demo).
+
+x-app-env: &app-env
+  # Inside a container "localhost" is the container itself, so .env's
+  # OLLAMA_BASE_URL can't reach Ollama. This points at the local-llm profile's
+  # container; to use Ollama running on your own machine instead, change it to
+  # http://host.docker.internal:11434
+  OLLAMA_BASE_URL: http://ollama:11434
 
 services:
   api:
@@ -14,6 +24,8 @@ services:
       - "8000:8000"
     env_file:
       - .env
+    environment:
+      <<: *app-env
     volumes:
       - polyglot-data:/data
     healthcheck:
@@ -25,7 +37,8 @@ services:
     restart: unless-stopped
 
   ui:
-    # Reuse the image built by the api service.
+    # Reuse the image built by the api service. The Gradio app runs the tutor
+    # in-process; it shares the data volume with the API rather than calling it.
     image: polyglot-swarm
     build: .
     command: python -m src.main
@@ -34,14 +47,38 @@ services:
     env_file:
       - .env
     environment:
-      # Point the UI at the API service inside the compose network.
+      <<: *app-env
       GRADIO_SERVER_PORT: "7860"
+      # Gradio listens on 127.0.0.1 by default, which is unreachable from
+      # outside the container.
+      GRADIO_SERVER_NAME: "0.0.0.0"
     volumes:
       - polyglot-data:/data
     depends_on:
       api:
         condition: service_healthy
     restart: unless-stopped
+
+  # Optional React dashboard. Enable with: --profile web (first start installs
+  # and builds, which takes a few minutes).
+  web:
+    image: node:20-alpine
+    profiles: ["web"]
+    working_dir: /app
+    command: sh -c "npm install --no-audit --no-fund && npm run build && npm start"
+    environment:
+      # Used by the browser, so it is the API's address as seen from your machine.
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+      NEXT_TELEMETRY_DISABLED: "1"
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend/react_app:/app
+      - web-node-modules:/app/node_modules
+      - web-next-build:/app/.next
+    depends_on:
+      api:
+        condition: service_healthy
 
   # Optional local LLM for privacy mode. Enable with: --profile local-llm
   ollama:
@@ -56,3 +93,5 @@ services:
 volumes:
   polyglot-data:
   ollama-models:
+  web-node-modules:
+  web-next-build:

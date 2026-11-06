@@ -110,6 +110,27 @@ class RetryPolicy:
         return float(backoff_delay(attempt, base_delay=self.base_delay, max_delay=self.max_delay))
 
 
+#: HTTP 4xx statuses that are still worth retrying: request timeout, conflict,
+#: and rate limiting all clear up on their own.
+_RETRYABLE_CLIENT_STATUSES = frozenset({408, 409, 429})
+
+
+def is_retryable(exc: BaseException) -> bool:
+    """Whether retrying the same provider could plausibly succeed.
+
+    A missing SDK package or a 4xx response (bad key, unknown model, an Ollama
+    model that was never pulled) fails identically on every retry, so retrying
+    only delays failover. Errors carrying no status (dropped connections,
+    timeouts) and 5xx responses are treated as transient.
+    """
+    if isinstance(exc, ImportError):
+        return False
+    status = getattr(exc, "status_code", None)
+    if isinstance(status, int) and 400 <= status < 500:
+        return status in _RETRYABLE_CLIENT_STATUSES
+    return True
+
+
 #: Shared breaker instance for the real (non-deterministic) provider chain.
 #: Module-level because src.llm.factory.get_provider builds a fresh
 #: RoutingProvider (and fresh concrete provider instances) on every call —
@@ -123,4 +144,5 @@ __all__ = [
     "RetryPolicy",
     "backoff_delay",
     "default_circuit_breaker",
+    "is_retryable",
 ]

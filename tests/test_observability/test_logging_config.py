@@ -134,6 +134,12 @@ class TestConfigureLogging:
         configure_logging()
         assert logging_config.is_configured() is True
 
+    def test_http_client_request_logs_are_quieted(self):
+        # One INFO line per LLM HTTP call would flood the interactive CLI chat.
+        configure_logging(level="INFO", fmt="text")
+        assert logging.getLogger("httpx").getEffectiveLevel() == logging.WARNING
+        assert logging.getLogger("httpcore").getEffectiveLevel() == logging.WARNING
+
 
 class TestEnsureConfigured:
     def test_configures_only_if_not_already_configured(self):

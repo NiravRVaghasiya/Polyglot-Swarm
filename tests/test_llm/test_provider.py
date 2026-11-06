@@ -73,7 +73,9 @@ class TestClaudeProviderGenerate:
         # Constructor received the right params.
         assert model.init_kwargs["model"] == "claude-test"
         assert model.init_kwargs["api_key"] == "sk-ant-test"
-        assert model.init_kwargs["temperature"] == 0.3
+        # Current Claude models reject non-default sampling parameters, and API
+        # version 2026-10-21 rejects them on every model, so none are sent.
+        assert "temperature" not in model.init_kwargs
         assert model.init_kwargs["max_tokens"] == 123
         # Messages mapped in order to LangChain message objects.
         assert [m.content for m in model.invoked_with] == [

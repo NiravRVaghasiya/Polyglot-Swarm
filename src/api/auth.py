@@ -63,6 +63,11 @@ login_rate_limiter = RateLimiter(max_calls=10, window_seconds=60.0)
 register_rate_limiter = RateLimiter(max_calls=5, window_seconds=60.0)
 
 
+#: bcrypt only reads the first 72 bytes of a password, and bcrypt 5.x raises
+#: on longer input rather than silently truncating it.
+MAX_PASSWORD_BYTES = 72
+
+
 class AuthError(Exception):
     """Raised for registration/login failures."""
 
@@ -105,8 +110,11 @@ def register(username: str, password: str) -> str:
 
     Raises :class:`AuthError` if the username is taken or inputs are invalid.
     """
+    username = username.strip()
     if not username or not password:
         raise AuthError("username and password are required")
+    if len(password.encode("utf-8")) > MAX_PASSWORD_BYTES:
+        raise AuthError(f"password must be at most {MAX_PASSWORD_BYTES} bytes")
 
     init_db()
     user_id = f"u-{uuid.uuid4().hex[:12]}"
@@ -128,6 +136,7 @@ def login(username: str, password: str) -> str:
     ever exists outside the caller's possession; only its SHA-256 hash is
     persisted. Raises :class:`AuthError` on invalid credentials.
     """
+    username = username.strip()
     init_db()
     with get_connection() as conn:
         row = conn.execute(

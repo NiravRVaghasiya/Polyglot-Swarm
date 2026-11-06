@@ -26,7 +26,12 @@ from src.llm.gemini import GeminiProvider
 from src.llm.ollama import OllamaProvider
 from src.llm.openai import OpenAIProvider
 from src.llm.provider import LLMProvider, Message, Tier
-from src.llm.reliability import CircuitBreaker, RetryPolicy, default_circuit_breaker
+from src.llm.reliability import (
+    CircuitBreaker,
+    RetryPolicy,
+    default_circuit_breaker,
+    is_retryable,
+)
 from src.llm.router import resolve_tier
 
 if TYPE_CHECKING:
@@ -210,7 +215,7 @@ class RoutingProvider(LLMProvider):
                     )
                 except Exception as exc:  # noqa: BLE001 - retry/failover is intentional
                     self._record(provider, timer, input_tokens, 0, success=False, error=str(exc))
-                    if attempt >= self.retry_policy.max_retries:
+                    if attempt >= self.retry_policy.max_retries or not is_retryable(exc):
                         return _CallFailed(exc)
                     delay = self.retry_policy.delay_for(attempt)
                     logger.warning(

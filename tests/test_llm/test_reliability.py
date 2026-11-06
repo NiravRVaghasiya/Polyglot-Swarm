@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.llm.reliability import CircuitBreaker, RetryPolicy, backoff_delay
+from src.llm.reliability import CircuitBreaker, RetryPolicy, backoff_delay, is_retryable
 
 
 class TestCircuitBreaker:
@@ -106,3 +106,25 @@ class TestBackoffDelay:
 @pytest.mark.parametrize("attempt", [0, 1, 2, 5])
 def test_backoff_delay_never_negative(attempt):
     assert backoff_delay(attempt, base_delay=0.1, max_delay=1.0) >= 0.0
+
+
+class _StatusError(Exception):
+    def __init__(self, status_code: int) -> None:
+        super().__init__(f"status {status_code}")
+        self.status_code = status_code
+
+
+class TestIsRetryable:
+    @pytest.mark.parametrize("status", [400, 401, 403, 404, 422])
+    def test_client_errors_are_permanent(self, status):
+        assert is_retryable(_StatusError(status)) is False
+
+    @pytest.mark.parametrize("status", [408, 409, 429, 500, 503])
+    def test_timeouts_rate_limits_and_server_errors_are_transient(self, status):
+        assert is_retryable(_StatusError(status)) is True
+
+    def test_missing_package_is_permanent(self):
+        assert is_retryable(ImportError("cannot import name 'ChatOllama'")) is False
+
+    def test_errors_without_a_status_are_transient(self):
+        assert is_retryable(ConnectionError("reset by peer")) is True

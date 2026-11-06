@@ -64,47 +64,88 @@ See [`docs/architecture.md`](docs/architecture.md) for how these layers actually
 
 ## Quick start
 
-### Prerequisites
+Five steps, about ten minutes. Commands are given for **Windows (PowerShell)** and **macOS / Linux**.
 
-- Python 3.12+
-- At least one of: an LLM API key (Anthropic / Google / OpenAI), a local Ollama endpoint, or `POLYGLOT_DETERMINISTIC=1` for a fully offline demo.
+### 1. Check you have Python 3.12 or newer
 
-### Install
+| Windows | macOS / Linux |
+|---|---|
+| `py -3.12 --version` | `python3.12 --version` |
+
+If that fails, install Python 3.12 from [python.org](https://www.python.org/downloads/). (An older default `python`, such as 3.11, is fine to keep; the steps below pick 3.12 explicitly.)
+
+### 2. Download and install
+
+**Windows (PowerShell):**
+
+```powershell
+git clone https://github.com/NiravRVaghasiya/Polyglot-Swarm.git
+cd Polyglot-Swarm
+py -3.12 -m venv .venv
+.venv\Scripts\Activate.ps1
+python -m pip install -e ".[dev]"
+copy .env.example .env
+```
+
+If PowerShell refuses to run `Activate.ps1`, open **Command Prompt** instead and run `.venv\Scripts\activate.bat` in place of that line.
+
+**macOS / Linux:**
 
 ```bash
 git clone https://github.com/NiravRVaghasiya/Polyglot-Swarm.git
 cd Polyglot-Swarm
-
-pip install -e ".[dev]"        # add ".[voice]" or ".[all]" for STT/TTS
-
-cp .env.example .env           # set an LLM key, or OLLAMA_BASE_URL, or leave it for deterministic mode
+python3.12 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e ".[dev]"
+cp .env.example .env
 ```
 
-All configuration is environment variables (loaded from `.env` via pydantic-settings) — see [`.env.example`](.env.example) for the full list and [`docs/deployment.md`](docs/deployment.md) for details.
+The install takes a few minutes. Every time you open a new terminal, `cd` into the folder and activate `.venv` again (the `Activate.ps1` / `activate.bat` / `source` line) before running `polyglot`.
 
-### Run
+### 3. Choose how the tutor thinks
 
-```bash
-# Terminal chat (any language by name, or a scenario by id)
-polyglot chat --language Spanish
-polyglot chat --scenario es_restaurant_ordering
-polyglot scenarios                         # list scenario ids
+Open `.env` in any text editor and set up **one** of these:
 
-# Gradio app (chat + voice)
-python -m src.main
+| Option | Best for | What to do |
+|---|---|---|
+| **A. Hosted AI** | Best conversation quality | Paste an API key: `ANTHROPIC_API_KEY=...` (from [console.anthropic.com](https://console.anthropic.com)), or `GOOGLE_API_KEY=...`, or `OPENAI_API_KEY=...`. One is enough. |
+| **B. Local model (Ollama)** | Free and private; nothing leaves your computer | Install [Ollama](https://ollama.com), then run `ollama pull llama3.1:8b` once. Nothing to change in `.env`. Needs about 8 GB of free memory, and a GPU for comfortable speed: each turn makes several model calls, so on a CPU alone a reply can take minutes. |
+| **C. Offline demo** | Clicking around without any AI | Set `POLYGLOT_DETERMINISTIC=1`. Replies are canned (they start with `[fake:`), so it's only for trying the interface. |
 
-# REST API (see http://localhost:8000/docs)
-uvicorn src.api.app:app --reload
-
-# React dashboard (separate Next.js app)
-cd frontend/react_app && npm install && npm run dev
-```
-
-Check your configuration and provider health at any time:
+### 4. Check your setup
 
 ```bash
 polyglot health
 ```
+
+It tests the option you chose and ends with **Ready** when everything works. If something is missing it prints a `fix:` line saying exactly what to do.
+
+### 5. Start learning
+
+| Interface | Start it with | Then open |
+|---|---|---|
+| Terminal chat | `polyglot chat --language Spanish` (type `quit` to end and see your report) | — |
+| Web app (chat + voice) | `python -m src.main` | http://localhost:7860 |
+| REST API | `uvicorn src.api.app:app --reload` | http://localhost:8000/docs |
+| React dashboard | Start the REST API first, then in a second terminal: `cd frontend/react_app`, `npm install`, `npm run dev` (needs [Node.js 20+](https://nodejs.org)) | http://localhost:3000 — register an account on first visit |
+
+Any language works by name (`--language Japanese`). For guided role-plays, list the scenarios with `polyglot scenarios` and start one with `polyglot chat --scenario es_restaurant_ordering`.
+
+All settings live in `.env` — see [`.env.example`](.env.example) for every option and [`docs/deployment.md`](docs/deployment.md) for details.
+
+### Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| `pip` says the package requires Python `>=3.12` | Your virtual environment uses an older Python. Delete `.venv` and redo step 2 with `py -3.12` / `python3.12`. |
+| `polyglot` is not recognized | Activate the virtual environment (step 2), or run `python -m src.cli` instead of `polyglot`. |
+| The tutor only replies "Disculpa, no te escuché bien" (or similar) | No AI backend is answering. Run `polyglot health` and follow its `fix:` line. |
+| Replies start with `[fake:` | Offline demo mode is on. Set `POLYGLOT_DETERMINISTIC=0` in `.env` once option A or B is set up. |
+| Ollama: model `llama3.1:8b` not found | Run `ollama pull llama3.1:8b`, or set `LLM_LOCAL=ollama/<model you have>` in `.env` (`ollama list` shows them). |
+| Ollama: out of memory | Lower `OLLAMA_NUM_CTX` to `4096` in `.env`, or use a smaller model: `ollama pull llama3.2:3b` and set `LLM_LOCAL=ollama/llama3.2:3b`. |
+| React dashboard says it can't reach the server | Start the REST API (step 5) on port 8000. If you serve the dashboard from another address, add it to `CORS_ORIGINS` in `.env`. |
+| "Address already in use" | Another program uses the port. Change `API_PORT` / `GRADIO_SERVER_PORT` in `.env`, or pass `--port 8001` to `uvicorn`. |
+| The microphone / spoken replies don't work | Voice is optional: `python -m pip install -e ".[voice]"` and install [ffmpeg](https://ffmpeg.org/download.html). |
 
 ### The CLI
 
@@ -112,6 +153,7 @@ Beyond `chat`, the `polyglot` command exposes the learner model and operations d
 
 | Command | What it does |
 |---|---|
+| `polyglot health` | Check setup and that an AI backend answers (with fixes) |
 | `polyglot plan` | Show the next-best-action learning plan |
 | `polyglot assess` | Show the multidimensional CEFR profile |
 | `polyglot progress` | Progress overview + streaks |
@@ -123,13 +165,19 @@ Beyond `chat`, the `polyglot` command exposes the learner model and operations d
 | `polyglot security backup/audit` | Database backups and the audit log |
 | `polyglot results` | Regenerate `docs/results.md` from the measurement harnesses |
 
+Run `polyglot --help` or `polyglot <command> --help` for every option.
+
 ## Docker
 
+The alternative to steps 1–2: needs only [Docker Desktop](https://www.docker.com/products/docker-desktop/). Copy `.env.example` to `.env` and choose an option from step 3 first.
+
 ```bash
-cp .env.example .env
-docker compose up                       # API (:8000) + Gradio UI (:7860)
-docker compose --profile local-llm up   # also start an Ollama container (:11434)
+docker compose up --build                     # web app on :7860, REST API on :8000
+docker compose --profile web up --build       # also the React dashboard on :3000
+docker compose --profile local-llm up --build # also an Ollama container (option B)
 ```
+
+With the `local-llm` profile, pull the model into the container once (while it is running): `docker compose exec ollama ollama pull llama3.1:8b`. To use an Ollama that already runs on your computer instead, see the comment at the top of [`docker-compose.yml`](docker-compose.yml).
 
 ## How the learning loop works
 
@@ -216,6 +264,17 @@ make results     # regenerate docs/results.md
 ```
 
 The test suite runs fully offline in deterministic mode (`POLYGLOT_DETERMINISTIC=1`), which routes every LLM call to a reproducible fake provider — no keys or network required.
+
+**Windows without `make`:** run the underlying commands from an activated `.venv`:
+
+```powershell
+python -m ruff check .
+python -m ruff format --check .
+python -m mypy src
+python -m pytest
+```
+
+Benchmarks and evals need deterministic mode set for the command: `$env:POLYGLOT_DETERMINISTIC="1"; python -m benchmarks` (and `python -m evals`).
 
 ## Tech stack
 

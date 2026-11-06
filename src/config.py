@@ -35,10 +35,19 @@ class Settings(BaseSettings):
     google_api_key: str = ""
     openai_api_key: str = ""
     ollama_base_url: str = "http://localhost:11434"
+    #: Context window requested from Ollama. Without it, Ollama may reserve the
+    #: model's full context (128k tokens for Llama 3.1, a ~16 GB KV cache) and
+    #: fail with out-of-memory on ordinary machines. Prompts here are small.
+    ollama_num_ctx: int = 8192
+
+    #: Offline demo/test mode: every LLM call goes to a deterministic fake
+    #: provider, so no key or local model is needed. Usually set as the
+    #: POLYGLOT_DETERMINISTIC environment variable; settable in .env too.
+    polyglot_deterministic: bool = False
 
     # LLM routing
-    llm_primary: str = "claude-sonnet-4-20250514"
-    llm_fast: str = "gemini-2.0-flash"
+    llm_primary: str = "claude-sonnet-5-5"
+    llm_fast: str = "gemini-3.6-flash"
     llm_local: str = "ollama/llama3.1:8b"
 
     # Language
@@ -167,4 +176,17 @@ def validate_settings(s: Settings, *, strict: bool = False) -> list[str]:
     return problems
 
 
+def export_deterministic_mode(s: Settings) -> None:
+    """Make a deterministic-mode flag set only in .env visible process-wide.
+
+    Deterministic mode is checked via the process environment
+    (:func:`src.llm.fake.is_deterministic`), which never sees values that
+    pydantic-settings read from .env. A value already in the environment wins,
+    so an explicit shell setting stays authoritative.
+    """
+    if s.polyglot_deterministic and "POLYGLOT_DETERMINISTIC" not in os.environ:
+        os.environ["POLYGLOT_DETERMINISTIC"] = "1"
+
+
 settings = Settings()
+export_deterministic_mode(settings)

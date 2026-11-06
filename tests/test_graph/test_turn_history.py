@@ -90,6 +90,25 @@ def test_cli_chat_sends_each_turn_once(temp_storage, recorder):
     assert recorder.prompts[-1] == _EXPECTED_LAST_PROMPT
 
 
+def test_cli_chat_runs_grammar_and_vocabulary_analysis(temp_storage):
+    # Regression: the CLI stopped each turn as soon as the reply existed, so
+    # the analysis agents never ran and CLI sessions recorded no learning
+    # evidence ("no errors detected", "none this session") whatever you typed.
+    from src.cli import app
+    from src.experiments import runner
+
+    with runner._scripted_agents():  # returns a real grammar error + two words
+        result = CliRunner().invoke(
+            app,
+            ["chat", "--language", "Spanish", "--user", "u-cli-analysis"],
+            input="Yo soy hambre, una mesa por favor\nquit\n",
+        )
+
+    assert result.exit_code == 0, result.output
+    assert "tengo hambre" in result.output
+    assert "mesa" in result.output
+
+
 async def test_ablation_runner_sends_each_turn_once(temp_storage, monkeypatch):
     from src.experiments import runner
 
