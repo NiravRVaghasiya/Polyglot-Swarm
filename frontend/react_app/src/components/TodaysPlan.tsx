@@ -7,16 +7,18 @@
 // never shown as a default level or as zero. Each skill shows its evidence
 // status and, when known, the model's mastery range rather than one number.
 
-import { statusLabel } from "@/lib/api";
+import { ActionIntent, statusLabel } from "@/lib/api";
 import { usePlan } from "@/lib/usePlan";
 
 const CEFR_ORDER = ["A1", "A2", "B1", "B2", "C1", "C2"];
 
-const INTENT_LABEL: Record<string, string> = {
+const INTENT_LABEL: Record<ActionIntent, string> = {
   assessment: "find your level",
   remediation: "fix a weakness",
   reinforcement: "consolidate",
-  advancement: "level up",
+  progression: "level up",
+  introduction: "something new",
+  review: "keep it fresh",
 };
 
 export function TodaysPlan({

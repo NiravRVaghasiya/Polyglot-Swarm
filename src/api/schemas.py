@@ -130,7 +130,8 @@ class PlanAction(BaseModel):
     reason: str = ""
     priority: float = 0.0
     estimated_minutes: float = 0.0
-    #: assessment | remediation | reinforcement | advancement ("" if unknown)
+    #: The adaptive engine's intent: assessment | remediation | reinforcement |
+    #: progression | introduction | review.
     intent: str = ""
 
 

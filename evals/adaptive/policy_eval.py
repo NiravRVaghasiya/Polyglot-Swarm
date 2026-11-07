@@ -1,24 +1,19 @@
 """Planner outcome simulation (Checkpoint 6) — SIMULATED learners only.
 
-Compares five ways of choosing what a learner practises. Each faces the same
+Compares four ways of choosing what a learner practises. Each faces the same
 simulated learners, with common random numbers.
 
 1. ``static``: a fixed syllabus.
    - Constructions in CEFR order, two sessions each, at the content level.
    - Three new words a session.
    - Reviews of the words introduced in the last two sessions.
-2. ``existing_planner``: the current ``src.curriculum.planner``.
-   - The real function, called with its data sources pointed at the
-     simulation (estimates, due cards, error patterns, construction
-     catalogue).
-   - Legacy FSRS: meeting a word counts as a ``Good`` review, and every
-     review is rated ``Good`` or ``Again``.
-3. ``adaptive``: the new engine with prediction, difficulty adaptation and
+2. ``adaptive``: the engine with prediction, difficulty adaptation and
    FSRS integration switched off. That leaves skill-level v2 estimates, the
-   content-level difficulty and legacy FSRS.
-4. ``adaptive_predictive``: plus subskill predictions and adaptive
+   content-level difficulty and legacy FSRS (meeting a word counts as a
+   ``Good`` review, and every review is rated ``Good`` or ``Again``).
+3. ``adaptive_predictive``: plus subskill predictions and adaptive
    difficulty.
-5. ``adaptive_full``: plus FSRS integration.
+4. ``adaptive_full``: plus FSRS integration.
    - Exposure is not recall.
    - Reviews progress from recognition to production.
    - Leeches are remediated.
@@ -50,15 +45,11 @@ Measured per learner, and compared with paired bootstrap intervals:
 
 from __future__ import annotations
 
-import contextlib
 import math
 import random
-from collections.abc import Iterator
 from dataclasses import asdict, dataclass, field
 from datetime import timedelta
-from types import SimpleNamespace
 from typing import Any
-from unittest import mock
 
 from fsrs import Card, Rating, Scheduler
 
@@ -75,17 +66,18 @@ from evals.adaptive.simulator import (
     session_days,
     visible,
 )
+from src.adaptive.constraints import PlanConstraints
 from src.adaptive.memory import live_retrievability, rating_for
 from src.adaptive.planner import PlannerConfig, Recommendation
 from src.adaptive.planner import plan as adaptive_plan
 from src.adaptive.snapshot import CatalogObjective, LearnerSnapshot
-from src.curriculum.constraints import PlanConstraints
 from src.evidence.difficulty import CEFR_ORDER
-from src.learner import skill_graph
-from src.learner.estimation import EvidenceMasteryEngine
-from src.llm.schemas import GrammarItem
 
-POLICIES = ("static", "existing_planner", "adaptive", "adaptive_predictive", "adaptive_full")
+POLICIES = ("static", "adaptive", "adaptive_predictive", "adaptive_full")
+#: Policy every other one is compared against, paired per learner. Until the
+#: old curriculum planner was removed (single planner), the baseline was that
+#: planner (``existing_planner``); results recorded before then use it.
+BASELINE = "static"
 AVOID = frozenset({"listening", "reading", "writing", "pragmatics", "speaking"})
 _SCHEDULER = Scheduler()
 FIRST_RETRIEVAL_DELAY = timedelta(minutes=10)
@@ -313,12 +305,6 @@ def _catalog(world: World) -> list[CatalogObjective]:
     ]
 
 
-def _due(env: Env) -> list[dict[str, Any]]:
-    now = env.now().isoformat()
-    due = [dict(c, objective_id=oid) for oid, c in env.cards.items() if c["next_review"] <= now]
-    return sorted(due, key=lambda c: (c["next_review"], c["word"]))
-
-
 # --- policies -----------------------------------------------------------------------
 
 
@@ -335,126 +321,6 @@ def _run_static(env: Env, cfg: PolicyEvalConfig) -> None:
             env.practice(current.objective_id, None)
     if env.minutes - start + 3 <= budget:
         env.expansion(3)
-
-
-@contextlib.contextmanager
-def _existing_planner_inputs(env: Env) -> Iterator[None]:
-    """Point the real existing planner's data sources at the simulation."""
-    import src.curriculum.planner as legacy
-
-    catalog = _catalog(env.world)
-    pairs = {"grammar": [(c.objective_id, c.difficulty) for c in catalog]}
-    rows = [visible(r) for r in env.rows]
-
-    def estimates(user_id: str, language: str, **_: Any) -> Any:
-        return EvidenceMasteryEngine().estimate_all(rows, catalogs=pairs)
-
-    def get_due(
-        user_id: str, language: str | None = None, *, limit: int = 20
-    ) -> list[dict[str, Any]]:
-        out = []
-        for c in _due(env)[:limit]:
-            outcomes = [
-                r
-                for r in rows
-                if r.get("item_id") == c["word"] and r["event_type"] == "REVIEW_RESULT"
-            ]
-            ok = sum(1 for r in outcomes if r["assessment"] == "correct")
-            out.append({**c, "recognition": ok / len(outcomes) if outcomes else 0.0})
-        return out
-
-    def patterns(
-        user_id: str, language: str | None = None, *, include_mastered: bool = True
-    ) -> list[dict[str, Any]]:
-        counts: dict[str, int] = {}
-        for r in rows:
-            if r.get("event_type") == "GRAMMAR_ERROR":
-                counts[str(r["subskill"])] = counts.get(str(r["subskill"]), 0) + 1
-        return [
-            {"error_type": k, "occurrences": v}
-            for k, v in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
-        ]
-
-    items = [
-        GrammarItem(
-            language="Simulated",
-            construction=c.subskill,
-            cefr=c.cefr,
-            prerequisites=[p.split(".", 1)[1] for p in c.prerequisites],
-        )
-        for c in sorted(catalog, key=lambda c: (c.cefr, c.subskill))
-    ]
-    prereqs = {i.construction: i.prerequisites for i in items}
-    graph = SimpleNamespace(
-        skill_prerequisites=skill_graph.skill_prerequisites,
-        construction_prerequisites=lambda language, construction: prereqs.get(construction, []),
-    )
-    with contextlib.ExitStack() as stack:
-        stack.enter_context(
-            mock.patch.object(
-                legacy, "get_knowledge_model", lambda: SimpleNamespace(current_estimates=estimates)
-            )
-        )
-        stack.enter_context(
-            mock.patch.object(legacy, "vocabulary_db", SimpleNamespace(get_due=get_due))
-        )
-        stack.enter_context(
-            mock.patch.object(legacy, "analytics", SimpleNamespace(get_error_patterns=patterns))
-        )
-        stack.enter_context(
-            mock.patch.object(legacy, "_pack_constructions", lambda language: items)
-        )
-        stack.enter_context(mock.patch.object(legacy, "skill_graph", graph))
-        yield
-
-
-def _run_existing(env: Env, cfg: PolicyEvalConfig) -> None:
-    from src.curriculum.actions import ActionType
-    from src.curriculum.planner import plan_next_actions
-
-    with _existing_planner_inputs(env):
-        actions = plan_next_actions(
-            env.learner.learner_id,
-            "Simulated",
-            constraints=PlanConstraints(
-                time_available_minutes=cfg.session_minutes,
-                goal="conversational",
-                max_actions=cfg.max_actions,
-                avoid_skills=AVOID,
-            ),
-        )
-    by_sub = {o.subskill: o.objective_id for o in env.world.objectives.values()}
-    for a in actions:
-        target = a.target
-        if a.type == ActionType.REVIEW_VOCAB:
-            oid = by_sub.get(target)
-            if oid:
-                env.review(oid, "recognition")
-        elif a.type in (ActionType.TARGET_GRAMMAR, ActionType.CONTRAST_TWO_FORMS):
-            oid = by_sub.get(target) or _first_unmastered(env)
-            env.practice(oid, None)
-        elif a.type == ActionType.DIAGNOSTIC_CHECK:
-            oid = by_sub.get(target)
-            if oid:
-                env.diagnostic(oid)
-        elif a.type == ActionType.RETRIEVAL_PRACTICE:
-            due = _due(env)
-            if due:
-                env.review(due[0]["objective_id"], "recognition")
-            else:
-                env.expansion(3)
-        elif a.type == ActionType.CONTINUE_CONVERSATION:
-            env.conversation(env.learner.level)
-
-
-def _first_unmastered(env: Env) -> str:
-    grammar = sorted(env.world.grammar(), key=lambda o: (CEFR_ORDER.index(o.cefr), o.objective_id))
-    rows = [r for r in env.rows if r.get("skill") == "grammar"]
-    for o in grammar:
-        mine = [r for r in rows if r.get("objective_id") == o.objective_id]
-        if not mine or sum(r["assessment"] == "correct" for r in mine) / len(mine) < 0.7:
-            return o.objective_id
-    return grammar[-1].objective_id
 
 
 def _run_adaptive(
@@ -559,8 +425,6 @@ def run_learner(policy: str, index: int, cfg: PolicyEvalConfig) -> dict[str, Any
         env.session, env.t = s, max(env.t, day)
         if policy == "static":
             _run_static(env, cfg)
-        elif policy == "existing_planner":
-            _run_existing(env, cfg)
         else:
             _run_adaptive(env, cfg, configs[policy], last)
     t_end = env.t
@@ -715,13 +579,13 @@ def evaluate_policies(cfg: PolicyEvalConfig) -> dict[str, Any]:
         }
         for p in cfg.policies
     }
-    vs_existing = {}
-    if "existing_planner" in runs:
-        base = runs["existing_planner"]
+    vs_baseline = {}
+    if BASELINE in runs:
+        base = runs[BASELINE]
         for p in cfg.policies:
-            if p == "existing_planner":
+            if p == BASELINE:
                 continue
-            vs_existing[p] = {
+            vs_baseline[p] = {
                 m: _paired(
                     [r["metrics"][m] for r in runs[p]],
                     [r["metrics"][m] for r in base],
@@ -777,7 +641,8 @@ def evaluate_policies(cfg: PolicyEvalConfig) -> dict[str, Any]:
         "metrics": metrics,
         "key_metrics": list(KEY_METRICS),
         "results": results,
-        "vs_existing": vs_existing,
+        "baseline": BASELINE,
+        "vs_baseline": vs_baseline,
         "ablations": ablations,
         "per_learner": {p: [r["metrics"] for r in runs[p]] for p in cfg.policies},
         "prediction": prediction,

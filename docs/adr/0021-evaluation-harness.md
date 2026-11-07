@@ -36,7 +36,7 @@ already had one (`src/evaluation/calibration.py`).
   It adds one thing the benchmark harness didn't need: `isolated_storage()`, an
   async context manager that redirects `src.config.settings`' storage paths to
   a throwaway temp directory and cleans up afterward, for suites that exercise
-  real SQLite-backed code (the curriculum planner).
+  real SQLite-backed code (the planner).
 - Add `src/evaluation/metrics.py`: `precision`, `recall`, `f1_score`,
   `false_positive_rate`, `PrecisionRecallResult`, `mean_absolute_error`,
   `pearson_correlation` — filling the gap `grammar_bench.py` had been
@@ -47,7 +47,10 @@ already had one (`src/evaluation/calibration.py`).
   "the policy changed") and a `suite.py` registering its evals. Every suite
   exercises real production code paths with no live model: `_select_errors`,
   `_parse_vocabulary_response`, `mastery_to_cefr`/`confidence_from`, and the
-  real `plan_next_actions` planner (via `isolated_storage`).
+  real `plan_next_actions` planner (via `isolated_storage`). Since
+  2026-11-08 the curriculum suite drives the adaptive engine
+  (`src.adaptive.service.recommend`), the only planner, and its
+  difficulty-appropriateness eval was removed with the old planner.
 - `evals/regression` rolls grammar+vocabulary+assessment into one pass/fail
   gate for a single CI signal, without curriculum (heavier, SQLite-backed;
   kept as its own explicit suite rather than folded into a lightweight gate).

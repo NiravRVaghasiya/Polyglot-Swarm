@@ -2,8 +2,8 @@
 
 This package is the strategic core of the product (Phase 6): a model of *what
 the learner can and cannot do*, updated from evidence rather than from an LLM's
-say-so. It sits between the evidence pipeline (what happened) and the curriculum
-planner (what to do next).
+say-so. It sits between the evidence pipeline (what happened) and the planner
+(:mod:`src.adaptive.planner`, what to do next).
 
 Modules:
 - :mod:`uncertainty`    — confidence/uncertainty helpers.

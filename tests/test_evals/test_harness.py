@@ -28,8 +28,8 @@ async def _boom() -> EvalResult:
 class TestAllEvals:
     def test_returns_every_suite(self):
         evals = all_evals()
-        # grammar(2) + vocabulary(2) + assessment(3) + curriculum(3) + regression(1)
-        assert len(evals) == 11
+        # grammar(2) + vocabulary(2) + assessment(3) + curriculum(2) + regression(1)
+        assert len(evals) == 10
 
     def test_every_eval_is_a_coroutine_function(self):
         import inspect

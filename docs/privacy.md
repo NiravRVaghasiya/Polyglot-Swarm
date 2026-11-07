@@ -87,11 +87,12 @@ Exposed as:
 
 `src/security/secrets.py` provides Fernet-based `encrypt_secret`/
 `decrypt_secret` for at-rest secrets — a helper, not a secrets manager; the
-caller owns key storage. `src/security/backup.py` uses SQLite's online
-backup API (`create_backup`/`list_backups`). `src/security/audit.py`
-provides the append-only audit table and `recent_events()`/
-`anonymize_for_user()`. All three are exposed via `polyglot security
-backup` / `backups` / `audit`.
+caller owns key storage. Backups are verified backup sets written by
+`src/ops/backup.py` (SQLite online backup API, plus media and profiles, with
+checksums); `polyglot security backup` / `backups` are aliases of `polyglot
+ops backup` / `backups`. `src/security/audit.py` provides the append-only
+audit table and `recent_events()`/`anonymize_for_user()`, exposed via
+`polyglot security audit`.
 
 ## What is never sent to a third party in local-only mode
 

@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **One planner.** `/learner/plan` (what the UI shows), `/learner/insights`
+  and `polyglot plan` now use the adaptive next-best-activity engine
+  (`adaptive-nba-v1`, ADR-0033), the one that was evaluated, through the new
+  `src/adaptive/service.py`. `/learner/recommendations` serves the same plan
+  with its full rationale.
+  - `PlanResponse` keeps its shape. `type` is now the engine's activity
+    (`grammar_practice`, `vocabulary_review`, `diagnostic_check`, ...),
+    `reason` its first rationale line, `priority` its score, and `intent`
+    one of `assessment`, `remediation`, `reinforcement`, `progression`,
+    `introduction`, `review` (`advancement` is gone). The frontend labels
+    the new intents.
+  - `/learner/plan` records each served plan in the adaptive audit trail
+    (`record=false` to preview), as `/recommendations` does; the engine reads
+    the last recorded plan to keep task difficulty continuous.
+  - The curriculum planner (`src/curriculum/`: `plan_next_actions`,
+    `plan_next_best`, its actions, objectives and difficulty helpers) was
+    removed. `PlanConstraints` moved to `src/adaptive/constraints.py`.
+  - The curriculum eval suite drives the adaptive engine and seeds grammar
+    errors as evidence, as conversation finalization records them. Its
+    difficulty-appropriateness eval was removed with the old helper.
+    `target_coverage` is gated at a 60-minute plan and also reports
+    `coverage_at_15_min` (0.714): at the UI's default 15 minutes, a new
+    learner's B1/B2 grammar weakness can rank below assessments and an
+    introduction.
+  - The adaptive simulation's `existing_planner` policy was removed with the
+    planner; paired differences are now against `static`.
+- **One backup module.** `src/security/backup.py` was removed;
+  `src/ops/backup.py` (verified backup sets) is the only implementation.
+  `polyglot security backup|backups` are now aliases of
+  `polyglot ops backup|backups`. Plain `*.backup.db` files written by the
+  old command are no longer listed; they are left in place.
+
 ### Added
 
 - **Production maturity baseline (ADR-0035).** The audit and risk register

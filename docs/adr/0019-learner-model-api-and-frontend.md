@@ -18,7 +18,9 @@ from a REPL. That requires: typed REST endpoints over the existing pure
 - Add `src/api/routes/learner_routes.py` under `/api/v1/learner`, auth-scoped
   via the existing `get_current_user` dependency, with one endpoint per
   existing query function rather than a new aggregate query layer:
-  - `GET /plan` → `curriculum.plan_next_actions`
+  - `GET /plan` → `curriculum.plan_next_actions` (since 2026-11-08:
+    `adaptive.service.recommend`, the ADR-0033 engine; the response shape
+    is unchanged, and `intent` takes the engine's values)
   - `GET /cefr` → `assessment.build_cefr_profile`
   - `GET /skill-map` → `learner.get_knowledge_model().current_beliefs`
   - `GET /cefr-history` → `memory.progress.cefr_progression`
