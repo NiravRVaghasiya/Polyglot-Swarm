@@ -50,7 +50,7 @@ eval: ## Run the evaluation harness: grammar/vocabulary/assessment/curriculum.
 eval-real-validate: ## Validate real-model eval datasets (offline).
 	$(PYTHON) -m evals.real validate
 
-eval-real: ## Real-model benchmark: make eval-real PROVIDERS=ollama:llama3.1:latest [CONFIG=default] [RUN=id].
+eval-real: ## Real-model benchmark: make eval-real PROVIDERS=claude[,ollama[:model]] [CONFIG=default] [RUN=id].
 	$(PYTHON) -m evals.real run --providers "$(PROVIDERS)" --config "$(or $(CONFIG),default)" $(if $(RUN),--run-id $(RUN),)
 
 eval-real-report: ## Score a real-model run: make eval-real-report RUN=<run_id>.

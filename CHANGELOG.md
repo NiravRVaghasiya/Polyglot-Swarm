@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **The real-model evaluation measures the production models.** A provider
+  named without a model (`claude`, `gemini`, `openai`, `ollama`) now
+  resolves to the code default in `src/config.py`
+  (`default_model_ids()`), not to the local `.env`. A stale
+  `.env` had made `claude` mean `claude-sonnet-4-20250514` and `gemini`
+  mean `gemini-2.0-flash`, while the app defaults are `claude-sonnet-5-5`
+  and `gemini-3.6-flash`.
+  `provider:model` still overrides the model, and each provider record in
+  the run manifest now states `model_source` (`app_default` or `override`)
+  and `app_default_model`.
+- The OpenAI fallback model is a setting (`LLM_OPENAI`, default
+  `gpt-4o-mini`) instead of a constant in `src/llm/openai.py`.
+
 ### Added
 
 - **Production maturity baseline (ADR-0035).** The audit and risk register

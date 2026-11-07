@@ -23,10 +23,6 @@ from src.llm.provider import (
     to_langchain_messages,
 )
 
-# Default model when none is configured. Kept here (not in Settings) since the
-# original three tiers own the three model settings; OpenAI is a fallback.
-_DEFAULT_MODEL = "gpt-4o-mini"
-
 
 class OpenAIProvider(LLMProvider):
     """OpenAI GPT provider — an optional fallback in the routing chain."""
@@ -34,7 +30,7 @@ class OpenAIProvider(LLMProvider):
     name = "openai"
 
     def __init__(self, model: str | None = None, api_key: str | None = None) -> None:
-        self.model = model or _DEFAULT_MODEL
+        self.model = model or settings.llm_openai
         self.api_key = api_key if api_key is not None else settings.openai_api_key
 
     def is_available(self) -> bool:
