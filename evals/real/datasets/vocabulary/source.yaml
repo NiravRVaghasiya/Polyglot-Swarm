@@ -1,0 +1,114 @@
+# Vocabulary-extraction evaluation cases — SOURCE (regenerate splits with
+#   python -m evals.real build-datasets).
+#
+# Provenance: written and labeled by the repository's AI coding assistant
+# (claude-opus-5-5) on 2026-11-06 under rubric vocabulary-rubric-1.0. NOT
+# reviewed by a qualified linguist: every case is validation_status=author_labeled.
+# "Required" words are ones a learner at the stated level is very unlikely to
+# know; which other words a model lists is a judgment call, so those are
+# "optional" and never counted against precision. "Forbidden" words break the
+# prompt's own rules (proper nouns, numbers, basic A1 words).
+# Keys: id, group, lang, cefr, diff, user, agent, req[{word, forms[], tr[], produced}], opt[], forbid[], tags[]
+
+dataset: vocabulary
+version: vocabulary-2026.11.0
+rubric_version: vocabulary-rubric-1.0
+annotator:
+  id: claude-opus-5-5
+  type: llm_assistant
+  date: "2026-11-06"
+
+cases:
+  - {id: es-v01, group: es-vg01, lang: Spanish, cefr: A2, diff: easy,
+     user: "Quiero reservar una mesa para dos.",
+     agent: "Perfecto. ¿Prefieren sentarse en la terraza o en el comedor? Hoy tenemos un menú degustación.",
+     req: [{word: terraza, tr: [terrace, patio, outdoor seating]},
+           {word: comedor, tr: [dining room, dining area, dining hall]},
+           {word: degustación, forms: [menú degustación], tr: [tasting, tasting menu]}],
+     opt: [reservar, prefieren, preferir, sentarse, menú, perfecto], forbid: [dos, hoy, mesa]}
+  - {id: es-v02, group: es-vg02, lang: Spanish, cefr: A1, diff: easy,
+     user: "Me duele la cabeza.",
+     agent: "Lo siento. ¿Tienes fiebre? Deberías tomar un analgésico y descansar.",
+     req: [{word: fiebre, tr: [fever, temperature]},
+           {word: analgésico, tr: [painkiller, analgesic, pain reliever]},
+           {word: descansar, tr: [rest, to rest]}],
+     opt: [duele, doler, cabeza, deberías, deber, tomar, siento, sentir], forbid: []}
+  - {id: es-v03, group: es-vg03, lang: Spanish, cefr: B1, diff: medium,
+     user: "El año pasado viajé a Perú con mi hermano.",
+     agent: "¡Qué envidia! ¿Visitaron Machu Picchu? Dicen que el paisaje es impresionante y la caminata, agotadora.",
+     req: [{word: envidia, tr: [envy, jealousy]},
+           {word: paisaje, tr: [landscape, scenery, view]},
+           {word: caminata, tr: [hike, walk, trek]},
+           {word: agotadora, forms: [agotador], tr: [exhausting, tiring, draining]}],
+     opt: [impresionante, visitaron, viajé], forbid: [Perú, Machu Picchu, año, hermano]}
+  - {id: es-v04, group: es-vg04, lang: Spanish, cefr: B2, diff: hard,
+     user: "Creo que el gobierno debería invertir más en educación.",
+     agent: "Es un tema polémico. Hay quienes sostienen que el gasto público ya es desmesurado.",
+     req: [{word: polémico, tr: [controversial, contentious, polemical]},
+           {word: sostienen, forms: [sostener], tr: [maintain, argue, hold, claim, contend]},
+           {word: desmesurado, tr: [excessive, disproportionate, inordinate, out of proportion]}],
+     opt: [gasto público, gasto, invertir, gobierno, tema, quienes], forbid: []}
+  - {id: es-v05, group: es-vg05, lang: Spanish, cefr: A2, diff: easy, tags: [learner_produced],
+     user: "Ayer compré una bufanda y unos guantes porque hace mucho frío.",
+     agent: "¡Buena idea! En invierno hace un frío tremendo.",
+     req: [{word: bufanda, tr: [scarf], produced: true},
+           {word: guantes, forms: [guante], tr: [gloves, glove], produced: true}],
+     opt: [tremendo, invierno, compré, comprar, frío, idea], forbid: [ayer]}
+  - {id: es-v06, group: es-vg06, lang: Spanish, cefr: B1, diff: medium, tags: [learner_produced],
+     user: "Mi jefe me regañó porque llegué tarde a la junta.",
+     agent: "Vaya, ¿y qué le dijiste?",
+     req: [{word: regañó, forms: [regañar], tr: [scolded, scold, told off, tell off, reprimanded, reprimand], produced: true},
+           {word: junta, tr: [meeting, board], produced: true}],
+     opt: [jefe, vaya, llegué, tarde], forbid: []}
+  - {id: es-v07, group: es-vg07, lang: Spanish, cefr: A2, diff: easy, tags: [nothing_to_extract],
+     user: "Hola, ¿cómo estás?",
+     agent: "¡Muy bien, gracias! ¿Y tú?",
+     req: [], opt: [], forbid: [hola, bien, gracias, cómo, estás, muy]}
+  - {id: it-v01, group: it-vg01, lang: Italian, cefr: A2, diff: easy,
+     user: "Domenica vado al mare con la mia famiglia.",
+     agent: "Che bello! Ricordati la crema solare e l'ombrellone, perché il sole è fortissimo.",
+     req: [{word: crema solare, forms: [crema], tr: [sunscreen, sun cream, suncream, sunblock]},
+           {word: ombrellone, tr: [beach umbrella, parasol, sunshade, umbrella]}],
+     opt: [ricordati, ricordare, fortissimo], forbid: [domenica, mare, famiglia, sole]}
+  - {id: it-v02, group: it-vg02, lang: Italian, cefr: B1, diff: medium,
+     user: "Ho trovato lavoro in una ditta di Milano.",
+     agent: "Complimenti! Il colloquio è andato bene? Adesso dovrai affrontare il pendolarismo ogni mattina.",
+     req: [{word: colloquio, tr: [interview, job interview]},
+           {word: affrontare, tr: [face, deal with, tackle, confront, cope with]},
+           {word: pendolarismo, tr: [commuting, commute]}],
+     opt: [ditta, complimenti, dovrai, mattina], forbid: [Milano]}
+  - {id: it-v03, group: it-vg03, lang: Italian, cefr: B2, diff: hard, tags: [learner_produced],
+     user: "Secondo me, la riforma è stata un fallimento.",
+     agent: "Capisco il tuo punto di vista, ma i dati mostrano un lieve miglioramento dell'occupazione.",
+     req: [{word: fallimento, tr: [failure, flop, fiasco, bankruptcy], produced: true},
+           {word: lieve, tr: [slight, mild, small, minor]},
+           {word: miglioramento, tr: [improvement]},
+           {word: occupazione, tr: [employment, occupation, jobs]}],
+     opt: [riforma, punto di vista, dati, mostrano, capisco], forbid: []}
+  - {id: fr-v01, group: fr-vg01, lang: French, cefr: A2, diff: medium,
+     user: "J'ai mal au dos depuis hier.",
+     agent: "Oh non ! Tu devrais consulter un kinésithérapeute et éviter de porter des charges lourdes.",
+     req: [{word: kinésithérapeute, forms: [kiné], tr: [physiotherapist, physical therapist, physio]},
+           {word: éviter, tr: [avoid, to avoid]},
+           {word: charges, forms: [charge, charges lourdes], tr: [loads, load, weights, heavy loads]}],
+     opt: [lourdes, lourd, consulter, devrais, porter, dos, mal au dos], forbid: [hier]}
+  - {id: fr-v02, group: fr-vg02, lang: French, cefr: B1, diff: medium,
+     user: "Je cherche un appartement à Lyon.",
+     agent: "Les loyers ont beaucoup augmenté. Tu devras fournir une caution et des fiches de paie.",
+     req: [{word: loyers, forms: [loyer], tr: [rent, rents]},
+           {word: caution, tr: [deposit, security deposit, guarantee, guarantor, bond]},
+           {word: fiches de paie, forms: [fiche de paie], tr: [payslips, payslip, pay slips, pay stubs, pay slip]}],
+     opt: [augmenté, augmenter, fournir, devras, appartement], forbid: [Lyon]}
+  - {id: de-v01, group: de-vg01, lang: German, cefr: A2, diff: easy,
+     user: "Ich möchte ein Zimmer buchen.",
+     agent: "Gern. Möchten Sie ein Einzelzimmer oder ein Doppelzimmer? Das Frühstück ist inklusive.",
+     req: [{word: Einzelzimmer, tr: [single room]},
+           {word: Doppelzimmer, tr: [double room]}],
+     opt: [inklusive, buchen, Frühstück, gern, möchten], forbid: [Zimmer, ich]}
+  - {id: de-v02, group: de-vg02, lang: German, cefr: B1, diff: medium,
+     user: "Mein Zug hatte zwei Stunden Verspätung.",
+     agent: "Das ist ärgerlich! Du kannst bei der Bahn eine Entschädigung beantragen.",
+     req: [{word: ärgerlich, tr: [annoying, irritating, frustrating, aggravating]},
+           {word: Entschädigung, tr: [compensation, refund, indemnity]},
+           {word: beantragen, tr: [apply for, request, claim, file for, to apply for]}],
+     opt: [Verspätung, Bahn, Stunden, Zug], forbid: [zwei]}

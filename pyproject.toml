@@ -92,3 +92,6 @@ strict = true
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = [
+    "real_model: calls real LLM providers (opt-in: POLYGLOT_REAL_EVAL=1)",
+]

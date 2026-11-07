@@ -95,3 +95,16 @@ POLYGLOT_DETERMINISTIC=1 python -m evals
 `make benchmark` (`python -m benchmarks`) is the sibling harness for
 performance/quality benchmarks (including the calibration benchmark above)
 rather than correctness regressions.
+
+## Real-model evaluation (separate, opt-in)
+
+Every suite above is offline: it scores hand-written model *outputs*, so it
+tests the pipeline and the policies, not whether a real model gets the
+language right. That question is answered by the real-model evaluation in
+`evals/real/` (`python -m evals.real`), documented in
+[`real-model-evaluation.md`](real-model-evaluation.md). It has versioned
+datasets with provenance and checksums, runs concrete providers with no
+failover or synthetic substitution, preserves every raw response, and reports
+metrics with confidence intervals. Only its offline parts (dataset validation,
+unit tests, typing) run in CI.
+

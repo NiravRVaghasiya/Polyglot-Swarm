@@ -14,10 +14,11 @@ from typing import Any
 
 from src.config import settings
 from src.llm.provider import (
+    Completion,
     LLMProvider,
     Message,
     apply_json_mode,
-    normalize_content,
+    completion_from_langchain,
     to_langchain_messages,
 )
 
@@ -52,9 +53,22 @@ class GeminiProvider(LLMProvider):
         max_tokens: int = 512,
         json_mode: bool = False,
     ) -> str:
+        completion = await self.generate_detailed(
+            messages, temperature=temperature, max_tokens=max_tokens, json_mode=json_mode
+        )
+        return completion.text
+
+    async def generate_detailed(
+        self,
+        messages: list[Message],
+        *,
+        temperature: float = 0.7,
+        max_tokens: int = 512,
+        json_mode: bool = False,
+    ) -> Completion:
         if json_mode:
             messages = apply_json_mode(messages)
 
         client = self._build_client(temperature=temperature, max_tokens=max_tokens)
         response = await client.ainvoke(to_langchain_messages(messages))
-        return normalize_content(response.content)
+        return completion_from_langchain(response, messages)

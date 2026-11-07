@@ -42,6 +42,7 @@ old ADR — we add a new one that supersedes it and mark the old one accordingly
 | [0029](0029-versioned-prompts.md) | Versioned prompt registry (Gate B) | Accepted |
 | [0030](0030-frontend-voice-pwa-onboarding.md) | Frontend voice, PWA, and onboarding (Gate E) | Accepted |
 | [0031](0031-evidence-driven-learner-knowledge-model.md) | Evidence-driven, difficulty- and uncertainty-aware learner knowledge model | Accepted |
+| [0032](0032-real-model-evaluation.md) | Real-model evaluation framework | Accepted |
 
 ## Creating a new ADR
 

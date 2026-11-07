@@ -48,6 +48,15 @@ jobs:
       - name: Evaluation harness (grammar/vocabulary/assessment/curriculum)
         run: python -m evals
 
+      # Real-model evaluation framework: offline checks only (dataset schema,
+      # checksums, split leakage, strict typing). Real model calls run in
+      # real-model-eval.yml, never here.
+      - name: Real-model eval datasets (validate)
+        run: python -m evals.real validate
+
+      - name: Type-check real-model eval framework (mypy)
+        run: python -m mypy --strict evals/real
+
   frontend:
     name: Frontend · Lint · Test
     runs-on: ubuntu-latest

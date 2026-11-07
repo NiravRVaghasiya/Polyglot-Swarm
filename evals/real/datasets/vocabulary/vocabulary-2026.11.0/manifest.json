@@ -1,0 +1,33 @@
+{
+  "dataset": "vocabulary",
+  "version": "vocabulary-2026.11.0",
+  "schema_version": "1.0",
+  "rubric_version": "vocabulary-rubric-1.0",
+  "task": "vocabulary",
+  "created": "2026-11-06",
+  "languages": [
+    "French",
+    "German",
+    "Italian",
+    "Spanish"
+  ],
+  "counts": {
+    "total": 14,
+    "dev": 3,
+    "test": 11
+  },
+  "validation_status_counts": {
+    "author_labeled": 14
+  },
+  "files": {
+    "dev.jsonl": "a6995ef7856528eb822a4dcffcd7037aaa64cc670b261480abc01a1a4ab2a7bd",
+    "test.jsonl": "ec5dd0a8190019e008d502e56ae82577c6c9707ea5bd5e425fd735cd83571086"
+  },
+  "split_rule": "sha256('polyglot-real-eval-split-v1:' + group_id); first 32 bits / 2^32 < 0.3 -> dev",
+  "provenance": "Cases written and labeled by claude-opus-5-5 (llm_assistant) under vocabulary-rubric-1.0. No qualified human expert has reviewed them.",
+  "known_limitations": [
+    "Single annotator: no inter-annotator agreement can be computed.",
+    "Labels are author judgments, not expert-validated; quality gates built on this dataset are provisional.",
+    "The annotator is itself an LLM, which may share blind spots with the models under evaluation."
+  ]
+}

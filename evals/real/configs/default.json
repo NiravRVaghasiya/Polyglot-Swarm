@@ -1,0 +1,40 @@
+{
+  "config_version": "real-eval-config-1.0",
+  "tasks": [
+    "grammar",
+    "vocabulary"
+  ],
+  "split": "test",
+  "grammar_prompts": [
+    "grammar@1"
+  ],
+  "variants_only_with_context": true,
+  "temperature": null,
+  "max_tokens_grammar": null,
+  "max_tokens_vocabulary": null,
+  "timeout_s": 180.0,
+  "max_retries": 2,
+  "retry_backoff_s": 2.0,
+  "concurrency": 1,
+  "repeats": 1,
+  "bootstrap_seed": 20261106,
+  "bootstrap_samples": 2000,
+  "regression_alpha": 0.05,
+  "gates": [
+    {
+      "metric": "grammar.false_correction_rate",
+      "threshold": 0.1,
+      "direction": "max"
+    },
+    {
+      "metric": "grammar.recall",
+      "threshold": 0.6,
+      "direction": "min"
+    },
+    {
+      "metric": "structured.schema_valid_rate",
+      "threshold": 0.95,
+      "direction": "min"
+    }
+  ]
+}

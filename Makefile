@@ -10,7 +10,8 @@
 
 .DEFAULT_GOAL := help
 .PHONY: help install install-dev test lint format format-check typecheck \
-        benchmark eval health results check ci clean lock
+        benchmark eval eval-real-validate eval-real eval-real-report health results \
+        check ci clean lock
 
 PYTHON ?= python
 
@@ -45,6 +46,15 @@ benchmark: ## Run the benchmark harness (deterministic).
 
 eval: ## Run the evaluation harness: grammar/vocabulary/assessment/curriculum.
 	POLYGLOT_DETERMINISTIC=1 $(PYTHON) -m evals
+
+eval-real-validate: ## Validate real-model eval datasets (offline).
+	$(PYTHON) -m evals.real validate
+
+eval-real: ## Real-model benchmark: make eval-real PROVIDERS=ollama:llama3.1:latest [CONFIG=default] [RUN=id].
+	$(PYTHON) -m evals.real run --providers "$(PROVIDERS)" --config "$(or $(CONFIG),default)" $(if $(RUN),--run-id $(RUN),)
+
+eval-real-report: ## Score a real-model run: make eval-real-report RUN=<run_id>.
+	$(PYTHON) -m evals.real report "$(RUN)"
 
 health: ## Report configuration + provider health.
 	$(PYTHON) -m src.cli health

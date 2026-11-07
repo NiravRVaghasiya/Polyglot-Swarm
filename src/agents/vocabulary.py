@@ -18,6 +18,35 @@ from src.orchestrator.state import LearnerState, VocabularyItem
 logger = logging.getLogger("polyglot.vocabulary")
 
 
+#: Generation parameters of the production vocabulary call (shared with the
+#: real-model evaluation runner).
+VOCABULARY_TEMPERATURE = 0.0
+VOCABULARY_MAX_TOKENS = 500
+VOCABULARY_SYSTEM_MESSAGE = "You extract vocabulary. Respond only in JSON."
+
+
+def build_vocabulary_messages(
+    language: str,
+    *,
+    cefr_level: str,
+    user_text: str,
+    agent_text: str,
+    prompt_version: int | None = None,
+) -> list[Message]:
+    """The exact messages the vocabulary agent sends for one exchange."""
+    prompt = str(
+        render_prompt(
+            "vocabulary",
+            version=prompt_version,
+            language=language,
+            cefr_level=cefr_level,
+            user_text=user_text,
+            agent_text=agent_text,
+        )
+    )
+    return [Message("system", VOCABULARY_SYSTEM_MESSAGE), Message("user", prompt)]
+
+
 async def vocabulary_node(state: LearnerState) -> dict[str, Any]:
     """Extract new vocabulary from the latest conversation turn.
 
@@ -33,16 +62,11 @@ async def vocabulary_node(state: LearnerState) -> dict[str, Any]:
     if not user_input and not agent_response:
         return {"new_vocabulary": []}
 
-    language_name = state["language"]  # User provides full language name
-
-    prompt = str(
-        render_prompt(
-            "vocabulary",
-            language=language_name,
-            cefr_level=state.get("cefr_level", "A2"),
-            user_text=user_input,
-            agent_text=agent_response,
-        )
+    messages = build_vocabulary_messages(
+        state["language"],  # User provides full language name
+        cefr_level=state.get("cefr_level", "A2"),
+        user_text=user_input,
+        agent_text=agent_response,
     )
 
     # Use fast LLM tier for vocabulary extraction (latency-sensitive), with failover.
@@ -51,12 +75,9 @@ async def vocabulary_node(state: LearnerState) -> dict[str, Any]:
     provider = get_provider("fast")
     try:
         response_text = await provider.generate(
-            [
-                Message("system", "You extract vocabulary. Respond only in JSON."),
-                Message("user", prompt),
-            ],
-            temperature=0.0,
-            max_tokens=500,
+            messages,
+            temperature=VOCABULARY_TEMPERATURE,
+            max_tokens=VOCABULARY_MAX_TOKENS,
             json_mode=True,
         )
     except Exception as exc:  # noqa: BLE001 - analysis must never break the turn
@@ -80,7 +101,14 @@ def _parse_vocabulary_response(response_text: str) -> list[VocabularyItem]:
                 text = text[4:]
 
         data = json.loads(text)
+        # A model may answer with a bare list or with non-object items; the
+        # contract is {"words": [{...}]}, so anything else yields no words
+        # rather than an AttributeError that would break the turn.
+        if not isinstance(data, dict):
+            return []
         words = data.get("words", [])
+        if not isinstance(words, list):
+            return []
 
         return [
             VocabularyItem(
@@ -91,7 +119,7 @@ def _parse_vocabulary_response(response_text: str) -> list[VocabularyItem]:
                 is_new=True,
             )
             for w in words
-            if w.get("word")
+            if isinstance(w, dict) and w.get("word")
         ]
     except (json.JSONDecodeError, KeyError, TypeError):
         return []

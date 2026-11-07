@@ -1,0 +1,34 @@
+{
+  "dataset": "grammar",
+  "version": "grammar-2026.11.0",
+  "schema_version": "1.0",
+  "rubric_version": "grammar-rubric-1.0",
+  "task": "grammar",
+  "created": "2026-11-06",
+  "languages": [
+    "French",
+    "German",
+    "Italian",
+    "Polish",
+    "Spanish"
+  ],
+  "counts": {
+    "total": 98,
+    "dev": 33,
+    "test": 65
+  },
+  "validation_status_counts": {
+    "author_labeled": 98
+  },
+  "files": {
+    "dev.jsonl": "724012621cd004ae4457d9f1bac1d0b85e035974e57797be7f916c0818bde891",
+    "test.jsonl": "77b12262dab8dbbee9e772c80e4f095020efc377dbb46fa14b1b9037a9b6dfac"
+  },
+  "split_rule": "sha256('polyglot-real-eval-split-v1:' + group_id); first 32 bits / 2^32 < 0.3 -> dev",
+  "provenance": "Cases written and labeled by claude-opus-5-5 (llm_assistant) under grammar-rubric-1.0. No qualified human expert has reviewed them.",
+  "known_limitations": [
+    "Single annotator: no inter-annotator agreement can be computed.",
+    "Labels are author judgments, not expert-validated; quality gates built on this dataset are provisional.",
+    "The annotator is itself an LLM, which may share blind spots with the models under evaluation."
+  ]
+}

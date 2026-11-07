@@ -29,6 +29,43 @@ logger = logging.getLogger("polyglot.grammar")
 _MIN_ERROR_CONFIDENCE = 0.5
 
 
+#: Generation parameters of the production grammar call (shared with the
+#: real-model evaluation runner so it measures exactly what production sends).
+GRAMMAR_TEMPERATURE = 0.0
+GRAMMAR_MAX_TOKENS = 700
+GRAMMAR_SYSTEM_MESSAGE = "You are a precise grammar analysis tool. Respond only in JSON."
+
+
+def build_grammar_messages(
+    language: str,
+    *,
+    cefr_level: str,
+    weaknesses: list[str],
+    user_text: str,
+    prompt_name: str = "grammar",
+    prompt_version: int | None = None,
+    **extra: Any,
+) -> list[Message]:
+    """The exact messages the grammar agent sends for one learner text.
+
+    ``prompt_name``/``prompt_version`` select a registered prompt variant
+    (production uses the current ``grammar`` prompt); ``extra`` supplies any
+    variables a variant needs (e.g. ``context``).
+    """
+    prompt = str(
+        render_prompt(
+            prompt_name,
+            version=prompt_version,
+            language=language,
+            cefr_level=cefr_level,
+            weaknesses=", ".join(weaknesses) or "none identified yet",
+            user_text=user_text,
+            **extra,
+        )
+    )
+    return [Message("system", GRAMMAR_SYSTEM_MESSAGE), Message("user", prompt)]
+
+
 async def grammar_node(state: LearnerState) -> dict[str, Any]:
     """Detect and classify grammar deviations in the user's latest input.
 
@@ -40,16 +77,11 @@ async def grammar_node(state: LearnerState) -> dict[str, Any]:
     if not user_input or len(user_input.strip()) < 3:
         return {"grammar_errors": []}
 
-    language_name = state["language"]
-
-    prompt = str(
-        render_prompt(
-            "grammar",
-            language=language_name,
-            cefr_level=state.get("cefr_level", "A2"),
-            weaknesses=", ".join(state.get("grammar_weaknesses", [])) or "none identified yet",
-            user_text=user_input,
-        )
+    messages = build_grammar_messages(
+        state["language"],
+        cefr_level=state.get("cefr_level", "A2"),
+        weaknesses=state.get("grammar_weaknesses", []),
+        user_text=user_input,
     )
 
     # Fast tier, deterministic, structured output validated against a schema.
@@ -58,13 +90,10 @@ async def grammar_node(state: LearnerState) -> dict[str, Any]:
     provider = get_provider("fast")
     try:
         analysis = await provider.generate_structured(
-            [
-                Message("system", "You are a precise grammar analysis tool. Respond only in JSON."),
-                Message("user", prompt),
-            ],
+            messages,
             GrammarAnalysis,
-            temperature=0.0,
-            max_tokens=700,
+            temperature=GRAMMAR_TEMPERATURE,
+            max_tokens=GRAMMAR_MAX_TOKENS,
         )
     except Exception as exc:  # noqa: BLE001 - analysis must never break the turn
         logger.warning("Grammar analysis skipped, no LLM provider answered: %s", exc)
