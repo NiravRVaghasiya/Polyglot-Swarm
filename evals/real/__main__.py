@@ -2,12 +2,16 @@
 
     python -m evals.real build-datasets
     python -m evals.real validate
-    python -m evals.real probe ollama:llama3.1:latest claude
-    python -m evals.real run --providers ollama:llama3.1:latest --config default
+    python -m evals.real probe ollama claude
+    python -m evals.real run --providers ollama --config default
     python -m evals.real report <run_id>
     python -m evals.real calibrate <dev_run_id>
     python -m evals.real compare <base_run_id> <candidate_run_id>
     python -m evals.real history
+
+A provider without ``:model`` uses the app's code default for it
+(``src.config.default_model_ids``); ``provider:model`` overrides it, and the
+run manifest records which (``model_source``).
 
 Nothing here runs in normal CI. ``run`` makes real, possibly billed, model
 calls; a provider that is unavailable is reported as such, never replaced.

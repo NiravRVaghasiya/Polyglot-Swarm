@@ -290,7 +290,19 @@ result is uncalibrated.
 - each prompt's template file and SHA-256;
 - the git commit and whether the tree was dirty;
 - Python and SDK versions;
-- each provider's probe outcome.
+- each provider's probe outcome, its model, and where the model came from:
+  `model_source` is `app_default` or `override`, next to the
+  `app_default_model`.
+
+### Which model is evaluated
+
+A provider named without a model (`claude`, `gemini`, `openai`, `ollama`)
+is evaluated with the model the app runs by default: the code default in
+`src/config.py` (`default_model_ids()`; `LLM_PRIMARY`, `LLM_FAST`,
+`LLM_OPENAI`, `LLM_LOCAL`). The environment and `.env` are deliberately
+ignored here, so a stale local setting cannot change what an evaluation
+measures. To evaluate another model, name it: `claude:<model-id>`; the
+manifest then records `model_source: override`.
 
 `responses.jsonl` holds the full message list of every call.
 `python -m evals.real report <run_id>` re-derives every number from these
@@ -310,8 +322,8 @@ The report shows each provider's state: `complete`, `partial`, `failed`, or
 
 ```bash
 python -m evals.real validate
-python -m evals.real probe ollama:llama3.1:latest claude openai gemini
-python -m evals.real run --providers ollama:llama3.1:latest --config context-variant \
+python -m evals.real probe ollama claude openai gemini
+python -m evals.real run --providers ollama --config context-variant \
     --run-id my-test-run --timeout 900
 python -m evals.real report my-test-run
 python -m evals.real compare <base_run> <candidate_run>
@@ -348,7 +360,11 @@ Artifacts, with raw responses and the full prompts:
 | `gemini` (`gemini-2.0-flash`) | `auth_failed` | not run | not run |
 
 - The hosted providers were **not evaluated**: the configured keys are
-  invalid. No hosted-model number exists anywhere in this repository.
+  invalid. The model ids in this table came from the local `.env` at the
+  time and are not the app defaults: Claude was `claude-sonnet-4-20250514`
+  (default `claude-sonnet-5-5`) and Gemini `gemini-2.0-flash` (default
+  `gemini-3.6-flash`). Provider defaults now come from `src/config.py`
+  (see *Which model is evaluated*). No hosted-model number exists anywhere in this repository.
 - `granite3.2:8b` crashed Ollama with a CUDA error and was left out.
 - Each test run made 81 calls: 65 grammar cases with `grammar@1`, 5 with
   `grammar_context@1` (the cases that have a situation), and 11 vocabulary

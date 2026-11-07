@@ -83,7 +83,7 @@ Set any combination of these in `.env` (see `.env.example`):
 |---|---|
 | `ANTHROPIC_API_KEY` | Enables Claude (primary tier, model `LLM_PRIMARY`, default `claude-sonnet-5-5`) |
 | `GOOGLE_API_KEY` | Enables Gemini (fast tier, model `LLM_FAST`, default `gemini-3.6-flash`) |
-| `OPENAI_API_KEY` | Enables OpenAI as an extra fallback |
+| `OPENAI_API_KEY` | Enables OpenAI as an extra fallback (model `LLM_OPENAI`, default `gpt-4o-mini`) |
 | `OLLAMA_BASE_URL` | Enables local Ollama (local tier, model `LLM_LOCAL`, default `ollama/llama3.1:8b`); default `http://localhost:11434` |
 | `OLLAMA_NUM_CTX` | Context window requested from Ollama (default `8192`). Without a cap Ollama may reserve the model's full context — 128k tokens for Llama 3.1, a ~16 GB KV cache — and fail with out-of-memory. |
 
