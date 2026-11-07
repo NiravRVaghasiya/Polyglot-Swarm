@@ -13,7 +13,7 @@ References:
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fsrs import Card, Rating, Scheduler
@@ -47,18 +47,24 @@ def review_node(state: LearnerState) -> dict[str, Any]:
     }
 
 
-def schedule_new_items(vocabulary_items: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Create FSRS cards for freshly learned vocabulary and schedule first review.
+#: Delay before a newly met word's first retrieval attempt.
+FIRST_RETRIEVAL_DELAY = timedelta(minutes=10)
 
-    Each new word is reviewed once as ``Good`` (a fresh encounter), producing an
-    initial ``next_review`` and serialized card state.
+
+def schedule_new_items(vocabulary_items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Create FSRS cards for newly met vocabulary, due for a first retrieval.
+
+    Meeting a word is exposure, not recall (ADR-0033). The card therefore
+    starts unreviewed: no stability, no difficulty, no ``last_review``. Its
+    first FSRS review is the learner's first real retrieval attempt. The first
+    due time is ``FIRST_RETRIEVAL_DELAY`` after the encounter, which keeps the
+    timing the old "exposure counted as Good" card had.
     """
     scheduled: list[dict[str, Any]] = []
     now = datetime.now(UTC)
 
     for item in vocabulary_items:
-        card = Card()
-        card, _log = scheduler.review_card(card, Rating.Good, now)
+        card = Card(due=now + FIRST_RETRIEVAL_DELAY)
         scheduled.append(
             {
                 "word": item["word"],

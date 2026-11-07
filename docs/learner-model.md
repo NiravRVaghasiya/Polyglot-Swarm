@@ -287,6 +287,18 @@ Other planner rules:
 - FSRS scheduling (`src/agents/srs.py`) is unchanged. The planner still takes
   *what is due* from `vocabulary_db.get_due`, most overdue first.
 
+This planner still serves `/api/v1/learner/plan`. ADR-0033 adds an adaptive
+engine alongside it, served at `/api/v1/learner/recommendations`. It adds:
+
+- subskill (construction-level) estimates built on top of v2;
+- predictions;
+- adaptive difficulty;
+- FSRS-integrated next-best activities;
+- personalized learning paths.
+
+See [adaptive-learning.md](adaptive-learning.md). The FSRS changes it makes
+(new words get unreviewed cards; review modes) are described there.
+
 ## API surface
 
 Routes under `/api/v1/learner` (`src/api/routes/learner_routes.py`) are

@@ -43,6 +43,7 @@ old ADR — we add a new one that supersedes it and mark the old one accordingly
 | [0030](0030-frontend-voice-pwa-onboarding.md) | Frontend voice, PWA, and onboarding (Gate E) | Accepted |
 | [0031](0031-evidence-driven-learner-knowledge-model.md) | Evidence-driven, difficulty- and uncertainty-aware learner knowledge model | Accepted |
 | [0032](0032-real-model-evaluation.md) | Real-model evaluation framework | Accepted |
+| [0033](0033-adaptive-learning-intelligence.md) | Adaptive learning intelligence: subskill model, predictions, difficulty, next-best activity, FSRS integration | Accepted |
 
 ## Creating a new ADR
 

@@ -107,11 +107,24 @@ def grade_review(
     rating: int,
     card_state: dict[str, Any] | None = None,
     session_id: str | None = None,
+    mode: str | None = None,
 ) -> dict[str, Any]:
     """Grade a review: run FSRS, persist, update mastery, and emit evidence.
 
     ``rating`` is the FSRS 1-4 scale (1=Again, 2=Hard, 3=Good, 4=Easy). A rating
     of 3+ counts as successful recall.
+
+    ``mode`` says what kind of retrieval the review asked for (ADR-0033):
+
+    - ``"recognition"``: understanding or choosing the word. A success is
+      rated ``Hard`` for FSRS, because recognition is weaker evidence of
+      recall than production.
+    - ``"production"``: producing the word unaided. A success keeps the
+      learner's rating.
+
+    The mode is recorded as the evidence subskill and the mastery dimension.
+    ``None`` keeps the legacy behaviour: the rating is unchanged and the
+    evidence is recorded as recognition.
 
     Returns the FSRS result (``card_state``, ``next_review``, ``review_log``)
     plus the emitted evidence ``event_id``.
@@ -127,8 +140,17 @@ def grade_review(
 
         card_state = schedule_new_items([{"word": word}])[0]["card_state"]
 
-    result = process_review_response(card_state, rating)
     correct = rating >= 3
+    dimension = "recognition"
+    fsrs_rating = rating
+    if mode is not None:
+        if mode not in ("recognition", "production"):
+            raise ValueError(f"unknown review mode: {mode!r}")
+        from src.adaptive.memory import rating_for
+
+        dimension = mode
+        fsrs_rating = int(rating_for(mode, correct, rating))
+    result = process_review_response(card_state, fsrs_rating)
 
     # Belief: persist the outcome + update the recognition dimension.
     vocabulary_db.record_review_outcome(
@@ -139,7 +161,7 @@ def grade_review(
         card_state=result["card_state"],
         next_review=result["next_review"],
     )
-    vocabulary_db.record_dimension(user_id, language, word, "recognition", success=correct)
+    vocabulary_db.record_dimension(user_id, language, word, dimension, success=correct)
 
     # Evidence: a graded review is strong, demonstrated recall evidence. The
     # card's FSRS difficulty *before* this review is the task difficulty
@@ -154,15 +176,15 @@ def grade_review(
         language,
         provenance=Provenance(source="review-v2", session_id=session_id),
         item_id=word,
-        subskill="recognition",
-        objective_id="vocabulary.recognition",
+        subskill=dimension,
+        objective_id=f"vocabulary.{dimension}",
         task_type="review_recall",
         difficulty=task_difficulty,
         difficulty_basis=DifficultyBasis.FSRS_CARD if task_difficulty is not None else None,
         observed=word,
         assessment="correct" if correct else "incorrect",
         confidence=0.95,
-        payload={"rating": rating},
+        payload={"rating": rating, "fsrs_rating": fsrs_rating, "mode": mode},
     )
     from src.evidence import store
 

@@ -57,6 +57,12 @@ jobs:
       - name: Type-check real-model eval framework (mypy)
         run: python -m mypy --strict evals/real
 
+      # Adaptive-learning evaluation harness (ADR-0033): strict typing only.
+      # Its unit tests run with the pytest step; the full simulated
+      # evaluation (python -m evals.adaptive) is run on demand.
+      - name: Type-check adaptive evaluation harness (mypy)
+        run: python -m mypy --strict evals/adaptive
+
   frontend:
     name: Frontend · Lint · Test
     runs-on: ubuntu-latest

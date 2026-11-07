@@ -34,7 +34,7 @@ from src.memory.db import get_connection
 logger = logging.getLogger("polyglot.memory.schema")
 
 # The schema version this code expects. Bump when you add a migration.
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 8
 
 
 # --------------------------------------------------------------------------- #
@@ -471,6 +471,33 @@ def _migration_0007_evidence_lkm_v2(conn: Connection) -> None:
         conn.execute(statement)
 
 
+_ADAPTIVE_SCHEMA = (
+    # ADR-0033: an append-only audit trail of adaptive decisions (next-best
+    # activity plans and learning paths), each with the digest of the inputs
+    # it was computed from, so any recommendation can be traced and replayed.
+    """
+    CREATE TABLE IF NOT EXISTS adaptive_decisions (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id       TEXT NOT NULL,
+        language      TEXT NOT NULL,
+        kind          TEXT NOT NULL,
+        engine        TEXT NOT NULL,
+        input_digest  TEXT NOT NULL,
+        payload       TEXT NOT NULL,
+        created_at    TEXT NOT NULL
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_adaptive_decisions_user "
+    "ON adaptive_decisions(user_id, language, kind, id)",
+)
+
+
+def _migration_0008_adaptive_decisions(conn: Connection) -> None:
+    """ADR-0033: the adaptive-decision audit table. Additive and idempotent."""
+    for statement in _ADAPTIVE_SCHEMA:
+        conn.execute(statement)
+
+
 # Ordered migrations. Index i (1-based) upgrades user_version from i-1 to i.
 _MIGRATIONS: list[Migration] = [
     _migration_0001_baseline,
@@ -480,6 +507,7 @@ _MIGRATIONS: list[Migration] = [
     _migration_0005_outcomes,
     _migration_0006_security,
     _migration_0007_evidence_lkm_v2,
+    _migration_0008_adaptive_decisions,
 ]
 
 

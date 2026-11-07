@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
 from src.api.deps import get_current_user
 from src.api.schemas import ReviewSubmitRequest
@@ -29,7 +29,24 @@ def submit(
     req: ReviewSubmitRequest,
     language: str = "Spanish",
     user_id: str = Depends(get_current_user),
-) -> dict[str, str]:
-    """Record the outcome of a review for a word."""
-    vocabulary_db.record_review_outcome(user_id, language, req.word, correct=req.correct)
-    return {"status": "recorded"}
+) -> dict[str, Any]:
+    """Grade a review for a word: FSRS scheduling, evidence and learner model.
+
+    This goes through :func:`src.agents.review.grade_review`, the same path as
+    in-app reviews. Before ADR-0033 it only bumped a counter, so a word
+    reviewed through the API was never rescheduled and stayed due.
+    """
+    from src.agents.review import grade_review
+
+    rating = req.rating if req.rating is not None else (3 if req.correct else 1)
+    if (rating >= 3) != req.correct:
+        raise HTTPException(
+            status_code=422, detail="rating and correct disagree (ratings 3-4 mean correct)"
+        )
+    result = grade_review(user_id, language, req.word, rating=rating, mode=req.mode)
+    return {
+        "status": "recorded",
+        "correct": result["correct"],
+        "next_review": result["next_review"],
+        "event_id": result["event_id"],
+    }
