@@ -2,9 +2,12 @@
 
 Skills and grammar constructions are not independent: the subjunctive builds on
 ser/estar; the genitive builds on the nominative. The skill graph captures those
-prerequisite relations so the mastery engine and (later) the curriculum planner
-can reason about readiness — e.g. don't push an advanced construction whose
-prerequisites are still weak.
+prerequisite relations for reasoning about readiness — e.g. don't push an
+advanced construction whose prerequisites are still weak.
+
+No planner reads it at present: the adaptive engine takes grammar
+prerequisites from the language pack's catalog (:mod:`src.adaptive.snapshot`).
+The planner it was written for has been removed.
 
 Construction prerequisites are sourced from the language packs (Phase 4); the
 coarse skill-level graph is a small fixed structure here.

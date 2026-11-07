@@ -20,7 +20,7 @@ old ADR — we add a new one that supersedes it and mark the old one accordingly
 | [0007](0007-grammar-taxonomy-and-abstention.md) | Grammar taxonomy, classification, and abstention (Phase 4) | Accepted |
 | [0008](0008-multidimensional-vocabulary.md) | Multi-dimensional vocabulary mastery and collocations (Phase 5) | Accepted |
 | [0009](0009-learner-knowledge-model.md) | Learner Knowledge Model & mastery engine (Phase 6) | Accepted (amended by [0031](0031-evidence-driven-learner-knowledge-model.md)) |
-| [0010](0010-next-best-learning-action.md) | Next Best Learning Action / curriculum planner (Phase 7) | Accepted (amended by [0031](0031-evidence-driven-learner-knowledge-model.md)) |
+| [0010](0010-next-best-learning-action.md) | Next Best Learning Action / curriculum planner (Phase 7) | Superseded by [0033](0033-adaptive-learning-intelligence.md) |
 | [0011](0011-fsrs-contextual-review.md) | FSRS integration & contextual review with recall measurement (Phase 8) | Accepted |
 | [0012](0012-verifier-and-abstention.md) | Evaluator as verifier: accept/revise/abstain + calibration (Phase 9) | Accepted |
 | [0013](0013-language-packs.md) | Language packs (Phase 10) | Accepted |

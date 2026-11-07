@@ -970,6 +970,82 @@
         "estimated_cost_usd": 0.0
       },
       "bare_list_sensitivity": null,
+      "committed_calibration": {
+        "status": "evaluated_on_test",
+        "map": {
+          "method": "platt",
+          "params": {
+            "a": -0.126896,
+            "b": 0.026372
+          },
+          "dev_predictions": 38,
+          "source_run": "20261106-local-dev",
+          "source_split": "dev",
+          "dataset_version": "grammar-2026.11.0"
+        },
+        "dataset_matches": true,
+        "test_predictions": 62,
+        "ece_before": 0.2935,
+        "ece_after": 0.0708,
+        "before": {
+          "false_correction_rate": {
+            "value": 0.6786,
+            "numerator": 19,
+            "denominator": 28,
+            "ci95": [
+              0.4934,
+              0.8207
+            ]
+          },
+          "precision": {
+            "value": 0.6275,
+            "numerator": 32,
+            "denominator": 51,
+            "ci95": [
+              0.4902,
+              0.7468
+            ]
+          },
+          "recall": {
+            "value": 0.9143,
+            "numerator": 32,
+            "denominator": 35,
+            "ci95": [
+              0.7762,
+              0.9704
+            ]
+          }
+        },
+        "after": {
+          "false_correction_rate": {
+            "value": 0.4643,
+            "numerator": 13,
+            "denominator": 28,
+            "ci95": [
+              0.2953,
+              0.6419
+            ]
+          },
+          "precision": {
+            "value": 0.6286,
+            "numerator": 22,
+            "denominator": 35,
+            "ci95": [
+              0.4634,
+              0.7683
+            ]
+          },
+          "recall": {
+            "value": 0.6286,
+            "numerator": 22,
+            "denominator": 35,
+            "ci95": [
+              0.4634,
+              0.7683
+            ]
+          }
+        }
+      },
       "vocabulary": {
         "calls": 11,
         "execution_failure_rate": {
@@ -1799,6 +1875,9 @@
         "estimated_cost_usd": 0.0
       },
       "bare_list_sensitivity": null,
+      "committed_calibration": {
+        "status": "absent"
+      },
       "vocabulary": {
         "calls": 11,
         "execution_failure_rate": {
@@ -2812,6 +2891,9 @@
             ]
           }
         }
+      },
+      "committed_calibration": {
+        "status": "insufficient_dev_data"
       },
       "vocabulary": {
         "calls": 11,

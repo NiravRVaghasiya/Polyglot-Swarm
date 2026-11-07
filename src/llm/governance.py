@@ -51,6 +51,8 @@ class BudgetExceededError(RuntimeError):
 
 _turn_calls: ContextVar[list[int] | None] = ContextVar("polyglot_turn_calls", default=None)
 _turn_answers: ContextVar[list[str] | None] = ContextVar("polyglot_turn_answers", default=None)
+#: ``provider:model`` of the latest answered call in this context.
+_last_answer: ContextVar[str | None] = ContextVar("polyglot_last_answer", default=None)
 
 
 @contextmanager
@@ -137,12 +139,23 @@ def record_usage(cost_usd: float) -> None:
 
 def note_answer(provider: str, model: str | None, *, fallback: bool) -> None:
     """Remember which model answered a request in the current turn."""
+    _last_answer.set(f"{provider}:{model or 'unknown'}")
     answers = _turn_answers.get()
     if answers is None:
         return
     label = f"{provider}:{model or 'unknown'}" + (" (fallback)" if fallback else "")
     if label not in answers:
         answers.append(label)
+
+
+def last_answer() -> str | None:
+    """``provider:model`` of the most recent answered call in this context.
+
+    Read right after awaiting a call to learn which model produced it (for
+    per-model calibration). Concurrent graph nodes run in separate tasks, so
+    they do not see each other's answers.
+    """
+    return _last_answer.get()
 
 
 def prune_usage(keep_days: int = 90) -> int:

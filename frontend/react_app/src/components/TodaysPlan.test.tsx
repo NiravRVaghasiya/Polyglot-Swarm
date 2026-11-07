@@ -16,12 +16,12 @@ describe("TodaysPlan with nullable CEFR", () => {
       goal: "conversational",
       actions: [
         {
-          type: "continue_conversation",
+          type: "speaking_check",
           target: "speaking",
           skill: "speaking",
           reason: "no graded evidence for speaking yet",
           priority: 0.9,
-          estimated_minutes: 8,
+          estimated_minutes: 3,
           intent: "assessment",
         },
       ],
@@ -65,5 +65,54 @@ describe("TodaysPlan with nullable CEFR", () => {
     expect(screen.getByText(/Still finding your level in: grammar, speaking/)).toBeTruthy();
     // No default band rendered anywhere.
     expect(screen.queryByText("A2")).toBeNull();
+  });
+
+  it("labels every adaptive-engine intent", async () => {
+    const intents = [
+      ["assessment", "find your level"],
+      ["remediation", "fix a weakness"],
+      ["reinforcement", "consolidate"],
+      ["progression", "level up"],
+      ["introduction", "something new"],
+      ["review", "keep it fresh"],
+    ] as const;
+    vi.spyOn(api, "todaysPlan").mockResolvedValue({
+      language: "Spanish",
+      goal: "conversational",
+      actions: intents.map(([intent], i) => ({
+        type: "grammar_practice",
+        target: `objective-${i}`,
+        skill: "grammar",
+        reason: "r",
+        priority: 0.5,
+        estimated_minutes: 5,
+        intent,
+      })),
+    });
+    vi.spyOn(api, "cefrProfile").mockResolvedValue({
+      language: "Spanish",
+      overall: null,
+      overall_status: "insufficient_evidence",
+      unassessed_skills: [],
+      skills: {},
+    });
+    vi.spyOn(api, "insights").mockResolvedValue({
+      language: "Spanish",
+      current_cefr: null,
+      overall_cefr: null,
+      overall_status: "insufficient_evidence",
+      weakest_skills: [],
+      needs_assessment: [],
+      top_weaknesses: [],
+      recommended_focus: [],
+      streak: 0,
+    });
+
+    render(<TodaysPlan token="t" language="Spanish" />);
+
+    await waitFor(() => expect(screen.getAllByTestId("action-intent")).toHaveLength(6));
+    expect(screen.getAllByTestId("action-intent").map((e) => e.textContent)).toEqual(
+      intents.map(([, label]) => label),
+    );
   });
 });

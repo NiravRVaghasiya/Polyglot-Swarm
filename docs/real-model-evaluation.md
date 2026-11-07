@@ -218,6 +218,35 @@ All rates are over successful calls.
   production policy (`confidence < 0.5`, or a non-error class, means nothing
   is surfaced).
 
+### Calibration maps used by the app
+
+`_select_errors` (the grammar agent) applies a per-model calibration map when
+one exists for the model that answered, and then applies its 0.5 threshold to
+the **calibrated** probability; the calibrated value also becomes the error's
+`confidence` (the model's own is kept as `raw_confidence`). Without a usable
+map it keeps the raw-confidence threshold and logs, once per model, that the
+result is uncalibrated.
+
+- **Fitting.** `python -m evals.real calibrate <dev_run_id>` (or
+  `make eval-real-calibrate RUN=<dev_run_id>`) fits one map per model from a
+  **dev-split** run and writes `evals/real/calibration/<provider_model>.json`.
+  A run on any other split is refused, and a test checks that every committed
+  map names a dev run whose manifest, split and dataset checksum match.
+- **Method.** Platt scaling or histogram binning
+  (`src/evaluation/statistics.py`), chosen by leave-one-out Brier score on the
+  dev pairs alone. With fewer than 15 dev predictions, or one class only, the
+  file records `status: insufficient_dev_data` and nothing is applied.
+- **Format.** `calibration_version` `grammar-calibration-1.0`, the model key,
+  the method and parameters, the dev sample size and the source run, split
+  and dataset checksum. A file that is unreadable, of another version, for
+  another model, not from dev, or with invalid parameters is logged and
+  ignored.
+- **Keys are exact.** A map for `ollama:llama3.1:latest` does not apply to
+  `ollama:llama3.1:8b`, even when the two tags are the same weights.
+- **Report.** For a test run, each model's section states the committed map's
+  effect, computed offline from the recorded responses: ECE and
+  false-correction rate (with precision and recall) before and after.
+
 ### Cross-provider, prompt variants and consistency
 
 - **Cross-provider:** for the production prompt, each provider pair gets case
@@ -261,7 +290,19 @@ All rates are over successful calls.
 - each prompt's template file and SHA-256;
 - the git commit and whether the tree was dirty;
 - Python and SDK versions;
-- each provider's probe outcome.
+- each provider's probe outcome, its model, and where the model came from:
+  `model_source` is `app_default` or `override`, next to the
+  `app_default_model`.
+
+### Which model is evaluated
+
+A provider named without a model (`claude`, `gemini`, `openai`, `ollama`)
+is evaluated with the model the app runs by default: the code default in
+`src/config.py` (`default_model_ids()`; `LLM_PRIMARY`, `LLM_FAST`,
+`LLM_OPENAI`, `LLM_LOCAL`). The environment and `.env` are deliberately
+ignored here, so a stale local setting cannot change what an evaluation
+measures. To evaluate another model, name it: `claude:<model-id>`; the
+manifest then records `model_source: override`.
 
 `responses.jsonl` holds the full message list of every call.
 `python -m evals.real report <run_id>` re-derives every number from these
@@ -281,8 +322,8 @@ The report shows each provider's state: `complete`, `partial`, `failed`, or
 
 ```bash
 python -m evals.real validate
-python -m evals.real probe ollama:llama3.1:latest claude openai gemini
-python -m evals.real run --providers ollama:llama3.1:latest --config context-variant \
+python -m evals.real probe ollama claude openai gemini
+python -m evals.real run --providers ollama --config context-variant \
     --run-id my-test-run --timeout 900
 python -m evals.real report my-test-run
 python -m evals.real compare <base_run> <candidate_run>
@@ -319,7 +360,11 @@ Artifacts, with raw responses and the full prompts:
 | `gemini` (`gemini-2.0-flash`) | `auth_failed` | not run | not run |
 
 - The hosted providers were **not evaluated**: the configured keys are
-  invalid. No hosted-model number exists anywhere in this repository.
+  invalid. The model ids in this table came from the local `.env` at the
+  time and are not the app defaults: Claude was `claude-sonnet-4-20250514`
+  (default `claude-sonnet-5-5`) and Gemini `gemini-2.0-flash` (default
+  `gemini-3.6-flash`). Provider defaults now come from `src/config.py`
+  (see *Which model is evaluated*). No hosted-model number exists anywhere in this repository.
 - `granite3.2:8b` crashed Ollama with a CUDA error and was left out.
 - Each test run made 81 calls: 65 grammar cases with `grammar@1`, 5 with
   `grammar_context@1` (the cases that have a situation), and 11 vocabulary
@@ -414,6 +459,16 @@ and granite3.2 1 in 4 regional ones. Three cases were missed by every model:
 - **No calibration maps were fitted for llama3.1 or granite3.2.** llama3.1's
   dev run surfaced only 9 predictions (15 are required), and granite3.2 has
   no dev run.
+- **Committed maps (2026-11-08).** gemma2's map is Platt (selected over
+  histogram by leave-one-out Brier on dev: 0.207 against 0.212). Its slope is
+  negative (a = −0.127): on dev, higher stated confidence went with *lower*
+  correctness. Applied offline to the test run, it lowers ECE from 0.29 to
+  0.07 and the false-correction rate from 0.68 [0.49, 0.82] to 0.46
+  [0.30, 0.64] (n=28 error-free cases), with precision unchanged (0.63) and
+  recall down from 0.91 to 0.63. The intervals overlap; it is one small dev
+  set and one model. llama3.1's map file records `insufficient_dev_data`
+  (9 predictions), so the app keeps the raw threshold for it, as for every
+  hosted model, none of which has been evaluated.
 - **Confidence-weighting the evidence did not help.** For gemma2 it lowered
   the precision of the evidence fed to the learner model, by 0.047
   [0.009, 0.081]. For the other two models the change was not significant.

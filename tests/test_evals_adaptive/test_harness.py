@@ -108,19 +108,13 @@ class TestPolicyEval:
         data = policy_eval.evaluate_policies(cfg)
         assert data["simulated"] is True
         assert set(data["results"]) == set(policy_eval.POLICIES)
-        assert set(data["vs_existing"]) == set(policy_eval.POLICIES) - {"existing_planner"}
+        assert data["baseline"] == policy_eval.BASELINE == "static"
+        assert set(data["vs_baseline"]) == set(policy_eval.POLICIES) - {"static"}
         for res in data["results"].values():
             assert 0.0 <= res["immediate_success"]["mean"] <= 1.0
             assert 0.0 <= res["grammar_recall_delayed"]["mean"] <= 1.0
         md = render_policies(data)
         assert BANNER in md and "delayed" in md
-
-    def test_existing_planner_patch_is_scoped(self):
-        import src.curriculum.planner as legacy
-
-        before = legacy.vocabulary_db
-        policy_eval.run_learner("existing_planner", 0, policy_eval.PolicyEvalConfig(n_sessions=2))
-        assert legacy.vocabulary_db is before
 
 
 class TestRealLogs:

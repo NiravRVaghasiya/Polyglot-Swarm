@@ -18,7 +18,7 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
-from src.config import settings
+from src.config import default_model_ids
 from src.llm.provider import LLMProvider, Message
 from src.llm.reliability import _http_status
 
@@ -31,12 +31,23 @@ class SyntheticProviderError(ValueError):
     """A synthetic provider was requested without allowing synthetic runs."""
 
 
+#: How a spec's model was chosen (recorded in the run manifest).
+APP_DEFAULT = "app_default"
+OVERRIDE = "override"
+
+
 @dataclass(frozen=True)
 class ProviderSpec:
-    """``<provider>:<model>``; the model defaults to the app's configured one."""
+    """``<provider>:<model>``; the model defaults to the app's code default.
+
+    ``model_source`` is :data:`APP_DEFAULT` when the model came from
+    :func:`src.config.default_model_ids` and :data:`OVERRIDE` when the spec
+    named a model explicitly.
+    """
 
     provider: str
     model: str
+    model_source: str = APP_DEFAULT
 
     @property
     def key(self) -> str:
@@ -48,16 +59,18 @@ class ProviderSpec:
 
 
 def default_model(provider: str) -> str:
-    from src.llm.ollama import _strip_provider_prefix
-    from src.llm.openai import _DEFAULT_MODEL
+    """The model the app runs for ``provider`` unless an operator overrides it.
 
-    return {
-        "claude": settings.llm_primary,
-        "gemini": settings.llm_fast,
-        "openai": _DEFAULT_MODEL,
-        "ollama": _strip_provider_prefix(settings.llm_local),
-        "fake": "fake-deterministic",
-    }[provider]
+    Taken from the code defaults in :mod:`src.config`, not from the
+    environment: a local ``.env`` must not silently change which model an
+    evaluation measures. Name a model explicitly to evaluate another one.
+    """
+    if provider == "fake":
+        return "fake-deterministic"
+    from src.llm.ollama import _strip_provider_prefix
+
+    model = default_model_ids()[provider]
+    return _strip_provider_prefix(model) if provider == "ollama" else model
 
 
 def parse_spec(text: str) -> ProviderSpec:
@@ -66,7 +79,9 @@ def parse_spec(text: str) -> ProviderSpec:
     provider = provider.lower()
     if provider not in REAL_PROVIDERS + SYNTHETIC_PROVIDERS:
         raise ValueError(f"unknown provider {provider!r}; expected one of {REAL_PROVIDERS}")
-    return ProviderSpec(provider, model or default_model(provider))
+    if model:
+        return ProviderSpec(provider, model, OVERRIDE)
+    return ProviderSpec(provider, default_model(provider))
 
 
 def build_provider(spec: ProviderSpec, *, allow_synthetic: bool = False) -> LLMProvider:
@@ -155,6 +170,8 @@ class ProbeResult:
         return {
             "provider": self.spec.provider,
             "model": self.spec.model,
+            "model_source": self.spec.model_source,
+            "app_default_model": default_model(self.spec.provider),
             "status": self.status,
             "detail": self.detail[:500],
             "latency_ms": round(self.latency_ms, 1),

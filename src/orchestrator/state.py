@@ -16,6 +16,8 @@ class GrammarError(TypedDict):
     classification: NotRequired[str]  # wrong|awkward|regional|informal|acceptable|...
     construction: NotRequired[str]
     confidence: NotRequired[float]
+    #: The model's own confidence when ``confidence`` is calibrated.
+    raw_confidence: NotRequired[float]
     alternatives: NotRequired[list[str]]
 
 

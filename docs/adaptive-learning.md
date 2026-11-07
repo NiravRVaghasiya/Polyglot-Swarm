@@ -19,7 +19,9 @@ personalized path. The design decision is
 | `src/adaptive/learner_model.py` | `lkm-subskill-v1`: subskill (construction) estimates on top of `lkm-evidence-v2`, performance patterns, predictions, and the leakage guard |
 | `src/adaptive/memory.py` | FSRS memory states replayed from demonstrated recall (words and constructions), and leeches |
 | `src/adaptive/difficulty.py` | adaptive task difficulty |
-| `src/adaptive/planner.py` | `adaptive-nba-v1` next-best-activity engine |
+| `src/adaptive/planner.py` | `adaptive-nba-v1` next-best-activity engine: the app's only planner |
+| `src/adaptive/service.py` | builds the snapshot from the stores, plans, records the decision; used by every plan surface |
+| `src/adaptive/constraints.py` | `PlanConstraints`: time, goal, fatigue and action budget |
 | `src/adaptive/paths.py` | personalized learning path |
 | `src/adaptive/prediction.py` | prediction bundle served by the API |
 | `src/adaptive/snapshot.py` | the single input value; built from the stores or from the simulator |
@@ -28,16 +30,22 @@ personalized path. The design decision is
 
 API (authenticated, under `/api/v1/learner`):
 
-- `GET /recommendations?language&minutes&goal&record` — the plan. It is
-  recorded in the audit trail unless `record=false`.
+- `GET /plan?language&minutes&goal&record` — the plan as the UI shows it:
+  one compact action per recommendation (`type` is the activity, `reason`
+  the first rationale line, `priority` the score). Recorded in the audit
+  trail unless `record=false`.
+- `GET /recommendations?language&minutes&goal&record` — the same plan with
+  the full rationale, evidence, predictions and score components. Recorded
+  unless `record=false`.
 - `GET /path?language&goal&target&record` — the learning path, with changes
   since the last recorded path.
 - `GET /predictions?skill&subskill&difficulty&language` — predictions only,
   labelled `"kind": "prediction"`.
 - `GET /decisions?language&kind&limit` — the audit trail.
 
-`/plan` and the planner in `src/curriculum` are unchanged. They are kept for
-compatibility and as the evaluation baseline.
+`/insights` takes its recommended focus from the same plan (previewed, not
+recorded), and `polyglot plan` prints it. The curriculum planner `/plan` used
+before was removed (single planner, 2026-11-08).
 
 ## Learner model: `lkm-subskill-v1`
 
@@ -373,7 +381,7 @@ is final.
 | policy | what it is |
 |---|---|
 | `static` | fixed syllabus at the content level |
-| `existing_planner` | the real current planner, with legacy FSRS |
+| `existing_planner` | the curriculum planner `/plan` used then, with legacy FSRS (removed 2026-11-08; not reproducible from later commits) |
 | `adaptive` | new engine, all three capabilities off |
 | `adaptive_predictive` | + subskill predictions and adaptive difficulty |
 | `adaptive_full` | + FSRS integration |

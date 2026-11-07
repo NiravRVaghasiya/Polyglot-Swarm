@@ -1,8 +1,8 @@
 """Contextual review — retrieval practice that measures actual recall.
 
-Phase 8 keeps the WHAT/WHEN split explicit: the curriculum planner chooses
-*what* to review and FSRS (in :mod:`src.agents.srs`) decides *when* an item is
-due. This module fills two gaps the plan calls out:
+Phase 8 keeps the WHAT/WHEN split explicit: the planner
+(:mod:`src.adaptive.planner`) chooses *what* to review and FSRS (in
+:mod:`src.agents.srs`) decides *when* an item is due. This module fills two gaps the plan calls out:
 
 1. **Contextual review generation** — instead of a flat "what does X mean?",
    embed the due item in a short scenario-compatible retrieval prompt, so the

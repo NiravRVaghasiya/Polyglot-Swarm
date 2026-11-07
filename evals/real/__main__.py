@@ -2,11 +2,16 @@
 
     python -m evals.real build-datasets
     python -m evals.real validate
-    python -m evals.real probe ollama:llama3.1:latest claude
-    python -m evals.real run --providers ollama:llama3.1:latest --config default
+    python -m evals.real probe ollama claude
+    python -m evals.real run --providers ollama --config default
     python -m evals.real report <run_id>
+    python -m evals.real calibrate <dev_run_id>
     python -m evals.real compare <base_run_id> <candidate_run_id>
     python -m evals.real history
+
+A provider without ``:model`` uses the app's code default for it
+(``src.config.default_model_ids``); ``provider:model`` overrides it, and the
+run manifest records which (``model_source``).
 
 Nothing here runs in normal CI. ``run`` makes real, possibly billed, model
 calls; a provider that is unavailable is reported as such, never replaced.
@@ -46,6 +51,9 @@ def main(argv: list[str] | None = None) -> int:
     p_rep = sub.add_parser("report", help="score a run and write report.json/report.md")
     p_rep.add_argument("run_id")
     p_rep.add_argument("--no-history", action="store_true")
+    p_cal = sub.add_parser("calibrate", help="fit per-model calibration maps from a dev-split run")
+    p_cal.add_argument("run_id")
+    p_cal.add_argument("--out", type=Path, default=None, help="map directory")
     p_cmp = sub.add_parser("compare", help="detect regressions between two runs")
     p_cmp.add_argument("base")
     p_cmp.add_argument("candidate")
@@ -113,6 +121,20 @@ def main(argv: list[str] | None = None) -> int:
 
         out = write_report(RUNS_DIR / args.run_id, record_history=not args.no_history)
         _say(f"wrote {out / 'report.md'}")
+        return 0
+    if args.cmd == "calibrate":
+        from evals.real.calibration import CalibrationSplitError, fit_from_run
+        from evals.real.runner import RUNS_DIR
+        from src.evaluation.calibration_maps import DEFAULT_DIR
+
+        try:
+            paths = fit_from_run(RUNS_DIR / args.run_id, args.out or DEFAULT_DIR)
+        except CalibrationSplitError as exc:
+            _say(f"refused: {exc}")
+            return 2
+        for path in paths:
+            doc = json.loads(path.read_text(encoding="utf-8"))
+            _say(f"{doc['key']}: {doc['status']} (dev n={doc['dev_predictions']}) -> {path}")
         return 0
     if args.cmd == "compare":
         from evals.real.regression import compare_runs

@@ -49,6 +49,9 @@ class Settings(BaseSettings):
     llm_primary: str = "claude-sonnet-5-5"
     llm_fast: str = "gemini-3.6-flash"
     llm_local: str = "ollama/llama3.1:8b"
+    #: OpenAI has no tier of its own; it joins the routing chain as an extra
+    #: fallback when ``OPENAI_API_KEY`` is set.
+    llm_openai: str = "gpt-4o-mini"
 
     # Language
     default_language: str = "Spanish"
@@ -192,6 +195,26 @@ class Settings(BaseSettings):
                 f"got {self.fsrs_desired_retention!r}."
             )
         return self
+
+
+#: Settings field holding each provider's model id.
+_MODEL_FIELDS = {
+    "claude": "llm_primary",
+    "gemini": "llm_fast",
+    "openai": "llm_openai",
+    "ollama": "llm_local",
+}
+
+
+def default_model_ids() -> dict[str, str]:
+    """Each provider's model id as defined in code, ignoring the environment.
+
+    ``settings`` reflects the environment and ``.env``, which differ per
+    machine; these defaults are what a deployment runs unless its operator
+    overrides them, so they are the models an evaluation should measure.
+    """
+    fields = Settings.model_fields
+    return {provider: str(fields[name].default) for provider, name in _MODEL_FIELDS.items()}
 
 
 def validate_settings(s: Settings, *, strict: bool = False) -> list[str]:

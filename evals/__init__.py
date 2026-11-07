@@ -20,7 +20,7 @@ Layout::
         grammar/        precision, recall, F1, false-correction rate, calibration
         vocabulary/     extraction precision/recall/F1
         assessment/     CEFR-vs-expert correlation, absolute error, calibration
-        curriculum/     target coverage, skill balance, difficulty appropriateness
+        curriculum/     target coverage, skill balance (the adaptive planner)
         regression/     runs every suite above and rolls them into one gate
 
 Each suite's dataset lives in its own ``dataset.py`` as a versioned, hand-
