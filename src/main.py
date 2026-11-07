@@ -123,6 +123,24 @@ def build_ui() -> gr.Blocks:
     return demo
 
 
+def gradio_auth(s: Any) -> tuple[str, str] | None:
+    """Credentials for the Gradio UI (ADR-0035, R5).
+
+    The UI has no accounts of its own and spends the operator's LLM budget,
+    so staging/production refuse to start it without ``GRADIO_AUTH``
+    (``user:password``).
+    """
+    user, sep, password = s.gradio_auth.partition(":")
+    if sep and user and len(password) >= s.min_password_length:
+        return (user, password)
+    if s.is_production_like:
+        raise SystemExit(
+            "GRADIO_AUTH (user:password, password >= MIN_PASSWORD_LENGTH) is required "
+            "to run the Gradio UI in staging/production."
+        )
+    return None
+
+
 if __name__ == "__main__":
     from src.llm.preflight import check_backends, has_usable_backend
 
@@ -138,4 +156,4 @@ if __name__ == "__main__":
     # Launch the upgraded Gradio MVP (chat + voice + persistent sessions).
     from frontend.gradio_app import build_ui as build_voice_ui
 
-    build_voice_ui().launch(server_port=settings.gradio_server_port)
+    build_voice_ui().launch(server_port=settings.gradio_server_port, auth=gradio_auth(settings))

@@ -75,7 +75,7 @@ def recent_events(
     where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
     with get_connection() as conn:
         rows = conn.execute(
-            f"SELECT * FROM audit_log {where} ORDER BY id DESC LIMIT ?",
+            f"SELECT * FROM audit_log {where} ORDER BY id DESC LIMIT ?",  # noqa: S608
             (*params, limit),
         ).fetchall()
     return [_row_to_dict(r) for r in rows]

@@ -55,7 +55,25 @@ class JsonFormatter(logging.Formatter):
         return json.dumps(payload, default=str, ensure_ascii=False)
 
 
-_TEXT_FORMAT = "%(asctime)s %(levelname)-8s %(name)s: %(message)s"
+_TEXT_FORMAT = "%(asctime)s %(levelname)-8s %(name)s [%(request_id)s]: %(message)s"
+
+
+class CorrelationFilter(logging.Filter):
+    """Stamp every record with the request / interaction ids in scope.
+
+    Lets an operator follow one request across the access log, provider
+    retries and evidence writes. Records outside a request get ``-``.
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        from src.observability.context import current_interaction, current_request_id
+
+        if not hasattr(record, "request_id"):
+            record.request_id = current_request_id() or "-"
+        if not hasattr(record, "interaction_id"):
+            record.interaction_id = current_interaction() or "-"
+        return True
+
 
 _configured = False
 
@@ -83,6 +101,7 @@ def configure_logging(*, level: str | None = None, fmt: str | None = None) -> No
         handler.setFormatter(JsonFormatter())
     else:
         handler.setFormatter(logging.Formatter(_TEXT_FORMAT))
+    handler.addFilter(CorrelationFilter())
 
     root = logging.getLogger()
     root.handlers.clear()  # idempotent: replace, don't stack, on repeated calls
@@ -115,6 +134,7 @@ def ensure_configured() -> None:
 
 
 __all__ = [
+    "CorrelationFilter",
     "JsonFormatter",
     "configure_logging",
     "ensure_configured",

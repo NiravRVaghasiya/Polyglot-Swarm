@@ -12,7 +12,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from src.memory.db import get_connection
+from src.memory.db import get_connection, once_per_database
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS conversation_turns (
@@ -30,6 +30,7 @@ CREATE INDEX IF NOT EXISTS idx_turns_user ON conversation_turns(user_id, languag
 """
 
 
+@once_per_database
 def init_db() -> None:
     """Create the conversation_turns table if it does not exist."""
     with get_connection() as conn:

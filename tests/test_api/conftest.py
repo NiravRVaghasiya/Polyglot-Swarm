@@ -23,8 +23,14 @@ def temp_storage(tmp_path, monkeypatch):
 def client(temp_storage):
     from src.api import auth, sessions
     from src.api.app import create_app
+    from src.api.deps import user_work_limiter
+    from src.memory import schema
 
+    # The app's lifespan migrates the schema at startup; TestClient without a
+    # ``with`` block skips the lifespan, so do it here as production would.
+    schema.init_all()
     sessions.reset()
+    user_work_limiter.reset()
     # The auth rate limiters are process-global (Phase 21) so every test gets
     # a clean budget instead of inheriting counters from earlier tests that
     # happened to share a client key (TestClient requests all appear to come
@@ -74,7 +80,7 @@ def auth_client(client):
     """A TestClient with a registered+authenticated user; returns (client, headers, user_id)."""
     resp = client.post(
         "/api/v1/auth/register",
-        json={"username": "alice", "password": "s3cret"},
+        json={"username": "alice", "password": "s3cret-pass"},
     )
     assert resp.status_code == 200, resp.text
     body = resp.json()

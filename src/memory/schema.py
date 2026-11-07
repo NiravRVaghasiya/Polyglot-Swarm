@@ -29,12 +29,12 @@ import logging
 from collections.abc import Callable
 from sqlite3 import Connection
 
-from src.memory.db import get_connection
+from src.memory.db import get_connection, once_per_database
 
 logger = logging.getLogger("polyglot.memory.schema")
 
 # The schema version this code expects. Bump when you add a migration.
-SCHEMA_VERSION = 9
+SCHEMA_VERSION = 10
 
 
 # --------------------------------------------------------------------------- #
@@ -547,6 +547,54 @@ def _migration_0009_multimodal_evidence(conn: Connection) -> None:
         conn.execute(statement)
 
 
+_PRODUCTION_SCHEMA = (
+    # Durable snapshots of in-flight chat sessions (R1): a restart or an
+    # abandoned tab no longer loses the session's learning evidence.
+    """
+    CREATE TABLE IF NOT EXISTS active_sessions (
+        user_id     TEXT NOT NULL,
+        session_id  TEXT NOT NULL,
+        language    TEXT NOT NULL,
+        status      TEXT NOT NULL DEFAULT 'active',
+        state_json  TEXT,
+        created_at  TEXT NOT NULL,
+        updated_at  TEXT NOT NULL,
+        PRIMARY KEY (user_id, session_id)
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_active_sessions_status ON active_sessions (status, updated_at)",
+    # Daily LLM usage per user ("*" = the whole deployment), for budgets (R3).
+    """
+    CREATE TABLE IF NOT EXISTS llm_usage_daily (
+        day       TEXT NOT NULL,
+        scope     TEXT NOT NULL,
+        calls     INTEGER NOT NULL DEFAULT 0,
+        cost_usd  REAL NOT NULL DEFAULT 0,
+        PRIMARY KEY (day, scope)
+    )
+    """,
+    # Client-supplied idempotency keys for mutating learning endpoints (R13).
+    """
+    CREATE TABLE IF NOT EXISTS idempotency_keys (
+        user_id       TEXT NOT NULL,
+        key           TEXT NOT NULL,
+        endpoint      TEXT NOT NULL,
+        request_hash  TEXT NOT NULL,
+        status_code   INTEGER,
+        response_json TEXT,
+        created_at    TEXT NOT NULL,
+        PRIMARY KEY (user_id, key)
+    )
+    """,
+)
+
+
+def _migration_0010_production(conn: Connection) -> None:
+    """Session snapshots, LLM usage budgets and idempotency keys (ADR-0035)."""
+    for statement in _PRODUCTION_SCHEMA:
+        conn.execute(statement)
+
+
 # Ordered migrations. Index i (1-based) upgrades user_version from i-1 to i.
 _MIGRATIONS: list[Migration] = [
     _migration_0001_baseline,
@@ -558,7 +606,11 @@ _MIGRATIONS: list[Migration] = [
     _migration_0007_evidence_lkm_v2,
     _migration_0008_adaptive_decisions,
     _migration_0009_multimodal_evidence,
+    _migration_0010_production,
 ]
+
+if len(_MIGRATIONS) != SCHEMA_VERSION:  # pragma: no cover - guards a forgotten bump
+    raise RuntimeError("SCHEMA_VERSION does not match the migration list")
 
 
 def _get_user_version(conn: Connection) -> int:
@@ -580,9 +632,16 @@ def run_migrations() -> int:
     _init_existing_stores()
     with get_connection() as conn:
         current = _get_user_version(conn)
-        target = len(_MIGRATIONS)
-        if current >= target:
-            return current
+    target = len(_MIGRATIONS)
+    if current >= target:
+        return current
+    if current > 0:
+        # Forward-only migrations: the rollback path is restoring this backup.
+        from src.ops.backup import create_backup_set
+
+        path = create_backup_set(label=f"pre-migration-v{current}")
+        logger.info("pre-migration backup written: %s", path.name)
+    with get_connection() as conn:
         for version in range(current + 1, target + 1):
             migration = _MIGRATIONS[version - 1]
             logger.info("applying migration %d (%s)", version, migration.__name__)
@@ -591,6 +650,7 @@ def run_migrations() -> int:
         return target
 
 
+@once_per_database
 def init_all() -> None:
     """Provision the entire database schema (existing + Phase 2 tables).
 

@@ -1,5 +1,19 @@
 # Deployment
 
+> **Staging and production** use [`docker-compose.prod.yml`](../docker-compose.prod.yml)
+> with `APP_ENV=staging|production`, which refuses to start on unsafe
+> settings. Start from [`.env.production.example`](../.env.production.example)
+> and follow the [operations runbook](production/operations-runbook.md):
+> deploy, rollback, backups and restore, alerts and incidents. The other
+> production documents:
+>
+> - [readiness audit and risk register](production/readiness-audit.md);
+> - [security and privacy review](production/security-privacy-review.md);
+> - [service objectives](production/service-objectives.md);
+> - [performance report](production/performance-report.md).
+>
+> The rest of this page covers local and self-hosted development setups.
+
 ## Running locally without Docker
 
 The README's [Quick start](../README.md#quick-start) has the full
@@ -72,7 +86,18 @@ Notable groups:
 - **Storage**: `DATA_DIR`, `DB_PATH`, `CHROMA_PATH`, `PROFILES_DIR`.
 - **Server**: `API_HOST`, `API_PORT`, `GRADIO_SERVER_PORT`, `CORS_ORIGINS`
   (browser origins allowed to call the API; defaults to the React dev server).
-- **Security**: `TOKEN_TTL_HOURS`, `TELEMETRY_ENABLED`.
+- **Security**: `TOKEN_TTL_HOURS`, `TELEMETRY_ENABLED`, `MIN_PASSWORD_LENGTH`,
+  `METRICS_TOKEN`, `GRADIO_AUTH`.
+- **Production controls** (ADR-0035):
+  - `APP_ENV`, `API_DOCS_ENABLED`;
+  - `MAX_REQUEST_BYTES`, `USER_RATE_LIMIT_PER_MINUTE`;
+  - `LLM_TIMEOUT_SECONDS`, `LLM_MAX_CALLS_PER_TURN`;
+  - `LLM_USER_DAILY_BUDGET_USD`, `LLM_USER_DAILY_CALLS`,
+    `LLM_GLOBAL_DAILY_BUDGET_USD`;
+  - `MAX_ACTIVE_SESSIONS_PER_USER`, `SESSION_IDLE_FINALIZE_HOURS`;
+  - `BACKUP_RETENTION_COUNT`, `MAINTENANCE_INTERVAL_SECONDS`.
+
+  Run `polyglot ops config-check` to validate.
 - **Voice** (optional): `LIVEKIT_URL`, `LIVEKIT_API_KEY`,
   `LIVEKIT_API_SECRET`.
 

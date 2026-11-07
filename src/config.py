@@ -112,7 +112,50 @@ class Settings(BaseSettings):
     #: blocks its requests. Empty disables CORS entirely.
     cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
 
+    # --- Production controls (Phase 5, ADR-0035) ------------------------------
+    #: ``development`` | ``staging`` | ``production``. Staging and production
+    #: fail fast on unsafe configuration (see :func:`validate_settings`).
+    app_env: str = "development"
+    #: Serve ``/docs`` and ``/openapi.json``. Must be off in production.
+    api_docs_enabled: bool = True
+    #: Largest accepted request body (bytes). Base64 audio of the 10 MB
+    #: upload limit is about 13.4 MB, so 16 MB leaves room for the JSON.
+    max_request_bytes: int = 16 * 1024 * 1024
+    #: Per-user requests per minute on learning endpoints that do work
+    #: (chat, assessment, review submission). 0 disables.
+    user_rate_limit_per_minute: int = 60
+    #: Seconds before one LLM attempt is abandoned (then retried / failed over).
+    llm_timeout_seconds: float = 45.0
+    #: LLM calls allowed while handling one turn (a runaway-loop guard).
+    llm_max_calls_per_turn: int = 16
+    #: Per-user daily LLM spend (estimated USD) and call caps. 0 disables.
+    llm_user_daily_budget_usd: float = 2.0
+    llm_user_daily_calls: int = 1500
+    #: Whole-deployment daily LLM spend cap (estimated USD). 0 disables.
+    llm_global_daily_budget_usd: float = 0.0
+    #: In-flight chat sessions per user; the oldest idle one is finalized.
+    max_active_sessions_per_user: int = 5
+    #: Idle sessions older than this are finalized by maintenance (hours).
+    session_idle_finalize_hours: float = 6.0
+    #: Minimum length for new passwords.
+    min_password_length: int = 8
+    #: Bearer token required to read ``/metrics``. Empty: only outside
+    #: staging/production (where it is required).
+    metrics_token: str = ""
+    #: Gradio UI credentials as ``user:password``. Required to start the
+    #: Gradio UI in staging/production.
+    gradio_auth: str = ""
+    #: Backup sets kept by ``polyglot ops backup`` (oldest pruned first).
+    backup_retention_count: int = 14
+    #: Seconds between in-process maintenance runs (0 disables the loop).
+    maintenance_interval_seconds: float = 900.0
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+
+    @property
+    def is_production_like(self) -> bool:
+        """Staging and production share the strict rules."""
+        return self.app_env.strip().lower() in {"staging", "production"}
 
     def has_hosted_provider(self) -> bool:
         """Whether any hosted-provider API key is configured."""
@@ -171,8 +214,39 @@ def validate_settings(s: Settings, *, strict: bool = False) -> list[str]:
                 "for offline/deterministic mode)."
             )
 
+    if s.app_env.strip().lower() not in {"development", "staging", "production"}:
+        problems.append(f"APP_ENV must be development, staging or production, got {s.app_env!r}.")
+    if s.is_production_like:
+        problems.extend(_production_problems(s))
     if strict and problems:
         raise RuntimeError("; ".join(problems))
+    return problems
+
+
+def _production_problems(s: Settings) -> list[str]:
+    """Unsafe settings for staging/production (each one blocks startup)."""
+    problems: list[str] = []
+    if _deterministic_mode_active():
+        problems.append("POLYGLOT_DETERMINISTIC must be off in staging/production.")
+    origins = s.cors_origin_list()
+    if not origins or any(
+        not o.startswith("https://") or "localhost" in o or "127.0.0.1" in o for o in origins
+    ):
+        problems.append("CORS_ORIGINS must list only https:// origins (no localhost).")
+    if s.api_docs_enabled:
+        problems.append("API_DOCS_ENABLED must be false in staging/production.")
+    if s.log_format != "json":
+        problems.append("LOG_FORMAT must be json in staging/production.")
+    if len(s.metrics_token) < 24:
+        problems.append("METRICS_TOKEN must be set (at least 24 characters).")
+    if s.llm_user_daily_budget_usd <= 0 or s.llm_global_daily_budget_usd <= 0:
+        problems.append(
+            "LLM_USER_DAILY_BUDGET_USD and LLM_GLOBAL_DAILY_BUDGET_USD must be positive."
+        )
+    if s.user_rate_limit_per_minute <= 0:
+        problems.append("USER_RATE_LIMIT_PER_MINUTE must be positive.")
+    if not s.telemetry_enabled:
+        problems.append("TELEMETRY_ENABLED must be true (cost and budget tracking need it).")
     return problems
 
 

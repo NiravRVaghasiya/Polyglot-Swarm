@@ -78,7 +78,9 @@ class TestReadiness:
 
 class TestRegister:
     def test_register_returns_token(self, client):
-        resp = client.post("/api/v1/auth/register", json={"username": "bob", "password": "pw"})
+        resp = client.post(
+            "/api/v1/auth/register", json={"username": "bob", "password": "pw-secret-1"}
+        )
         assert resp.status_code == 200
         body = resp.json()
         assert body["token_type"] == "bearer"
@@ -86,12 +88,16 @@ class TestRegister:
         assert body["user_id"].startswith("u-")
 
     def test_duplicate_username_rejected(self, client):
-        client.post("/api/v1/auth/register", json={"username": "dup", "password": "pw"})
-        resp = client.post("/api/v1/auth/register", json={"username": "dup", "password": "pw"})
+        client.post("/api/v1/auth/register", json={"username": "dup", "password": "pw-secret-1"})
+        resp = client.post(
+            "/api/v1/auth/register", json={"username": "dup", "password": "pw-secret-1"}
+        )
         assert resp.status_code == 400
 
     def test_creates_profile(self, client):
-        resp = client.post("/api/v1/auth/register", json={"username": "carol", "password": "pw"})
+        resp = client.post(
+            "/api/v1/auth/register", json={"username": "carol", "password": "pw-secret-1"}
+        )
         user_id = resp.json()["user_id"]
         from src.memory.user_profile import profile_exists
 
@@ -100,18 +106,22 @@ class TestRegister:
 
 class TestLogin:
     def test_login_success(self, client):
-        client.post("/api/v1/auth/register", json={"username": "dave", "password": "pw"})
-        resp = client.post("/api/v1/auth/login", json={"username": "dave", "password": "pw"})
+        client.post("/api/v1/auth/register", json={"username": "dave", "password": "pw-secret-1"})
+        resp = client.post(
+            "/api/v1/auth/login", json={"username": "dave", "password": "pw-secret-1"}
+        )
         assert resp.status_code == 200
         assert resp.json()["access_token"]
 
     def test_wrong_password_rejected(self, client):
-        client.post("/api/v1/auth/register", json={"username": "eve", "password": "pw"})
+        client.post("/api/v1/auth/register", json={"username": "eve", "password": "pw-secret-1"})
         resp = client.post("/api/v1/auth/login", json={"username": "eve", "password": "wrong"})
         assert resp.status_code == 401
 
     def test_unknown_user_rejected(self, client):
-        resp = client.post("/api/v1/auth/login", json={"username": "ghost", "password": "pw"})
+        resp = client.post(
+            "/api/v1/auth/login", json={"username": "ghost", "password": "pw-secret-1"}
+        )
         assert resp.status_code == 401
 
 
@@ -131,6 +141,10 @@ class TestProtectedRoutes:
         assert resp.json()["username"] == "alice"
 
     def test_two_users_isolated(self, client):
-        r1 = client.post("/api/v1/auth/register", json={"username": "u_a", "password": "pw"})
-        r2 = client.post("/api/v1/auth/register", json={"username": "u_b", "password": "pw"})
+        r1 = client.post(
+            "/api/v1/auth/register", json={"username": "u_a", "password": "pw-secret-1"}
+        )
+        r2 = client.post(
+            "/api/v1/auth/register", json={"username": "u_b", "password": "pw-secret-1"}
+        )
         assert r1.json()["user_id"] != r2.json()["user_id"]

@@ -1,0 +1,70 @@
+# Polyglot Swarm — staging/production stack (ADR-0035).
+#
+#   cp .env.production.example .env.production   # fill in secrets
+#   docker compose -f docker-compose.prod.yml run --rm api polyglot ops config-check
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Differences from the local docker-compose.yml:
+# - only the API is published, and only on 127.0.0.1: put a TLS-terminating
+#   reverse proxy (Caddy, nginx, a cloud load balancer) in front of it;
+# - the Gradio UI is not run (it has no per-learner accounts; ADR-0035 R5);
+# - a read-only root filesystem, no added capabilities, resource limits;
+# - a nightly verified backup job writing into the same volume (copy the
+#   backups off-host as well; see the operations runbook).
+# Staging uses this same file with APP_ENV=staging and its own .env file:
+#   docker compose -f docker-compose.prod.yml --env-file .env.staging -p polyglot-staging up -d
+
+x-app: &app
+  build: .
+  image: polyglot-swarm:${POLYGLOT_IMAGE_TAG:-latest}
+  env_file:
+    - ${POLYGLOT_ENV_FILE:-.env.production}
+  environment:
+    # The root filesystem is read-only; libraries that cache models under
+    # ~/.cache (ChromaDB's embedding model) write to the data volume instead.
+    HOME: /data/.home
+  volumes:
+    - polyglot-data:/data
+  read_only: true
+  tmpfs:
+    - /tmp
+  cap_drop: [ALL]
+  security_opt:
+    - no-new-privileges:true
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options: {max-size: "20m", max-file: "5"}
+
+services:
+  api:
+    <<: *app
+    command: >-
+      uvicorn src.api.app:app --host 0.0.0.0 --port 8000 --workers 1
+      --proxy-headers --forwarded-allow-ips=* --timeout-graceful-shutdown 30
+    ports:
+      - "127.0.0.1:8000:8000"
+    deploy:
+      resources:
+        limits: {cpus: "2.0", memory: 2g}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready', timeout=4)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  backup:
+    <<: *app
+    # A verified backup set every 24 h (RPO 24 h); retention per BACKUP_RETENTION_COUNT.
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["while true; do polyglot ops backup --label nightly || echo 'BACKUP FAILED'; sleep 86400; done"]
+    deploy:
+      resources:
+        limits: {cpus: "0.5", memory: 512m}
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  polyglot-data:

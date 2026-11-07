@@ -7,16 +7,24 @@ resolved from its bearer token.
 
 from __future__ import annotations
 
+import asyncio
+import hmac
+import logging
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 
 from src import __version__
 from src.api import auth
+from src.api.middleware import (
+    BodySizeLimitMiddleware,
+    RequestContextMiddleware,
+    SecurityHeadersMiddleware,
+)
 from src.api.routes import (
     assessment_routes,
     auth_routes,
@@ -31,6 +39,14 @@ from src.api.routes import (
     trace_routes,
     voice_routes,
 )
+
+logger = logging.getLogger("polyglot.api")
+
+
+def _failed(check: str, exc: Exception) -> dict[str, Any]:
+    """A failed sub-check: logged in full, reported by exception class only."""
+    logger.error("readiness check %s failed: %s", check, exc)
+    return {"ok": False, "error": type(exc).__name__}
 
 
 def _readiness_checks() -> dict[str, dict[str, Any]]:
@@ -55,11 +71,16 @@ def _check_database() -> dict[str, Any]:
     from src.memory.db import get_connection
 
     try:
+        from src.memory import schema
+
         with get_connection() as conn:
             conn.execute("SELECT 1")
-        return {"ok": True}
+            version = int(conn.execute("PRAGMA user_version").fetchone()[0])
+        if version != schema.SCHEMA_VERSION:
+            return {"ok": False, "error": "schema_version_mismatch", "schema_version": version}
+        return {"ok": True, "schema_version": version}
     except Exception as exc:  # noqa: BLE001 - report, don't crash the probe
-        return {"ok": False, "error": str(exc)}
+        return _failed("database", exc)
 
 
 def _check_llm_providers() -> dict[str, Any]:
@@ -73,7 +94,7 @@ def _check_llm_providers() -> dict[str, Any]:
         any_available = any(h["available"] for h in chain_health.values())
         return {"ok": any_available, "tiers": chain_health}
     except Exception as exc:  # noqa: BLE001 - report, don't crash the probe
-        return {"ok": False, "error": str(exc)}
+        return _failed("llm_providers", exc)
 
 
 def _check_vector_store() -> dict[str, Any]:
@@ -88,33 +109,52 @@ def _check_vector_store() -> dict[str, Any]:
         # search), not required for core chat/grammar/vocabulary flows — so
         # unlike the database, its absence degrades rather than fails
         # overall readiness. Still reported so operators can see it's down.
-        return {"ok": True, "degraded": True, "error": str(exc)}
+        logger.warning("vector store unavailable: %s", exc)
+        return {"ok": True, "degraded": True, "error": type(exc).__name__}
 
 
 @asynccontextmanager
 async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
-    from src.config import settings
+    from src.config import settings, validate_settings
     from src.memory import model_runs, schema
     from src.observability.logging_config import ensure_configured
+    from src.ops.maintenance import maintenance_loop
 
     ensure_configured()  # Phase 23: structured/leveled logging from the start
+    # Staging/production refuse to start on unsafe configuration (ADR-0035).
+    validate_settings(settings, strict=settings.is_production_like)
     schema.init_all()  # provision the full schema (migrations) at startup
     if settings.telemetry_enabled:  # Phase 21: configurable telemetry
         model_runs.enable_persistence()  # persist LLM telemetry to model_runs
     auth.init_db()
-    yield
+    task = (
+        asyncio.create_task(maintenance_loop())
+        if settings.maintenance_interval_seconds > 0
+        else None
+    )
+    try:
+        yield
+    finally:
+        if task is not None:
+            task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task
 
 
 def create_app() -> FastAPI:
     """Build and return the FastAPI application."""
+    from src.config import settings
+
+    docs = settings.api_docs_enabled
     app = FastAPI(
         title="Polyglot Swarm API",
         version=__version__,
         description="Multi-agent AI language learning — REST API.",
         lifespan=_lifespan,
+        docs_url="/docs" if docs else None,
+        redoc_url="/redoc" if docs else None,
+        openapi_url="/openapi.json" if docs else None,
     )
-
-    from src.config import settings
 
     origins = settings.cors_origin_list()
     if origins:
@@ -123,7 +163,43 @@ def create_app() -> FastAPI:
             CORSMiddleware,
             allow_origins=origins,
             allow_methods=["*"],
-            allow_headers=["Authorization", "Content-Type"],
+            allow_headers=["Authorization", "Content-Type", "Idempotency-Key", "X-Request-ID"],
+            expose_headers=["X-Request-ID", "Retry-After"],
+        )
+    # Added last = outermost: every response (including CORS and 413s) gets a
+    # request id, an access-log line and metrics.
+    app.add_middleware(SecurityHeadersMiddleware, hsts=settings.is_production_like)
+    app.add_middleware(BodySizeLimitMiddleware, max_bytes=settings.max_request_bytes)
+    app.add_middleware(RequestContextMiddleware)
+
+    @app.exception_handler(Exception)
+    async def unhandled(request: Request, exc: Exception) -> JSONResponse:
+        request_id = getattr(request.state, "request_id", None)
+        logger.exception(
+            "unhandled error on %s %s",
+            request.method,
+            request.url.path,
+            extra={"request_id": request_id or "-"},
+        )
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "internal error", "request_id": request_id},
+            headers={"x-request-id": request_id} if request_id else None,
+        )
+
+    @app.get("/metrics", tags=["health"], include_in_schema=False)
+    def metrics_endpoint(request: Request) -> PlainTextResponse:
+        from src.observability import metrics
+
+        token = settings.metrics_token
+        if token:
+            supplied = request.headers.get("authorization", "").removeprefix("Bearer ").strip()
+            if not hmac.compare_digest(supplied.encode(), token.encode()):
+                return PlainTextResponse("unauthorized", status_code=401)
+        elif settings.is_production_like:  # pragma: no cover - startup already refuses this
+            return PlainTextResponse("metrics disabled", status_code=404)
+        return PlainTextResponse(
+            metrics.render(), media_type="text/plain; version=0.0.4; charset=utf-8"
         )
 
     @app.get("/health", tags=["health"])

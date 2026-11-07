@@ -86,3 +86,30 @@ def interaction_scope(
         _interaction_id.reset(interaction_token)
         if session_token is not None:
             _session_id.reset(session_token)
+
+
+# --- HTTP request correlation (Phase 5, ADR-0035) ---------------------------
+_request_id: ContextVar[str | None] = ContextVar("polyglot_request_id", default=None)
+_principal: ContextVar[str | None] = ContextVar("polyglot_principal", default=None)
+
+
+def current_request_id() -> str | None:
+    """The id of the HTTP request in scope (echoed as ``X-Request-ID``)."""
+    return _request_id.get()
+
+
+def set_request_id(request_id: str | None) -> Token[str | None]:
+    return _request_id.set(request_id)
+
+
+def reset_request_id(token: Token[str | None]) -> None:
+    _request_id.reset(token)
+
+
+def current_principal() -> str | None:
+    """The authenticated user the current work is done for (budget scope)."""
+    return _principal.get()
+
+
+def set_principal(user_id: str | None) -> Token[str | None]:
+    return _principal.set(user_id)

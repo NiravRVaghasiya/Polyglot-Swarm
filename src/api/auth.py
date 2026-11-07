@@ -35,7 +35,7 @@ from datetime import UTC, datetime, timedelta
 import bcrypt
 
 from src.config import settings
-from src.memory.db import get_connection
+from src.memory.db import get_connection, once_per_database
 from src.security.rate_limit import RateLimiter
 
 _SCHEMA = """
@@ -72,6 +72,7 @@ class AuthError(Exception):
     """Raised for registration/login failures."""
 
 
+@once_per_database
 def init_db() -> None:
     """Create the users and auth_tokens tables if they do not exist."""
     with get_connection() as conn:
@@ -113,6 +114,8 @@ def register(username: str, password: str) -> str:
     username = username.strip()
     if not username or not password:
         raise AuthError("username and password are required")
+    if len(password) < settings.min_password_length:
+        raise AuthError(f"password must be at least {settings.min_password_length} characters")
     if len(password.encode("utf-8")) > MAX_PASSWORD_BYTES:
         raise AuthError(f"password must be at most {MAX_PASSWORD_BYTES} bytes")
 

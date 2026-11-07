@@ -17,7 +17,7 @@ import sqlite3
 from datetime import UTC, datetime
 from typing import Any
 
-from src.memory.db import get_connection
+from src.memory.db import get_connection, once_per_database
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS vocabulary (
@@ -75,6 +75,7 @@ _PHASE5_COLUMNS: dict[str, str] = {
 }
 
 
+@once_per_database
 def init_db() -> None:
     """Create the vocabulary table and indexes if they do not exist."""
     with get_connection() as conn:
@@ -210,7 +211,7 @@ def record_review_outcome(
                 next_review = COALESCE(?, next_review),
                 updated_at = ?
             WHERE user_id=? AND language=? AND word=?
-            """,
+            """,  # noqa: S608
             (
                 json.dumps(card_state) if card_state else None,
                 next_review,
@@ -274,7 +275,7 @@ def record_dimension(
                 sets.append("failed_productions = failed_productions + 1")
 
         conn.execute(
-            f"UPDATE vocabulary SET {', '.join(sets)} WHERE user_id=? AND language=? AND word=?",
+            f"UPDATE vocabulary SET {', '.join(sets)} WHERE user_id=? AND language=? AND word=?",  # noqa: S608
             (*params, user_id, language, word),
         )
         out = conn.execute(
@@ -309,7 +310,7 @@ def set_metadata(
         params.append(frequency_rank)
     with get_connection() as conn:
         conn.execute(
-            f"UPDATE vocabulary SET {', '.join(sets)} WHERE user_id=? AND language=? AND word=?",
+            f"UPDATE vocabulary SET {', '.join(sets)} WHERE user_id=? AND language=? AND word=?",  # noqa: S608
             (*params, user_id, language, word),
         )
         if first_seen is not None:

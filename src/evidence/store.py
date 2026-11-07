@@ -117,7 +117,7 @@ def record_events(events: list[LearningEvent]) -> int:
                 "transcription_confidence": e.transcription_confidence,
             }
             cursor = conn.execute(
-                f"INSERT OR IGNORE INTO evidence ({', '.join(_COLUMNS)}) VALUES ({placeholders})",
+                f"INSERT OR IGNORE INTO evidence ({', '.join(_COLUMNS)}) VALUES ({placeholders})",  # noqa: S608
                 tuple(values[c] for c in _COLUMNS),
             )
             inserted += cursor.rowcount
@@ -173,7 +173,7 @@ def get_events(
     where = " AND ".join(clauses)
     with get_connection() as conn:
         rows = conn.execute(
-            f"SELECT * FROM evidence WHERE {where} ORDER BY id DESC LIMIT ?",
+            f"SELECT * FROM evidence WHERE {where} ORDER BY id DESC LIMIT ?",  # noqa: S608
             (*params, limit),
         ).fetchall()
     return [_row_to_dict(r) for r in rows]
@@ -223,7 +223,7 @@ def active_events(
                   WHERE s.user_id = ?{sup_clause}
               )
             ORDER BY e.created_at, e.event_id
-            """,
+            """,  # noqa: S608
             (*params, *sup_params),
         ).fetchall()
     return [_row_to_dict(r) for r in rows]

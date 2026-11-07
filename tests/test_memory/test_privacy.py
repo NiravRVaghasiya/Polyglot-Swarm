@@ -61,7 +61,7 @@ class TestExportUserData:
         assert len(data["outcomes"]) == 1
 
     def test_export_includes_account_row(self, temp_storage):
-        user_id = auth.register("exportuser", "pw")
+        user_id = auth.register("exportuser", "pw-secret-1")
         data = privacy.export_user_data(user_id)
         assert data["account"]["username"] == "exportuser"
 
@@ -93,8 +93,8 @@ class TestDeleteUserData:
         assert vocabulary_db.get_all_for_user("u2") != []
 
     def test_deletes_account_and_invalidates_tokens(self, temp_storage):
-        user_id = auth.register("deleteuser", "pw")
-        token = auth.login("deleteuser", "pw")
+        user_id = auth.register("deleteuser", "pw-secret-1")
+        token = auth.login("deleteuser", "pw-secret-1")
         assert auth.resolve_token(token) == user_id
 
         result = privacy.delete_user_data(user_id)

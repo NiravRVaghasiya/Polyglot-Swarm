@@ -109,7 +109,7 @@ def load_profile(user_id: str) -> UserProfile:
     # Back-fill the SQLite source of truth from the legacy JSON mirror.
     try:
         profiles_db.save(profile.model_dump())
-    except Exception:  # noqa: BLE001 - JSON remains the fallback if DB is unavailable
+    except Exception:  # noqa: BLE001, S110
         pass
     return profile
 

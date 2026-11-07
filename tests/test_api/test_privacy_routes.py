@@ -36,8 +36,12 @@ class TestPrivacyRoutes:
         assert me.status_code == 401
 
     def test_delete_does_not_affect_other_users(self, client):
-        a = client.post("/api/v1/auth/register", json={"username": "priv-a", "password": "pw"})
-        b = client.post("/api/v1/auth/register", json={"username": "priv-b", "password": "pw"})
+        a = client.post(
+            "/api/v1/auth/register", json={"username": "priv-a", "password": "pw-secret-1"}
+        )
+        b = client.post(
+            "/api/v1/auth/register", json={"username": "priv-b", "password": "pw-secret-1"}
+        )
         ha = {"Authorization": f"Bearer {a.json()['access_token']}"}
         hb = {"Authorization": f"Bearer {b.json()['access_token']}"}
 
@@ -49,13 +53,15 @@ class TestPrivacyRoutes:
 
 class TestAuthRateLimiting:
     def test_login_returns_429_after_exceeding_the_limit(self, client):
-        client.post("/api/v1/auth/register", json={"username": "burst", "password": "pw"})
+        client.post("/api/v1/auth/register", json={"username": "burst", "password": "pw-secret-1"})
         from src.api import auth
 
         limit = auth.login_rate_limiter.max_calls
         for _ in range(limit):
-            client.post("/api/v1/auth/login", json={"username": "burst", "password": "pw"})
-        resp = client.post("/api/v1/auth/login", json={"username": "burst", "password": "pw"})
+            client.post("/api/v1/auth/login", json={"username": "burst", "password": "pw-secret-1"})
+        resp = client.post(
+            "/api/v1/auth/login", json={"username": "burst", "password": "pw-secret-1"}
+        )
         assert resp.status_code == 429
 
     def test_register_returns_429_after_exceeding_the_limit(self, client):
@@ -63,8 +69,10 @@ class TestAuthRateLimiting:
 
         limit = auth.register_rate_limiter.max_calls
         for i in range(limit):
-            client.post("/api/v1/auth/register", json={"username": f"spam{i}", "password": "pw"})
+            client.post(
+                "/api/v1/auth/register", json={"username": f"spam{i}", "password": "pw-secret-1"}
+            )
         resp = client.post(
-            "/api/v1/auth/register", json={"username": "one-too-many", "password": "pw"}
+            "/api/v1/auth/register", json={"username": "one-too-many", "password": "pw-secret-1"}
         )
         assert resp.status_code == 429

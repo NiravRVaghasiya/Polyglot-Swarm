@@ -19,12 +19,15 @@ from __future__ import annotations
 
 import base64
 import binascii
+import hashlib
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
-from src.api.deps import get_current_user
+from src.api import idempotency
+from src.api.deps import get_current_user, rate_limited_user
+from src.observability import metrics
 
 router = APIRouter(prefix="/api/v1/assessment", tags=["assessment"])
 
@@ -50,7 +53,9 @@ class ListeningAnswers(BaseModel):
 
 @router.post("/speaking")
 async def speaking(
-    req: SpeakingRequest, user_id: str = Depends(get_current_user)
+    req: SpeakingRequest,
+    user_id: str = Depends(rate_limited_user),
+    key: str | None = Depends(idempotency.idempotency_key),
 ) -> dict[str, Any]:
     from src.multimodal.audio import AudioValidationError
     from src.multimodal.pipeline import assess_speaking
@@ -64,6 +69,13 @@ async def speaking(
         raise HTTPException(
             status_code=400, detail={"code": "invalid_base64", "message": "invalid base64"}
         ) from exc
+    body = {
+        **req.model_dump(exclude={"audio_base64"}),
+        "audio_sha256": hashlib.sha256(req.audio_base64.encode("ascii", "ignore")).hexdigest(),
+    }
+    claim = idempotency.begin(user_id, key, "assessment.speaking", body)
+    if claim.replayed is not None:
+        return claim.replayed
     try:
         outcome = await assess_speaking(
             data,
@@ -76,10 +88,17 @@ async def speaking(
             retain_audio=req.retain_audio,
         )
     except AudioValidationError as exc:
+        claim.abandon()
+        metrics.ASSESSMENTS.inc(kind="speaking", status="rejected")
         raise HTTPException(
             status_code=exc.http_status, detail={"code": exc.code, "message": str(exc)}
         ) from exc
-    return outcome.report.as_dict()
+    except Exception:
+        claim.abandon()
+        metrics.ASSESSMENTS.inc(kind="speaking", status="error")
+        raise
+    metrics.ASSESSMENTS.inc(kind="speaking", status=outcome.report.status.value)
+    return claim.complete(outcome.report.as_dict())
 
 
 @router.get("/listening/tasks")
@@ -123,7 +142,10 @@ async def listening_audio(task_id: str, user_id: str = Depends(get_current_user)
 
 @router.post("/listening/tasks/{task_id}/answers")
 def listening_answers(
-    task_id: str, req: ListeningAnswers, user_id: str = Depends(get_current_user)
+    task_id: str,
+    req: ListeningAnswers,
+    user_id: str = Depends(rate_limited_user),
+    key: str | None = Depends(idempotency.idempotency_key),
 ) -> dict[str, Any]:
     from src.multimodal.pipeline import assess_listening
 
@@ -132,8 +154,18 @@ def listening_answers(
     unknown = set(req.answers) - known
     if unknown:
         raise HTTPException(status_code=422, detail=f"unknown question ids: {sorted(unknown)}")
-    report, _ = assess_listening(task, req.answers, user_id=user_id, session_id=req.session_id)
-    return report.as_dict()
+    claim = idempotency.begin(
+        user_id, key, "assessment.listening", {"task": task_id, "req": req.model_dump()}
+    )
+    if claim.replayed is not None:
+        return claim.replayed
+    try:
+        report, _ = assess_listening(task, req.answers, user_id=user_id, session_id=req.session_id)
+    except Exception:
+        claim.abandon()
+        raise
+    metrics.ASSESSMENTS.inc(kind="listening", status=report.status.value)
+    return claim.complete(report.as_dict())
 
 
 @router.get("/submissions")

@@ -132,7 +132,7 @@ def get_updates(user_id: str, language: str, *, skill: str | None = None) -> lis
         params.append(skill)
     with get_connection() as conn:
         rows = conn.execute(
-            f"SELECT * FROM mastery_updates WHERE user_id=? AND language=?{clause} ORDER BY id",
+            f"SELECT * FROM mastery_updates WHERE user_id=? AND language=?{clause} ORDER BY id",  # noqa: S608
             params,
         ).fetchall()
     out = []

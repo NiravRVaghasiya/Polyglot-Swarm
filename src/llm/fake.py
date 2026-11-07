@@ -15,6 +15,7 @@ deterministic echo that is obviously synthetic (prefixed ``[fake]``).
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import os
@@ -55,6 +56,11 @@ class FakeProvider(LLMProvider):
         max_tokens: int = 512,
         json_mode: bool = False,
     ) -> str:
+        # Load testing only (ADR-0035): simulate provider latency so concurrent
+        # turns wait the way they would on a real model. Default 0.
+        delay_ms = float(os.getenv("POLYGLOT_FAKE_LATENCY_MS", "0") or 0)
+        if delay_ms > 0:
+            await asyncio.sleep(delay_ms / 1000)
         last_user = next(
             (m.content for m in reversed(messages) if m.role == "user"),
             "",

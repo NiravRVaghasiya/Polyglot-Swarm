@@ -74,6 +74,9 @@ app.add_typer(privacy_app, name="privacy")
 cost_app = typer.Typer(help="LLM cost and latency, scoped to a session or user.")
 app.add_typer(cost_app, name="cost")
 
+ops_app = typer.Typer(help="Operations: verified backups, restore, maintenance, DB checks.")
+app.add_typer(ops_app, name="ops")
+
 
 @app.command()
 def results(
@@ -685,6 +688,118 @@ def trace(
     # markup=False: the trace text contains literal "[...]" section headers
     # (e.g. "[interaction ...]") that are not Rich style tags.
     console.print(format_trace(result), markup=False)
+
+
+# --- Operations (Phase 5, ADR-0035; see docs/production/operations-runbook.md) ---
+
+
+@ops_app.command("backup")
+def ops_backup(
+    label: str | None = typer.Option(None, help="Short tag in the backup set name."),
+    prune: bool = typer.Option(True, help="Apply BACKUP_RETENTION_COUNT afterwards."),
+) -> None:
+    """Write and verify a backup set (database, media, profiles)."""
+    from src.ops.backup import create_backup_set, prune_backups
+
+    path = create_backup_set(label=label)
+    console.print(f"[bold green]Verified backup set:[/bold green] {path}")
+    if prune:
+        for old in prune_backups():
+            console.print(f"[dim]pruned {old.name}[/dim]")
+
+
+@ops_app.command("backups")
+def ops_backups() -> None:
+    """List backup sets, newest first, with their row counts."""
+    import json
+
+    from src.ops.backup import MANIFEST, list_backup_sets
+
+    sets = list_backup_sets()
+    if not sets:
+        console.print("[dim]No backup sets. Run `polyglot ops backup`.[/dim]")
+        return
+    for path in sets:
+        manifest = json.loads((path / MANIFEST).read_text(encoding="utf-8"))
+        console.print(f"{path.name}  v{manifest['schema_version']}  {manifest['row_counts']}")
+
+
+@ops_app.command("verify")
+def ops_verify(path: Path = typer.Argument(..., help="Backup set directory.")) -> None:
+    """Re-verify a backup set (checksums and SQLite integrity)."""
+    from src.ops.backup import BackupError, verify_backup_set
+
+    try:
+        manifest = verify_backup_set(path)
+    except BackupError as exc:
+        console.print(f"[bold red]FAILED:[/bold red] {exc}")
+        raise typer.Exit(code=1) from exc
+    console.print(f"[green]OK[/green] {path.name}: {manifest['row_counts']}")
+
+
+@ops_app.command("restore")
+def ops_restore(
+    path: Path = typer.Argument(..., help="Backup set directory."),
+    yes: bool = typer.Option(False, "--yes", help="Confirm: the API is stopped."),
+) -> None:
+    """Restore a backup set over the live data. Stop the API first."""
+    from src.ops.backup import BackupError, restore_backup_set
+
+    if not yes:
+        console.print("Refusing without --yes. Stop the API, then re-run with --yes.")
+        raise typer.Exit(code=2)
+    try:
+        manifest = restore_backup_set(path)
+    except BackupError as exc:
+        console.print(f"[bold red]Restore failed:[/bold red] {exc}")
+        raise typer.Exit(code=1) from exc
+    console.print(f"[bold green]Restored[/bold green] {path.name}: {manifest['row_counts']}")
+
+
+@ops_app.command("maintenance")
+def ops_maintenance() -> None:
+    """Run recovery and housekeeping once (idle sessions, tokens, media, keys)."""
+    from src.memory import schema
+    from src.ops.maintenance import run_maintenance
+
+    schema.init_all()
+    console.print(asyncio.run(run_maintenance()))
+
+
+@ops_app.command("db-check")
+def ops_db_check() -> None:
+    """Exit non-zero unless the database is intact and at the expected schema."""
+    import sqlite3
+
+    from src.config import settings
+    from src.memory import schema
+
+    conn = sqlite3.connect(settings.db_path)
+    try:
+        integrity = conn.execute("PRAGMA integrity_check").fetchone()[0]
+        version = int(conn.execute("PRAGMA user_version").fetchone()[0])
+    finally:
+        conn.close()
+    ok = integrity == "ok" and version == schema.SCHEMA_VERSION
+    console.print(
+        f"integrity={integrity} schema={version} expected={schema.SCHEMA_VERSION} "
+        + ("[green]OK[/green]" if ok else "[red]NOT OK[/red]")
+    )
+    if not ok:
+        raise typer.Exit(code=1)
+
+
+@ops_app.command("config-check")
+def ops_config_check() -> None:
+    """Validate configuration for APP_ENV (exit 1 on any problem)."""
+    from src.config import settings, validate_settings
+
+    problems = validate_settings(settings)
+    for problem in problems:
+        console.print(f"[red]-[/red] {problem}")
+    if problems:
+        raise typer.Exit(code=1)
+    console.print(f"[green]configuration OK for APP_ENV={settings.app_env}[/green]")
 
 
 if __name__ == "__main__":

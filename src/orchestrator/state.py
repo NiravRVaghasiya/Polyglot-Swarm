@@ -45,6 +45,10 @@ class LearnerState(TypedDict):
     # observability); set by src.api.sessions.run_turn from the contextvar so
     # anything reading state directly can also correlate to it.
     interaction_id: NotRequired[str]
+    #: Providers/models that answered this session's LLM calls, e.g.
+    #: ``"claude:claude-sonnet-5-5"`` or ``"ollama:llama3.1:8b (fallback)"``;
+    #: stamped on the session's evidence as ``model_version`` (ADR-0035).
+    llm_models: NotRequired[list[str]]
 
     # --- Conversation ---
     messages: Annotated[list[dict[str, Any]], add]  # Chat history (appended via reducer)
