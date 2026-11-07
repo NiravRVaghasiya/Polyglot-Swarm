@@ -81,6 +81,7 @@ Skill accuracy by expected skill: grammar: 1.000 [0.83, 1.00] (n=19), pragmatics
 - pipeline: n=62, mean confidence 0.6968, accuracy 0.419 [0.30, 0.54] (n=62), ECE 0.2935 [0.2048, 0.4629], Brier 0.4377, AURC 0.7046, distinct confidence values 4
 - raw confidence missing: 0.274 [0.18, 0.40] (n=62)
 - Platt map (dev n=38) on test: ECE 0.0708, Brier 0.203; histogram: ECE 0.0323, Brier 0.2265
+- committed map (platt, fitted on dev run 20261106-local-dev, n=38), applied offline to this run: ECE 0.2935 -> 0.0708; false-correction rate 0.679 [0.49, 0.82] (n=28) -> 0.464 [0.30, 0.64] (n=28); precision 0.627 [0.49, 0.75] (n=51) -> 0.629 [0.46, 0.77] (n=35); recall 0.914 [0.78, 0.97] (n=35) -> 0.629 [0.46, 0.77] (n=35)
 - learner-model input: unweighted precision 0.4194, confidence-weighted 0.3727 (difference -0.0467, 95% CI [-0.0809, -0.0089])
 
 ### Detection accuracy by language
@@ -206,6 +207,7 @@ Skill accuracy by expected skill: grammar: 1.000 [0.77, 1.00] (n=13), pragmatics
 - pipeline: n=34, mean confidence 0.8735, accuracy 0.471 [0.31, 0.63] (n=34), ECE 0.4029 [0.25, 0.5618], Brier 0.4003, AURC 0.4637, distinct confidence values 2
 - raw confidence missing: 0.000 [0.00, 0.10] (n=34)
 - fitted calibration: no_dev_run {'status': 'no_dev_run'}
+- committed calibration map: absent
 - learner-model input: unweighted precision 0.5333, confidence-weighted 0.5379 (difference 0.0045, 95% CI [-0.0037, 0.0125])
 
 ### Detection accuracy by language
@@ -331,6 +333,7 @@ Skill accuracy by expected skill: grammar: 1.000 [0.51, 1.00] (n=4), pragmatics:
 - pipeline: n=10, mean confidence 0.96, accuracy 0.500 [0.24, 0.76] (n=10), ECE 0.46 [0.18, 0.75], Brier 0.426, AURC 0.3389, distinct confidence values 3
 - raw confidence missing: 0.000 [0.00, 0.28] (n=10)
 - fitted calibration: insufficient_dev_data {'status': 'insufficient_dev_data', 'dev_predictions': 9, 'required': 15}
+- committed calibration map: insufficient_dev_data
 - learner-model input: unweighted precision 0.5, confidence-weighted 0.5208 (difference 0.0208, 95% CI [0.0, 0.0383])
 
 ### Detection accuracy by language

@@ -5,8 +5,11 @@ This agent:
 - Does NOT interrupt the conversation flow.
 - Classifies each deviation on a taxonomy (wrong / awkward / unusual / regional
   / formal / informal / acceptable) rather than treating every deviation as an
-  error, and attaches a calibrated confidence — so the tutor does not
-  "correct" perfectly valid regional or informal language (Phase 4).
+  error, so the tutor does not "correct" perfectly valid regional or informal
+  language (Phase 4).
+- Calibrates the model's self-reported confidence with the answering model's
+  calibration map when one exists (:mod:`src.evaluation.calibration_maps`);
+  otherwise the raw confidence is used and the result logged as uncalibrated.
 - Only genuine errors (``wrong``/``awkward``) are surfaced and persisted; other
   classifications are recognized and dropped so they never reach the report.
 - Builds a persistent error profile for the learner.
@@ -14,8 +17,11 @@ This agent:
 """
 
 import logging
+from pathlib import Path
 from typing import Any
 
+from src.evaluation.calibration_maps import load_map
+from src.llm import governance
 from src.llm.factory import get_provider
 from src.llm.prompts import render_prompt
 from src.llm.provider import Message
@@ -24,9 +30,13 @@ from src.orchestrator.state import GrammarError, LearnerState
 
 logger = logging.getLogger("polyglot.grammar")
 
-#: Minimum confidence for a genuine error to be surfaced. Below this the agent
-#: abstains (drops it) rather than risk a false correction.
+#: Minimum confidence for a genuine error to be surfaced: the calibrated
+#: probability when the answering model has a calibration map, else the raw
+#: confidence. Below this the agent abstains rather than risk a false
+#: correction.
 _MIN_ERROR_CONFIDENCE = 0.5
+#: Models already reported as uncalibrated (logged once per process).
+_uncalibrated_logged: set[str] = set()
 
 
 #: Generation parameters of the production grammar call (shared with the
@@ -99,20 +109,38 @@ async def grammar_node(state: LearnerState) -> dict[str, Any]:
         logger.warning("Grammar analysis skipped, no LLM provider answered: %s", exc)
         return {"grammar_errors": state.get("grammar_errors", [])}
 
-    errors = _select_errors(analysis)
+    errors = _select_errors(analysis, model_key=governance.last_answer())
 
     return {"grammar_errors": state.get("grammar_errors", []) + errors}
 
 
-def _select_errors(analysis: GrammarAnalysis | None) -> list[GrammarError]:
+def _select_errors(
+    analysis: GrammarAnalysis | None,
+    *,
+    model_key: str | None = None,
+    calibration_dir: Path | None = None,
+) -> list[GrammarError]:
     """Turn a validated analysis into the genuine, confident errors to surface.
 
     Filters out acceptable variation (regional/informal/acceptable/...) and
     low-confidence flags, then maps each surviving model into the backward
     -compatible :class:`GrammarError` dict (legacy keys preserved).
+
+    ``model_key`` (``provider:model``) is the model that answered. With a
+    fitted calibration map for it, the threshold applies to the calibrated
+    probability, which also replaces ``confidence`` (the model's own value is
+    kept as ``raw_confidence``). Without one, the raw confidence is used and
+    the model is logged once as uncalibrated.
     """
     if analysis is None:
         return []
+
+    calibration = load_map(model_key, calibration_dir) if model_key else None
+    if calibration is None:
+        label = model_key or "unknown model"
+        if label not in _uncalibrated_logged:
+            _uncalibrated_logged.add(label)
+            logger.info("grammar confidence for %s is uncalibrated (no calibration map)", label)
 
     kept: list[GrammarError] = []
     for e in analysis.errors:
@@ -120,9 +148,14 @@ def _select_errors(analysis: GrammarAnalysis | None) -> list[GrammarError]:
             continue
         if not e.is_error():
             continue  # acceptable variation — do not correct
-        if e.confidence < _MIN_ERROR_CONFIDENCE:
+        confidence = e.confidence if calibration is None else calibration(e.confidence)
+        if confidence < _MIN_ERROR_CONFIDENCE:
             continue  # abstain rather than risk a false correction
-        kept.append(_to_grammar_error(e))
+        error = _to_grammar_error(e)
+        if calibration is not None:
+            error["raw_confidence"] = e.confidence
+            error["confidence"] = round(confidence, 4)
+        kept.append(error)
     return kept
 
 

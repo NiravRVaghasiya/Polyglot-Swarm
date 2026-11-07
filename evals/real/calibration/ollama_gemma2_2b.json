@@ -1,0 +1,29 @@
+{
+  "calibration_version": "grammar-calibration-1.0",
+  "dev_positive": 12,
+  "dev_predictions": 38,
+  "key": "ollama:gemma2:2b",
+  "method": "platt",
+  "params": {
+    "a": -0.126896,
+    "b": 0.026372
+  },
+  "selection": {
+    "criterion": "leave-one-out Brier on dev",
+    "scores": {
+      "histogram": 0.212231,
+      "platt": 0.207399
+    }
+  },
+  "source": {
+    "confidence": "pipeline (the value _select_errors receives)",
+    "config_hash": "541fc421e084",
+    "dataset_sha256": "724012621cd004ae4457d9f1bac1d0b85e035974e57797be7f916c0818bde891",
+    "dataset_version": "grammar-2026.11.0",
+    "prompt": "grammar@1",
+    "run_id": "20261106-local-dev",
+    "split": "dev"
+  },
+  "status": "fitted",
+  "target": "P(surfaced grammar correction matches an expected error)"
+}

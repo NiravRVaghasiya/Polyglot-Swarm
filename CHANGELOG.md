@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Calibrated correction confidence.** The grammar agent's `_select_errors`
+  applies a per-model calibration map for the model that answered
+  (`governance.last_answer()`), and its 0.5 threshold then applies to the
+  calibrated probability, which becomes the error's `confidence`
+  (`raw_confidence` keeps the model's own). Without a usable map (absent,
+  `insufficient_dev_data`, or corrupt) it keeps the raw threshold and logs
+  the model once as uncalibrated.
+  - `src/evaluation/calibration_maps.py` fits (Platt or histogram, chosen by
+    leave-one-out Brier on dev) and loads versioned map files.
+  - `python -m evals.real calibrate <dev_run_id>` /
+    `make eval-real-calibrate` writes them to `evals/real/calibration/` and
+    refuses any non-dev run.
+  - Committed: `ollama:gemma2:2b` (Platt, 38 dev predictions) and
+    `ollama:llama3.1:latest` (`insufficient_dev_data`: 9 dev predictions, so
+    it stays uncalibrated).
+  - The report of `20261106-local-test` was rescored offline and now states
+    the committed map's effect: for gemma2, ECE 0.29 → 0.07 and
+    false-correction rate 0.68 → 0.46, with recall 0.91 → 0.63.
+
 - **Production maturity baseline (ADR-0035).** The audit and risk register
   are in `docs/production/`.
   - **Durable chat sessions:** a snapshot after every turn, rehydration after

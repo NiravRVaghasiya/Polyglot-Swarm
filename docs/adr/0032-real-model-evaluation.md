@@ -65,6 +65,13 @@ real-model benchmark:
 
 ## Consequences
 
+> **Amended (2026-11-08).** The grammar agent now applies per-model
+> calibration maps, fitted on the dev split by `python -m evals.real
+> calibrate` and committed under `evals/real/calibration/`; without one it
+> keeps the raw-confidence threshold and logs the result as uncalibrated.
+> See *Calibration maps used by the app* in
+> [real-model-evaluation.md](../real-model-evaluation.md).
+
 - Benchmark numbers now come from real models, can be traced to their exact
   prompts, data and code, and can be re-scored without paying again.
 - Results on `author_labeled` data are provisional. Expert annotation of the
