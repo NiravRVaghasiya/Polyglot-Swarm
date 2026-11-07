@@ -1,0 +1,86 @@
+{
+  "data": "synthetic_offline_tts",
+  "by_format": {
+    "wav": {
+      "clips": 4,
+      "decoded": 4,
+      "latency_ms_median": 5227.227100171149,
+      "mean_wer": 0.0
+    },
+    "flac": {
+      "clips": 4,
+      "decoded": 4,
+      "latency_ms_median": 5166.885199956596,
+      "mean_wer": 0.0
+    },
+    "mp3": {
+      "clips": 4,
+      "decoded": 4,
+      "latency_ms_median": 5154.833099804819,
+      "mean_wer": 0.0
+    },
+    "ogg": {
+      "clips": 4,
+      "decoded": 4,
+      "latency_ms_median": 5178.931899834424,
+      "mean_wer": 0.0
+    },
+    "webm": {
+      "clips": 4,
+      "decoded": 4,
+      "latency_ms_median": 5125.427099876106,
+      "mean_wer": 0.0
+    },
+    "mp4": {
+      "clips": 4,
+      "decoded": 4,
+      "latency_ms_median": 5121.58209993504,
+      "mean_wer": 0.0
+    }
+  },
+  "edge_cases": [
+    {
+      "case": "silence",
+      "accepted": true,
+      "issues": [
+        "no_speech_detected"
+      ]
+    },
+    {
+      "case": "clipped",
+      "accepted": true,
+      "issues": [
+        "clipped"
+      ]
+    },
+    {
+      "case": "too_short",
+      "accepted": false,
+      "code": "too_short",
+      "http_status": 422
+    },
+    {
+      "case": "too_long",
+      "accepted": false,
+      "code": "too_long",
+      "http_status": 413
+    },
+    {
+      "case": "truncated_webm",
+      "accepted": true,
+      "issues": []
+    },
+    {
+      "case": "mislabelled",
+      "accepted": false,
+      "code": "format_mismatch",
+      "http_status": 422
+    },
+    {
+      "case": "not_audio",
+      "accepted": false,
+      "code": "unsupported_format",
+      "http_status": 415
+    }
+  ]
+}

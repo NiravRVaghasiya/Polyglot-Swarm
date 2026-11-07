@@ -18,8 +18,9 @@ and a missing dependency raises :class:`SpeechDependencyError`.
 
 from __future__ import annotations
 
-import audioop
 import logging
+import math
+from array import array
 
 from src.speech.stt import SpeechDependencyError
 
@@ -33,18 +34,20 @@ _ENERGY_SILENCE_THRESHOLD = 200
 def _energy_has_speech(audio: bytes, *, sample_width: int = 2) -> bool:
     """Dependency-free VAD: is the buffer's average amplitude above the floor?
 
-    Uses ``audioop.rms`` (stdlib) on 16-bit PCM. Empty/near-silent buffers are
-    no-speech; anything with meaningful energy is treated as speech.
+    Computes the RMS of 16-bit PCM with the standard library (``audioop`` was
+    removed in Python 3.13). Empty/near-silent buffers are no-speech; anything
+    with meaningful energy is treated as speech.
     """
     if not audio:
         return False
-    try:
-        rms = audioop.rms(audio, sample_width)
-    except audioop.error:
+    if sample_width != 2 or len(audio) % 2:
         # Not clean PCM of the expected width — fall back to a byte heuristic:
         # a buffer that is not almost-all-zero probably carries signal.
         nonzero = sum(1 for b in audio if b != 0)
         return nonzero > len(audio) * 0.05
+    samples = array("h")
+    samples.frombytes(audio)
+    rms = math.sqrt(sum(s * s for s in samples) / len(samples))
     return rms >= _ENERGY_SILENCE_THRESHOLD
 
 

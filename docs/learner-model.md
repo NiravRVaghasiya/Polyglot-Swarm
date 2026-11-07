@@ -49,7 +49,14 @@ store.record_events            — append-only `evidence` table (idempotent on e
 | Task | `task_type` (`free_conversation`, `scenario_roleplay`, `review_recall`, …), `difficulty` in [0, 1] or `null`, `difficulty_basis` (`unknown`, `cefr_label`, `fsrs_card`, `measured`) |
 | Provenance | `source`, `session_id`, `interaction_id`, `model_version`, `prompt_version` (e.g. `grammar@1`), `rubric_version` (e.g. `grammar-taxonomy-v1`), `created_at` (observation time), `recorded_at` (store time) |
 | Independence | `correlation_id` (judgments of the same learner production share it), `fingerprint` (content hash; equal fingerprints mean duplicate evaluations) |
-| Corrections | `supersedes` (the event a correction replaces), `schema_version` (1 for rows stored before ADR-0031) |
+| Corrections | `supersedes` (the event a correction replaces), `schema_version` (1 for rows stored before ADR-0031; 3 since ADR-0034) |
+| Modality (ADR-0034) | `modality` (`text` default, `audio`), `media_ref` (asset / submission / time span), `processing` (stages, providers, latencies), `transcription_confidence` (the recogniser's confidence, kept apart from `confidence`) |
+
+For transcript-derived evidence the engine's reliability is
+`confidence × transcription_confidence`: a poor recording counts for less
+and is never read as low ability. A `scored` assessment carries a continuous
+outcome in `payload.score` (e.g. a fluency score in [0, 1]). See
+[multimodal-assessment.md](multimodal-assessment.md).
 
 An unknown difficulty is `null` with basis `unknown`. It is never replaced by
 a "medium" value. Difficulty sources today:

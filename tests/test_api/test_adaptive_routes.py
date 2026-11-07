@@ -120,4 +120,4 @@ class TestAdaptiveRoutes:
     def test_schema_reaches_version_8(self, temp_storage):
         from src.memory import schema
 
-        assert schema.run_migrations() == schema.SCHEMA_VERSION == 8
+        assert schema.run_migrations() == schema.SCHEMA_VERSION >= 8

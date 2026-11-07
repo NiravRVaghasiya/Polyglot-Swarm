@@ -10,7 +10,7 @@
 
 .DEFAULT_GOAL := help
 .PHONY: help install install-dev test lint format format-check typecheck \
-        benchmark eval eval-real-validate eval-real eval-real-report eval-adaptive health results \
+        benchmark eval eval-real-validate eval-real eval-real-report eval-adaptive eval-speech health results \
         check ci clean lock
 
 PYTHON ?= python
@@ -60,6 +60,12 @@ eval-adaptive: ## SIMULATED adaptive-learning evaluation: learner models + plann
 	$(PYTHON) -m evals.adaptive models --family continuous
 	$(PYTHON) -m evals.adaptive models --family bkt
 	$(PYTHON) -m evals.adaptive policies --name policies-main
+
+eval-speech: ## Speech benchmark (needs the voice extra; speechocean762 under evals/speech/external).
+	$(PYTHON) -m evals.speech speechocean
+	$(PYTHON) -m evals.speech synthetic-build
+	$(PYTHON) -m evals.speech synthetic
+	$(PYTHON) -m evals.speech report
 
 health: ## Report configuration + provider health.
 	$(PYTHON) -m src.cli health

@@ -34,7 +34,7 @@ from src.memory.db import get_connection
 logger = logging.getLogger("polyglot.memory.schema")
 
 # The schema version this code expects. Bump when you add a migration.
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 9
 
 
 # --------------------------------------------------------------------------- #
@@ -498,6 +498,55 @@ def _migration_0008_adaptive_decisions(conn: Connection) -> None:
         conn.execute(statement)
 
 
+_EVIDENCE_V3_COLUMNS: dict[str, str] = {
+    "modality": "TEXT NOT NULL DEFAULT 'text'",
+    "media_ref": "TEXT",  # JSON {asset_id, start, end}
+    "processing": "TEXT",  # JSON processing provenance
+    "transcription_confidence": "REAL",
+}
+
+_MULTIMODAL_SCHEMA = (
+    # ADR-0034: one row per multimodal submission (speaking or listening).
+    # ``report`` holds derived artifacts (transcript, measures, feedback).
+    # Raw audio is stored only with consent, at ``storage_path``, until
+    # ``retain_until``.
+    """
+    CREATE TABLE IF NOT EXISTS media_submissions (
+        submission_id TEXT PRIMARY KEY,
+        user_id       TEXT NOT NULL,
+        language      TEXT NOT NULL,
+        modality      TEXT NOT NULL,
+        task_type     TEXT NOT NULL,
+        status        TEXT NOT NULL,
+        media_format  TEXT,
+        sha256        TEXT,
+        size_bytes    INTEGER,
+        duration_s    REAL,
+        retained      INTEGER NOT NULL DEFAULT 0,
+        retain_until  TEXT,
+        storage_path  TEXT,
+        report        TEXT NOT NULL,
+        created_at    TEXT NOT NULL
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_media_submissions_user "
+    "ON media_submissions(user_id, language, created_at)",
+)
+
+
+def _migration_0009_multimodal_evidence(conn: Connection) -> None:
+    """ADR-0034: multimodal evidence columns and the submissions table.
+
+    Additive and idempotent; existing evidence rows read back as ``text``.
+    """
+    existing = _existing_columns(conn, "evidence")
+    for column, ddl in _EVIDENCE_V3_COLUMNS.items():
+        if column not in existing:
+            conn.execute(f"ALTER TABLE evidence ADD COLUMN {column} {ddl}")
+    for statement in _MULTIMODAL_SCHEMA:
+        conn.execute(statement)
+
+
 # Ordered migrations. Index i (1-based) upgrades user_version from i-1 to i.
 _MIGRATIONS: list[Migration] = [
     _migration_0001_baseline,
@@ -508,6 +557,7 @@ _MIGRATIONS: list[Migration] = [
     _migration_0006_security,
     _migration_0007_evidence_lkm_v2,
     _migration_0008_adaptive_decisions,
+    _migration_0009_multimodal_evidence,
 ]
 
 

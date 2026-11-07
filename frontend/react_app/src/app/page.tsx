@@ -7,6 +7,7 @@ import { api, UserProfile } from "@/lib/api";
 import { ChatPanel } from "@/components/ChatPanel";
 import { ProgressDashboard } from "@/components/ProgressDashboard";
 import { TodaysPlan } from "@/components/TodaysPlan";
+import { ListeningExercise } from "@/components/ListeningExercise";
 import { Onboarding } from "@/components/Onboarding";
 
 export default function HomePage() {
@@ -81,6 +82,11 @@ export default function HomePage() {
       <section>
         <h2 className="mb-2 text-lg font-semibold">Practice</h2>
         <ChatPanel token={token} />
+      </section>
+
+      <section>
+        <h2 className="mb-2 text-lg font-semibold">Listening</h2>
+        <ListeningExercise token={token} language={language} />
       </section>
 
       <section>

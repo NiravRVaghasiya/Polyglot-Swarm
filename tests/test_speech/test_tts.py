@@ -80,6 +80,20 @@ class TestSynthesize:
         assert result == out
         assert fake_edge_tts.last.saved_to == out
 
+    async def test_non_default_rate_is_passed_through(self, monkeypatch):
+        seen = {}
+
+        class _RateCommunicate(_FakeCommunicate):
+            def __init__(self, text, voice, rate):
+                super().__init__(text, voice)
+                seen["rate"] = rate
+
+        module = types.ModuleType("edge_tts")
+        module.Communicate = _RateCommunicate
+        monkeypatch.setitem(sys.modules, "edge_tts", module)
+        assert await tts.synthesize("hola", language="Spanish", rate="-15%") == b"ABCD"
+        assert seen["rate"] == "-15%"
+
 
 class TestMissingDependency:
     async def test_raises_clear_error(self, monkeypatch):

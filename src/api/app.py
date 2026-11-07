@@ -18,6 +18,7 @@ from fastapi.responses import JSONResponse
 from src import __version__
 from src.api import auth
 from src.api.routes import (
+    assessment_routes,
     auth_routes,
     chat_routes,
     cost_routes,
@@ -150,6 +151,7 @@ def create_app() -> FastAPI:
     app.include_router(privacy_routes.router)
     app.include_router(cost_routes.router)
     app.include_router(voice_routes.router)
+    app.include_router(assessment_routes.router)
 
     return app
 

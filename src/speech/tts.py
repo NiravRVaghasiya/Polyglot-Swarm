@@ -30,19 +30,25 @@ def voice_for_language(language: str | None) -> str:
     return _LANG_TO_VOICE.get(language.strip().lower(), DEFAULT_VOICE)
 
 
-def _communicate(text: str, voice: str) -> Any:
+def _communicate(text: str, voice: str, rate: str = "+0%") -> Any:
     """Build an edge_tts.Communicate, raising a clear error if unavailable."""
     try:
-        import edge_tts  # type: ignore[import-not-found]
+        import edge_tts  # type: ignore[import-not-found, import-untyped, unused-ignore]
     except ImportError as exc:  # pragma: no cover - depends on optional extra
         raise SpeechDependencyError(
             "edge-tts is not installed. Install the voice extra: "
             "pip install 'polyglot-swarm[voice]'"
         ) from exc
-    return edge_tts.Communicate(text, voice)
+    # "+0%" is edge-tts's own default; only pass a rate when it differs, so
+    # callers and stand-ins written against the two-argument form keep working.
+    if rate == "+0%":
+        return edge_tts.Communicate(text, voice)
+    return edge_tts.Communicate(text, voice, rate=rate)
 
 
-async def synthesize(text: str, *, language: str | None = None, voice: str | None = None) -> bytes:
+async def synthesize(
+    text: str, *, language: str | None = None, voice: str | None = None, rate: str = "+0%"
+) -> bytes:
     """Synthesize ``text`` to speech and return the audio as MP3 bytes.
 
     Args:
@@ -57,7 +63,7 @@ async def synthesize(text: str, *, language: str | None = None, voice: str | Non
         return b""
 
     chosen_voice = voice or voice_for_language(language)
-    communicate = _communicate(text, chosen_voice)
+    communicate = _communicate(text, chosen_voice, rate)
 
     audio = bytearray()
     async for chunk in communicate.stream():

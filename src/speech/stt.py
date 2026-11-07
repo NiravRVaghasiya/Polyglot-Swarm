@@ -45,7 +45,7 @@ def language_to_whisper_code(language: str | None) -> str | None:
 def _load_model(model_size: str) -> Any:
     """Load (and cache) a Whisper model. Raises if whisper is unavailable."""
     try:
-        import whisper  # type: ignore[import-not-found]
+        import whisper  # type: ignore[import-not-found, import-untyped, unused-ignore]
     except ImportError as exc:  # pragma: no cover - depends on optional extra
         raise SpeechDependencyError(
             "Whisper is not installed. Install the voice extra: pip install 'polyglot-swarm[voice]'"
