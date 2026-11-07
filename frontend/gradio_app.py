@@ -50,11 +50,18 @@ def _ensure_session(state_box: dict[str, Any], language: str, scenario_id: str) 
     return state
 
 
+async def _turn(state: LearnerState, message: str) -> str:
+    """One turn, analysis included: each call here runs its own event loop."""
+    result = await session_manager.run_turn(state, message)
+    await session_manager.wait_for_analysis(state)
+    return result.reply
+
+
 def chat_text(message: str, language: str, scenario_id: str, state_box: dict[str, Any]) -> str:
     """Handle a text message; returns the assistant reply."""
     state = _ensure_session(state_box, language, scenario_id)
     try:
-        return asyncio.run(session_manager.run_turn(state, message))
+        return asyncio.run(_turn(state, message))
     except Exception as e:  # noqa: BLE001 - surface errors to the UI
         return f"Error: {e}\n\nMake sure an LLM API key is set in .env"
 

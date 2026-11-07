@@ -19,7 +19,7 @@ from typing import Any
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.memory import MemorySaver
-from langgraph.graph import END, StateGraph
+from langgraph.graph import END, START, StateGraph
 
 from src.agents.conversation import conversation_node
 from src.agents.cultural import cultural_node
@@ -202,6 +202,39 @@ def compile_turn_graph(components: frozenset[AblationComponent] | None = None) -
             studies); ``None`` builds the full production graph.
     """
     return build_graph(components).compile()
+
+
+#: Components of the reply stage: everything but analysis. Turn runners stop
+#: it once the conversation node has replied.
+REPLY_COMPONENTS: frozenset[AblationComponent] = frozenset({"review"})
+
+
+def build_analysis_graph() -> StateGraph[LearnerState, None, LearnerState, LearnerState]:
+    """The analysis stage on its own, for running it after the reply.
+
+    Topology: ``grammar``, ``vocabulary`` and ``cultural`` in parallel from the
+    start, then ``evaluator``, then end. These are the same nodes and the same
+    fan-out/fan-in as the analysis part of :func:`build_graph`; the only
+    difference is that nothing loops back to the router.
+    """
+    graph = StateGraph(LearnerState)
+    graph.add_node("grammar", grammar_node)
+    graph.add_node("vocabulary", vocabulary_node)
+    graph.add_node("cultural", cultural_node)
+    graph.add_node("evaluator", evaluator_node)
+    for node in ("grammar", "vocabulary", "cultural"):
+        graph.add_edge(START, node)
+        graph.add_edge(node, "evaluator")
+    graph.add_edge("evaluator", END)
+    return graph
+
+
+def compile_analysis_graph() -> Any:
+    """Compile :func:`build_analysis_graph` without a checkpointer.
+
+    Like :func:`compile_turn_graph`, the caller owns the session state.
+    """
+    return build_analysis_graph().compile()
 
 
 async def compile_graph_async() -> Any:

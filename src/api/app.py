@@ -139,6 +139,10 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
             task.cancel()
             with suppress(asyncio.CancelledError):
                 await task
+        # Let in-flight turn analyses finish; any cut short re-run on next use.
+        from src.api import sessions
+
+        await sessions.drain_pending()
 
 
 def create_app() -> FastAPI:

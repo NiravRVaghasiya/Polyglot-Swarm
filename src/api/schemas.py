@@ -48,9 +48,19 @@ class ChatRequest(BaseModel):
 
 
 class HiddenFeedback(BaseModel):
+    """Feedback accumulated over the session's *analyzed* turns.
+
+    A turn is analyzed after its reply is sent, so the response to turn N
+    carries the feedback through turn N-1 (``through_turn``); turn N's own
+    feedback arrives with the response to turn N+1 and in the end-of-session
+    report.
+    """
+
     grammar: list[dict[str, Any]] = []
     vocabulary: list[dict[str, Any]] = []
     cultural: list[str] = []
+    #: Number of turns this feedback covers (0 before any turn is analyzed).
+    through_turn: int = 0
 
 
 class ChatResponse(BaseModel):
