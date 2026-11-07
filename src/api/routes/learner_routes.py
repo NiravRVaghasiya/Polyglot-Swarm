@@ -1,16 +1,21 @@
 """Learner-model routes: today's plan, CEFR profile, skill map, insights.
 
 These expose the learner model the rest of the app has been building — the
-curriculum planner (Phase 7), the multidimensional CEFR profile (Phase 12), and
-the per-skill knowledge model (Phase 6) — over the API so the frontend can
-answer "what should I practise today, and why?" (Phase 16).
+adaptive next-best-activity engine (ADR-0033), the multidimensional CEFR
+profile (Phase 12), and the per-skill knowledge model (Phase 6) — over the API
+so the frontend can answer "what should I practise today, and why?" (Phase 16).
+
+``/plan``, ``/insights`` and ``/recommendations`` all plan with the one engine
+(:func:`src.adaptive.service.recommend`); ``/plan`` serves the compact action
+list the UI renders, ``/recommendations`` the full rationale.
 
 Since ADR-0031 the CEFR fields are nullable with an explicit evidence status,
 and two audit endpoints expose how an estimate was reached: ``/explain/{skill}``
 (per-event contributions) and ``/history`` (every recorded mastery update).
 
-Every endpoint is a thin, auth-scoped wrapper over a pure (no-LLM) function, so
-they are cheap and safe to serve synchronously like the progress routes.
+Every endpoint is a thin, auth-scoped wrapper over deterministic, LLM-free
+code, so they are cheap and safe to serve synchronously like the progress
+routes.
 """
 
 from __future__ import annotations
@@ -41,17 +46,22 @@ def plan(
     language: str = _DEFAULT_LANGUAGE,
     minutes: float = 15.0,
     goal: str = "conversational",
+    record: bool = True,
     user_id: str = Depends(get_current_user),
 ) -> PlanResponse:
-    """Return today's ranked next-best learning actions with explanations."""
-    from src.curriculum import PlanConstraints, plan_next_actions
+    """Return today's ranked next-best learning activities with a reason each.
 
-    constraints = PlanConstraints(time_available_minutes=minutes, goal=goal)
-    actions = plan_next_actions(user_id, language, constraints=constraints)
+    The served plan is recorded as a ``recommendation`` decision (as with
+    ``/recommendations``), which keeps task difficulty continuous between
+    plans; ``record=false`` previews without recording.
+    """
+    from src.adaptive.service import recommend
+
+    served = recommend(user_id, language, minutes=minutes, goal=goal, record=record)
     return PlanResponse(
         language=language,
         goal=goal,
-        actions=[a.as_dict() for a in actions],  # type: ignore[misc]
+        actions=[r.as_action() for r in served.plan.recommendations],  # type: ignore[misc]
     )
 
 
@@ -155,19 +165,20 @@ def insights(
 ) -> InsightsResponse:
     """Compose a learner-facing insights summary: where to focus and why.
 
-    Combines the progress overview, the CEFR profile, and the plan's top
-    recommendations into one explainable payload. A skill is only called weak
+    Combines the progress overview, the CEFR profile, and the adaptive
+    engine's top recommendations (previewed, not recorded) into one
+    explainable payload. A skill is only called weak
     when its evidence is provisional or better; skills without enough evidence
     are listed under ``needs_assessment`` instead.
     """
+    from src.adaptive.service import recommend
     from src.assessment import build_cefr_profile
-    from src.curriculum import PlanConstraints, plan_next_actions
     from src.learner.estimation import status_rank
     from src.memory import progress
 
     overview = progress.progress_overview(user_id, language)
     profile = build_cefr_profile(user_id, language)
-    actions = plan_next_actions(user_id, language, constraints=PlanConstraints())
+    top = recommend(user_id, language, record=False).plan.recommendations[:3]
 
     assessed = [
         a for a in profile.skills.values() if a.mastery is not None and status_rank(a.status) >= 1
@@ -182,7 +193,7 @@ def insights(
         weakest_skills=[a.skill for a in weakest],
         needs_assessment=profile.unassessed_skills,
         top_weaknesses=overview.get("top_weaknesses", []),
-        recommended_focus=[a.reason for a in actions[:3]],
+        recommended_focus=[r.as_action()["reason"] for r in top],
         streak=overview.get("current_streak", 0),
     )
 
@@ -198,33 +209,16 @@ def recommendations(
     record: bool = True,
     user_id: str = Depends(get_current_user),
 ) -> dict[str, Any]:
-    """Next-best learning activities from the adaptive engine, with full rationale.
+    """The same plan as ``/plan``, with the engine's full rationale.
 
     Deterministic and LLM-free. Each served plan is recorded in the audit
     trail (``record=false`` to preview without recording); the returned
     ``decision_id`` points at that record.
     """
-    from src.adaptive import audit
-    from src.adaptive.planner import plan as adaptive_plan
-    from src.adaptive.snapshot import snapshot_from_store
-    from src.curriculum import PlanConstraints
+    from src.adaptive.service import recommend
 
-    snapshot = snapshot_from_store(user_id, language, goal=goal)
-    result = adaptive_plan(
-        snapshot, constraints=PlanConstraints(time_available_minutes=minutes, goal=goal)
-    )
-    payload = result.as_dict()
-    decision_id = None
-    if record:
-        decision_id = audit.record_decision(
-            user_id,
-            language,
-            kind="recommendation",
-            engine=result.engine,
-            input_digest=result.input_digest,
-            payload=payload,
-        )
-    return {**payload, "decision_id": decision_id}
+    served = recommend(user_id, language, minutes=minutes, goal=goal, record=record)
+    return {**served.plan.as_dict(), "decision_id": served.decision_id}
 
 
 @router.get("/path")

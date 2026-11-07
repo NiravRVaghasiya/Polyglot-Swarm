@@ -42,7 +42,9 @@ dependency (via another package) but unused in `src/`.
   `decrypt_secret`/`generate_key`. Deliberately not a secrets manager: it
   answers one question (encrypt/decrypt a string given a key) and leaves key
   custody to the caller.
-- **Backups**: `src.security.backup.create_backup` uses SQLite's own online
+- **Backups** (superseded by ADR-0035: `src/ops/backup.py` writes verified
+  backup sets, and `polyglot security backup` is an alias of `polyglot ops
+  backup`). Originally: `src.security.backup.create_backup` used SQLite's own online
   backup API (`sqlite3.Connection.backup()`), safe against a live database
   without stopping writers — not a naive file copy. Backups land in
   `{data_dir}/backups/`, timestamp-prefixed so `list_backups` sorts

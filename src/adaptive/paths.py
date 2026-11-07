@@ -37,11 +37,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from src.adaptive.constraints import GOAL_SKILL_WEIGHTS
 from src.adaptive.learner_model import LearnerEstimates, SubskillModel
 from src.adaptive.memory import MemoryState, replay_memory
 from src.adaptive.planner import MASTERED_PROBABILITY, WEAK_PROBABILITY, _recent_share
 from src.adaptive.snapshot import CatalogObjective, LearnerSnapshot
-from src.curriculum.constraints import GOAL_SKILL_WEIGHTS
 from src.evidence.difficulty import CEFR_ORDER
 from src.learner.estimation import EvidenceStatus
 

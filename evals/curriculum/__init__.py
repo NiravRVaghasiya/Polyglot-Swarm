@@ -1,22 +1,20 @@
 """Curriculum evaluation suite.
 
-Drives :func:`src.curriculum.plan_next_actions` — the Next Best Learning Action
-planner — against seeded learner states in isolated storage (see
-:func:`evals.harness.isolated_storage`) and checks the plan's shape against
-what the plan (Phase 7/18) requires.
+Drives the planner — the adaptive next-best-activity engine, through
+:func:`src.adaptive.service.recommend`, as the app does — against seeded
+learner states in isolated storage (see :func:`evals.harness.isolated_storage`)
+and checks the plan against what Phase 7/18 requires.
 
-Plan (Phase 18) metrics and their status here:
+Metrics and their status here:
 
 - **target coverage** — measured: does a plan seeded with due reviews and
-  grammar weaknesses actually surface actions targeting them?
-- **skill balance** — measured: across a batch of learners with different weak
-  skills, does the planner distribute actions across skills rather than
-  fixating on one?
-- **difficulty appropriateness** — measured: reuses
-  :func:`src.curriculum.difficulty.difficulty_appropriate` directly against
-  labeled (mastery, fatigue) cases — this is a pure function, so it is scored
-  exactly rather than approximated.
+  grammar weaknesses actually surface recommendations targeting them?
+- **skill balance** — measured: across learners with different weak skills,
+  does each learner's weak skill appear in their own plan?
+- **difficulty appropriateness** — measured by the adaptive engine's own
+  tests (``tests/test_adaptive``); the old planner's ``difficulty_appropriate``
+  helper was removed with it.
 - **learner success rate** — out of scope offline: it is an outcome measured
-  from real usage over time (did following the plan improve the learner's
-  mastery), not something a static seeded-state suite can produce.
+  from real usage over time, not something a static seeded-state suite can
+  produce. ``python -m evals.adaptive`` simulates it.
 """

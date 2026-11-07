@@ -268,43 +268,32 @@ instructional setting:
   evidence reaches the model. It used to persist it before, so the stored
   profile lagged one session behind.
 
-## Curriculum
+## Planning
 
-`src/curriculum/planner.py` gives every action an `intent`:
+The app has one planner: the adaptive next-best-activity engine
+(`src/adaptive/planner.py`, `adaptive-nba-v1`, ADR-0033), reached through
+`src/adaptive/service.py`. `/api/v1/learner/plan` (what the UI shows),
+`/insights`, `/recommendations` and `polyglot plan` all use it. Every
+recommendation carries an intent:
 
-| Intent | When | Scoring |
-|---|---|---|
-| `assessment` | the skill is `insufficient_evidence`, or a grammar construction was flagged only once | `assessment_value`: information value from uncertainty, evidence quality and the coverage gap. No mastery input is used, so an unassessed skill is never scored as weak. |
-| `remediation` | evidence at `provisional` or better with mastery < 0.4, or a grammar error that recurs at least twice | ELV with the estimate's mastery and uncertainty |
-| `reinforcement` | 0.4 ≤ mastery < 0.75, and every FSRS-due review | ELV |
-| `advancement` | mastery ≥ 0.75 and lower interval bound ≥ 0.5 | ELV |
+| Intent | When |
+|---|---|
+| `assessment` | too little evidence, or a one-session dip to confirm |
+| `remediation` | a demonstrated weakness (or a weak prerequisite), or a vocabulary leech |
+| `reinforcement` | in progress, not yet mastered; contextual conversation practice |
+| `progression` | mastered at this difficulty: step up |
+| `introduction` | a new construction whose prerequisites are met, or new vocabulary |
+| `review` | an FSRS-due word, or a demonstrated item whose recall has decayed |
 
-Other planner rules:
+Insufficient evidence still leads to assessment, never to remediation, and an
+unassessed prerequisite does not block. The engine plans from the evidence
+store and the language pack's grammar catalog only. See
+[adaptive-learning.md](adaptive-learning.md) for scoring, selection and the
+FSRS integration.
 
-- Readiness blocks a skill only when the evidence shows a prerequisite is weak
-  (provisional or better, with mastery < 0.4). An unassessed prerequisite does
-  not block.
-- When grammar evidence is insufficient, a `diagnostic_check` targets the
-  easiest grammar-pack construction that has not been assessed yet.
-- At most `MAX_ASSESSMENT_ACTIONS` (2) assessments are planned while learning
-  actions still fit. If time is left over, the deferred assessments fill it.
-  No separate vocabulary probe is proposed when FSRS reviews are due, because
-  a graded review already is vocabulary evidence.
-- An unknown belief enters ELV as the neutral 0.5, never as 0.
-- FSRS scheduling (`src/agents/srs.py`) is unchanged. The planner still takes
-  *what is due* from `vocabulary_db.get_due`, most overdue first.
-
-This planner still serves `/api/v1/learner/plan`. ADR-0033 adds an adaptive
-engine alongside it, served at `/api/v1/learner/recommendations`. It adds:
-
-- subskill (construction-level) estimates built on top of v2;
-- predictions;
-- adaptive difficulty;
-- FSRS-integrated next-best activities;
-- personalized learning paths.
-
-See [adaptive-learning.md](adaptive-learning.md). The FSRS changes it makes
-(new words get unreviewed cards; review modes) are described there.
+The curriculum planner that `/plan` used before (`src/curriculum/`, with the
+intents `assessment`/`remediation`/`reinforcement`/`advancement`) was removed
+so that the UI shows the engine that was evaluated.
 
 ## API surface
 

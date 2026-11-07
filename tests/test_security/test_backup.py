@@ -1,60 +1,46 @@
-"""Phase 21 tests: SQLite database backups."""
+"""`polyglot security backup|backups` are aliases of the verified ops backups."""
 
 from __future__ import annotations
 
-from src.security.backup import BACKUP_SUFFIX, create_backup, list_backups
+import sqlite3
+
+from typer.testing import CliRunner
+
+from src.cli import app
+from src.ops import backup
+
+runner = CliRunner()
 
 
-class TestCreateBackup:
-    def test_creates_a_file(self, temp_storage):
-        path = create_backup()
-        assert path.exists()
-        assert path.name.endswith(BACKUP_SUFFIX)
-
-    def test_backup_contains_data(self, temp_storage):
+class TestSecurityBackupAlias:
+    def test_writes_a_verified_backup_set(self, temp_storage):
         from src.memory import vocabulary_db
 
         vocabulary_db.upsert_word("u1", "Spanish", "mesa")
-        path = create_backup()
-
-        import sqlite3
-
-        conn = sqlite3.connect(str(path))
+        result = runner.invoke(app, ["security", "backup", "--label", "pre-migration"])
+        assert result.exit_code == 0, result.output
+        [path] = backup.list_backup_sets()
+        assert path.name.endswith("-pre-migration")
+        assert path.parent == backup.backup_root()
+        backup.verify_backup_set(path)  # raises if the set is not restorable
+        conn = sqlite3.connect(str(path / backup.DB_NAME))
         try:
             row = conn.execute("SELECT word FROM vocabulary WHERE user_id='u1'").fetchone()
         finally:
             conn.close()
-        assert row is not None
-        assert row[0] == "mesa"
+        assert row == ("mesa",)
 
-    def test_label_appears_in_filename(self, temp_storage):
-        path = create_backup(label="pre-migration")
-        assert "pre-migration" in path.name
+    def test_lists_the_same_sets_as_ops(self, temp_storage):
+        assert "No backup sets" in runner.invoke(app, ["security", "backups"]).output
+        assert runner.invoke(app, ["security", "backup", "--label", "one"]).exit_code == 0
+        assert runner.invoke(app, ["security", "backup", "--label", "two"]).exit_code == 0
+        listed = runner.invoke(app, ["security", "backups"]).output
+        assert listed == runner.invoke(app, ["ops", "backups"]).output
+        names = [p.name for p in backup.list_backup_sets()]
+        assert len(names) == 2 and names[0].endswith("-two")  # newest first
+        assert all(name in listed for name in names)
 
-    def test_backups_land_in_a_backups_subdirectory(self, temp_storage):
-        path = create_backup()
-        assert path.parent.name == "backups"
+    def test_there_is_one_backup_module(self):
+        import importlib.util
 
-    def test_multiple_backups_get_distinct_names(self, temp_storage):
-        a = create_backup(label="a")
-        b = create_backup(label="b")
-        assert a != b
-
-
-class TestListBackups:
-    def test_empty_when_none_created(self, temp_storage):
-        assert list_backups() == []
-
-    def test_lists_created_backups(self, temp_storage):
-        create_backup(label="one")
-        create_backup(label="two")
-        backups = list_backups()
-        assert len(backups) == 2
-
-    def test_most_recent_first(self, temp_storage):
-        first = create_backup(label="first")
-        second = create_backup(label="second")
-        backups = list_backups()
-        # Filenames are timestamp-prefixed, so reverse-sorted = newest first.
-        assert backups[0] in (first, second)
-        assert backups == sorted(backups, reverse=True)
+        assert importlib.util.find_spec("src.security.backup") is None

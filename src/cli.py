@@ -269,23 +269,27 @@ def plan(
     minutes: float = typer.Option(15.0, help="Minutes available for this session."),
     goal: str = typer.Option("conversational", help="Learning goal (conversational/reading/...)."),
 ) -> None:
-    """Show today's plan: the next best learning actions and why."""
-    from src.curriculum import PlanConstraints, plan_next_actions
+    """Show today's plan: the next best learning activities and why.
 
-    constraints = PlanConstraints(time_available_minutes=minutes, goal=goal)
-    actions = plan_next_actions(user, language, constraints=constraints)
+    Uses the same adaptive engine as the app and records the plan in the
+    audit trail, as ``/learner/plan`` does.
+    """
+    from src.adaptive.service import recommend
+
+    served = recommend(user, language, minutes=minutes, goal=goal)
 
     console.print(f"[bold green]Today's plan for {user}[/bold green] — {language} ({goal})")
-    if not actions:
+    if not served.plan.recommendations:
         console.print("[dim]No plan yet — have a conversation session first.[/dim]")
         return
-    for i, a in enumerate(actions, 1):
-        intent = f"{a.intent}, " if a.intent else ""
+    for i, rec in enumerate(served.plan.recommendations, 1):
+        a = rec.as_action()
         console.print(
-            f"  [cyan]{i}. {a.type.value}[/cyan] "
-            f"[dim]({intent}{a.estimated_minutes:g} min, priority {a.priority:.2f})[/dim]"
+            f"  [cyan]{i}. {a['type']}[/cyan] "
+            f"[dim]({a['intent']}, {a['estimated_minutes']:g} min, "
+            f"priority {a['priority']:.2f})[/dim]"
         )
-        console.print(f"     -> {a.target}  -  {a.reason}")
+        console.print(f"     -> {a['target']}  -  {a['reason']}")
 
 
 @app.command()
@@ -540,26 +544,16 @@ def experiment_due(
 
 @security_app.command("backup")
 def security_backup(
-    label: str | None = typer.Option(None, help="Optional short tag for the backup filename."),
+    label: str | None = typer.Option(None, help="Short tag in the backup set name."),
 ) -> None:
-    """Create a timestamped backup of the SQLite database."""
-    from src.security.backup import create_backup
-
-    path = create_backup(label=label)
-    console.print(f"[bold green]Backup created:[/bold green] {path}")
+    """Alias of `polyglot ops backup`: write and verify a backup set."""
+    ops_backup(label=label, prune=True)
 
 
 @security_app.command("backups")
 def security_backups() -> None:
-    """List existing database backups, most recent first."""
-    from src.security.backup import list_backups
-
-    backups = list_backups()
-    if not backups:
-        console.print("[dim]No backups yet. Run `polyglot security backup` to create one.[/dim]")
-        return
-    for path in backups:
-        console.print(str(path))
+    """Alias of `polyglot ops backups`: list backup sets, newest first."""
+    ops_backups()
 
 
 @security_app.command("audit")
