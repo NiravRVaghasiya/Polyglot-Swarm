@@ -1,8 +1,8 @@
-"""Seeded learner-state cases for the curriculum planner.
+"""Seeded learner-state cases for the planner (the adaptive engine).
 
 Each case describes what to seed into storage (due vocabulary, grammar error
-patterns, skill beliefs) for one synthetic learner, and which action targets
-the resulting plan (:func:`src.curriculum.plan_next_actions`) must cover.
+evidence, skill beliefs) for one synthetic learner, and which targets the
+resulting plan (:func:`src.adaptive.service.recommend`) must cover.
 """
 
 from __future__ import annotations
@@ -10,17 +10,27 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 #: Bump when cases are added/changed/removed.
-DATASET_VERSION = "2026.11.0"
+DATASET_VERSION = "2026.11.1"
 
 
 @dataclass(frozen=True)
 class CoverageCase:
     """A learner state seeded with due reviews and/or grammar weaknesses.
 
-    ``expected_targets`` are action ``target`` values (words or construction
-    ids) the plan must contain at least one action for — this is the "target
-    coverage" property: things the learner is overdue on, or weak in, must
-    show up as recommendations.
+    ``expected_targets`` are recommendation ``target`` values (words or
+    construction ids) the plan must contain — the "target coverage" property:
+    things the learner is overdue on, or weak in, must show up as
+    recommendations.
+
+    Grammar errors are seeded as ``GRAMMAR_ERROR`` evidence events, one per
+    session, as conversation finalization records them; constructions must be
+    in the language pack, since the planner only plans catalog objectives.
+
+    The gated budget is generous (60 minutes, up to 10 activities), as for
+    :class:`SkillBalanceCase`: for a learner with no other evidence the
+    engine also schedules assessments and an introduction, which can push a
+    B1/B2 remediation past a 15-minute plan. The suite reports coverage at
+    the UI's 15-minute default too, ungated, so that ranking stays visible.
     """
 
     name: str
@@ -28,6 +38,8 @@ class CoverageCase:
     due_words: tuple[str, ...] = ()
     grammar_errors: tuple[tuple[str, int], ...] = ()  # (construction, occurrences)
     expected_targets: frozenset[str] = field(default_factory=frozenset)
+    time_available_minutes: float = 60.0
+    max_actions: int = 10
 
 
 COVERAGE_CASES: list[CoverageCase] = [
@@ -44,7 +56,7 @@ COVERAGE_CASES: list[CoverageCase] = [
         expected_targets=frozenset({"ser_vs_estar"}),
     ),
     CoverageCase(
-        name="vs_construction_becomes_contrast",
+        name="b1_contrast_weakness",
         user_id="eval-coverage-contrast",
         grammar_errors=(("por_vs_para", 3),),
         expected_targets=frozenset({"por_vs_para"}),
@@ -53,8 +65,8 @@ COVERAGE_CASES: list[CoverageCase] = [
         name="mixed_review_and_grammar",
         user_id="eval-coverage-mixed",
         due_words=("hambre",),
-        grammar_errors=(("subjunctive_trigger", 4),),
-        expected_targets=frozenset({"hambre", "subjunctive_trigger"}),
+        grammar_errors=(("subjunctive_present", 4),),
+        expected_targets=frozenset({"hambre", "subjunctive_present"}),
     ),
 ]
 
@@ -114,32 +126,5 @@ SKILL_BALANCE_CASES: list[SkillBalanceCase] = [
         # reading's only prerequisite is vocabulary.
         events=(("reading", "incorrect", 6), ("vocabulary", "correct", 6)),
         expected_skill_in_plan="reading",
-    ),
-]
-
-
-@dataclass(frozen=True)
-class DifficultyCase:
-    """A (mastery, fatigue) pair with the expected appropriateness verdict.
-
-    Exercises :func:`src.curriculum.difficulty.difficulty_appropriate` directly
-    — a pure function, so this is scored exactly rather than approximated.
-    """
-
-    name: str
-    mastery: float
-    fatigue: float
-    expected_appropriate: bool
-
-
-DIFFICULTY_CASES: list[DifficultyCase] = [
-    DifficultyCase("mid_mastery_no_fatigue", mastery=0.5, fatigue=0.0, expected_appropriate=True),
-    DifficultyCase("mastered_item", mastery=0.97, fatigue=0.0, expected_appropriate=False),
-    DifficultyCase(
-        "hard_item_while_fatigued", mastery=0.2, fatigue=0.8, expected_appropriate=False
-    ),
-    DifficultyCase("hard_item_while_fresh", mastery=0.2, fatigue=0.0, expected_appropriate=True),
-    DifficultyCase(
-        "moderate_item_while_fatigued", mastery=0.5, fatigue=0.8, expected_appropriate=True
     ),
 ]

@@ -148,12 +148,12 @@ def render_policies(data: dict[str, Any]) -> str:
             e = data["results"][pol][metric]
             row.append(f"{_f(e['mean'])} [{_f(e['ci95'][0])}, {_f(e['ci95'][1])}]")
         lines.append("| " + " | ".join(row) + " |")
-    lines += ["", "Paired differences against `existing_planner` (policy minus baseline):", ""]
+    lines += ["", f"Paired differences against `{data['baseline']}` (policy minus baseline):", ""]
     lines += [
         "| policy | " + " | ".join(data["key_metrics"]) + " |",
         "|---|" + "---|" * len(data["key_metrics"]),
     ]
-    for pol, diffs in data["vs_existing"].items():
+    for pol, diffs in data["vs_baseline"].items():
         lines.append(
             f"| {pol} | " + " | ".join(_diff(diffs[m]) for m in data["key_metrics"]) + " |"
         )

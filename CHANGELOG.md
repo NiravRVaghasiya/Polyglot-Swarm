@@ -7,22 +7,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
+### Changed
 
-- **The real-model evaluation measures the production models.** A provider
-  named without a model (`claude`, `gemini`, `openai`, `ollama`) now
-  resolves to the code default in `src/config.py`
-  (`default_model_ids()`), not to the local `.env`. A stale
-  `.env` had made `claude` mean `claude-sonnet-4-20250514` and `gemini`
-  mean `gemini-2.0-flash`, while the app defaults are `claude-sonnet-5-5`
-  and `gemini-3.6-flash`.
-  `provider:model` still overrides the model, and each provider record in
-  the run manifest now states `model_source` (`app_default` or `override`)
-  and `app_default_model`.
-- The OpenAI fallback model is a setting (`LLM_OPENAI`, default
-  `gpt-4o-mini`) instead of a constant in `src/llm/openai.py`.
+- **One planner.** `/learner/plan` (what the UI shows), `/learner/insights`
+  and `polyglot plan` now use the adaptive next-best-activity engine
+  (`adaptive-nba-v1`, ADR-0033), the one that was evaluated, through the new
+  `src/adaptive/service.py`. `/learner/recommendations` serves the same plan
+  with its full rationale.
+  - `PlanResponse` keeps its shape. `type` is now the engine's activity
+    (`grammar_practice`, `vocabulary_review`, `diagnostic_check`, ...),
+    `reason` its first rationale line, `priority` its score, and `intent`
+    one of `assessment`, `remediation`, `reinforcement`, `progression`,
+    `introduction`, `review` (`advancement` is gone). The frontend labels
+    the new intents.
+  - `/learner/plan` records each served plan in the adaptive audit trail
+    (`record=false` to preview), as `/recommendations` does; the engine reads
+    the last recorded plan to keep task difficulty continuous.
+  - The curriculum planner (`src/curriculum/`: `plan_next_actions`,
+    `plan_next_best`, its actions, objectives and difficulty helpers) was
+    removed. `PlanConstraints` moved to `src/adaptive/constraints.py`.
+  - The curriculum eval suite drives the adaptive engine and seeds grammar
+    errors as evidence, as conversation finalization records them. Its
+    difficulty-appropriateness eval was removed with the old helper.
+    `target_coverage` is gated at a 60-minute plan and also reports
+    `coverage_at_15_min` (0.714): at the UI's default 15 minutes, a new
+    learner's B1/B2 grammar weakness can rank below assessments and an
+    introduction.
+  - The adaptive simulation's `existing_planner` policy was removed with the
+    planner; paired differences are now against `static`.
+- **One backup module.** `src/security/backup.py` was removed;
+  `src/ops/backup.py` (verified backup sets) is the only implementation.
+  `polyglot security backup|backups` are now aliases of
+  `polyglot ops backup|backups`. Plain `*.backup.db` files written by the
+  old command are no longer listed; they are left in place.
 
 ### Added
+
+- **Calibrated correction confidence.** The grammar agent's `_select_errors`
+  applies a per-model calibration map for the model that answered
+  (`governance.last_answer()`), and its 0.5 threshold then applies to the
+  calibrated probability, which becomes the error's `confidence`
+  (`raw_confidence` keeps the model's own). Without a usable map (absent,
+  `insufficient_dev_data`, or corrupt) it keeps the raw threshold and logs
+  the model once as uncalibrated.
+  - `src/evaluation/calibration_maps.py` fits (Platt or histogram, chosen by
+    leave-one-out Brier on dev) and loads versioned map files.
+  - `python -m evals.real calibrate <dev_run_id>` /
+    `make eval-real-calibrate` writes them to `evals/real/calibration/` and
+    refuses any non-dev run.
+  - Committed: `ollama:gemma2:2b` (Platt, 38 dev predictions) and
+    `ollama:llama3.1:latest` (`insufficient_dev_data`: 9 dev predictions, so
+    it stays uncalibrated).
+  - The report of `20261106-local-test` was rescored offline and now states
+    the committed map's effect: for gemma2, ECE 0.29 → 0.07 and
+    false-correction rate 0.68 → 0.46, with recall 0.91 → 0.63.
 
 - **Production maturity baseline (ADR-0035).** The audit and risk register
   are in `docs/production/`.

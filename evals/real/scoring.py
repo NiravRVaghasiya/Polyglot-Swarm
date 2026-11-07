@@ -31,6 +31,7 @@ import json
 import re
 import unicodedata
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from evals.real.schema import GrammarCase, VocabularyCase
@@ -282,14 +283,25 @@ def _evidence_for(case: GrammarCase, surfaced: list[dict[str, Any]]) -> dict[str
     }
 
 
-def score_grammar(case: GrammarCase, record: dict[str, Any]) -> GrammarOutcome:
-    """Score one grammar response for one case."""
+def score_grammar(
+    case: GrammarCase,
+    record: dict[str, Any],
+    *,
+    model_key: str | None = None,
+    calibration_dir: Path | None = None,
+) -> GrammarOutcome:
+    """Score one grammar response for one case.
+
+    By default errors are selected as without a calibration map (raw
+    confidence threshold). ``model_key`` selects with that model's committed
+    calibration map instead, as the app does for the model that answered.
+    """
     from src.agents.grammar import _select_errors
 
     text = record.get("response_text")
     structure = inspect_grammar_json(text)
     analysis = parse_structured(text, GrammarAnalysis) if text else None
-    surfaced = _select_errors(analysis)
+    surfaced = _select_errors(analysis, model_key=model_key, calibration_dir=calibration_dir)
     surfaced_originals = [s["original"] for s in surfaced]
 
     candidates: list[Candidate] = []

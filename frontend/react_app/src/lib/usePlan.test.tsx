@@ -14,12 +14,13 @@ describe("usePlan", () => {
       goal: "conversational",
       actions: [
         {
-          type: "review_vocab",
+          type: "vocabulary_review",
           target: "mesa",
           skill: "vocabulary",
           reason: "due for review",
           priority: 0.8,
           estimated_minutes: 1,
+          intent: "review",
         },
       ],
     });

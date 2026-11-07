@@ -2,9 +2,9 @@
 
 Reads the per-language ``languages/<code>/grammar/constructions.yaml`` packs and
 exposes them as validated :class:`~src.llm.schemas.GrammarItem` objects. The
-grammar agent and (later) the curriculum planner use this to ground
-construction ids, CEFR levels, prerequisites, and known interferences — so the
-taxonomy is explicit data, not buried in a prompt.
+grammar agent and the planner's catalog (:mod:`src.adaptive.snapshot`) use this
+to ground construction ids, CEFR levels, prerequisites, and known
+interferences — so the taxonomy is explicit data, not buried in a prompt.
 
 Language is addressed by the full name the app uses everywhere ("Spanish",
 "Polish", "Italian"); the loader maps it to the pack directory code. Unknown

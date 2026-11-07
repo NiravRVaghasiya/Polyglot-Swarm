@@ -63,15 +63,38 @@ grammar_rules, conversations, cultural_notes). `src/memory/schema.py` owns
 migrations (additive-only).
 
 **Evidence and learner model** (`src/evidence/`, `src/learner/`,
-`src/assessment/`) — see [`learner-model.md`](learner-model.md).
+`src/adaptive/`, `src/assessment/`) — see [`learner-model.md`](learner-model.md)
+and [`adaptive-learning.md`](adaptive-learning.md). The layers, from data to
+decision:
+
+| layer | module | role |
+|---|---|---|
+| evidence | `src/evidence/store.py` | the record of truth: append-only learning events |
+| skill engine | `src/learner/estimation.py` (`lkm-evidence-v2`) | pure function from active evidence to per-skill estimates |
+| subskill engine | `src/adaptive/learner_model.py` (`lkm-subskill-v1`) | extends v2 to subskills and objectives; predictions |
+| wrapper | `src/learner/knowledge_model.py` | facade over the skill engine: records evidence, materializes `skill_states`, history, explain |
+| wrapper | `src/assessment/cefr_profile.py` | CEFR bands derived from the skill estimates |
+| wrapper | `src/adaptive/snapshot.py` | gathers every engine input (evidence, vocabulary, catalog) into one `LearnerSnapshot` |
+| **planner** | `src/adaptive/planner.py` (`adaptive-nba-v1`) | the only planner: pure function from a snapshot to ranked activities |
+| wrapper | `src/adaptive/service.py` | builds the snapshot, plans, records the decision |
+
+There is one planner. `/learner/plan` (what the UI shows), `/learner/insights`,
+`/learner/recommendations` (the same plan with its full rationale) and
+`polyglot plan` all call `src.adaptive.service.recommend`. The engine is the
+one evaluated in `python -m evals.adaptive`; the curriculum planner it
+replaced (`src/curriculum/`) was removed. Note that it plans only from the
+evidence store and the language pack's catalog: grammar errors recorded only
+in the analytics error table (writing-exercise corrections) do not reach it.
 
 **Language packs** (`src/languages/`) — see
 [`language-packs.md`](language-packs.md).
 
 **Safety and security** (`src/safety/`, `src/security/`) — prompt-injection
 hardening for scenario content, cultural-claim abstention, rate limiting,
-token hashing/expiry, encrypted secrets, backups, and the audit log. See
-[`privacy.md`](privacy.md).
+token hashing/expiry, encrypted secrets, and the audit log. See
+[`privacy.md`](privacy.md). Backups have one implementation, `src/ops/backup.py`
+(verified backup sets); `polyglot security backup|backups` are aliases of
+`polyglot ops backup|backups`.
 
 **API** (`src/api/`) — a FastAPI app (`app.py`) exposing auth, chat/sessions,
 review, progress, scenarios, profile, learner-model, trace, privacy, and cost

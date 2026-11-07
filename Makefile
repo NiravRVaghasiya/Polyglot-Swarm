@@ -10,7 +10,7 @@
 
 .DEFAULT_GOAL := help
 .PHONY: help install install-dev test lint format format-check typecheck \
-        benchmark eval eval-real-validate eval-real eval-real-report eval-adaptive eval-speech health results \
+        benchmark eval eval-real-validate eval-real eval-real-calibrate eval-real-report eval-adaptive eval-speech health results \
         check ci clean lock
 
 PYTHON ?= python
@@ -52,6 +52,9 @@ eval-real-validate: ## Validate real-model eval datasets (offline).
 
 eval-real: ## Real-model benchmark: make eval-real PROVIDERS=claude[,ollama[:model]] [CONFIG=default] [RUN=id].
 	$(PYTHON) -m evals.real run --providers "$(PROVIDERS)" --config "$(or $(CONFIG),default)" $(if $(RUN),--run-id $(RUN),)
+
+eval-real-calibrate: ## Fit grammar calibration maps from a DEV run: make eval-real-calibrate RUN=<dev_run_id>.
+	$(PYTHON) -m evals.real calibrate "$(RUN)"
 
 eval-real-report: ## Score a real-model run: make eval-real-report RUN=<run_id>.
 	$(PYTHON) -m evals.real report "$(RUN)"

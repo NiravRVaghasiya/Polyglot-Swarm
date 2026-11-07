@@ -142,16 +142,25 @@ export type EvidenceStatus =
   | "estimated"
   | "validated";
 
-export type ActionIntent = "assessment" | "remediation" | "reinforcement" | "advancement" | "";
+// Intents of the adaptive next-best-activity engine (ADR-0033), the only
+// planner behind /learner/plan.
+export type ActionIntent =
+  | "assessment"
+  | "remediation"
+  | "reinforcement"
+  | "progression"
+  | "introduction"
+  | "review";
 
 export interface PlanAction {
+  // The activity, e.g. "grammar_practice", "vocabulary_review", "diagnostic_check".
   type: string;
   target: string;
   skill: string | null;
   reason: string;
   priority: number;
   estimated_minutes: number;
-  intent?: ActionIntent;
+  intent: ActionIntent;
 }
 
 export interface PlanResponse {

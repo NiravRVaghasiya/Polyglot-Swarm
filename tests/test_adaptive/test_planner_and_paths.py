@@ -7,6 +7,7 @@ from datetime import timedelta
 
 from fsrs import Card, Rating, Scheduler
 
+from src.adaptive.constraints import PlanConstraints
 from src.adaptive.paths import build_path
 from src.adaptive.planner import (
     MAX_ASSESSMENTS,
@@ -15,7 +16,6 @@ from src.adaptive.planner import (
     _dedupe,
     plan,
 )
-from src.curriculum.constraints import PlanConstraints
 from tests.test_adaptive.conftest import T0, grammar_row, snapshot, vocab_row
 
 REQUIRED = (

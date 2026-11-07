@@ -1,7 +1,12 @@
 # 0010. Next Best Learning Action / curriculum planner (Phase 7)
 
-- Status: Accepted
+- Status: Superseded by [ADR-0033](0033-adaptive-learning-intelligence.md)
 - Date: 2026-09-14
+
+> **Superseded (2026-11-08).** The curriculum planner described here
+> (`src/curriculum/planner.py`, `plan_next_actions`) was removed. `/plan`,
+> `/insights` and `polyglot plan` now use the adaptive engine of ADR-0033.
+> `PlanConstraints` moved to `src/adaptive/constraints.py`.
 
 > **Amended by [ADR-0031](0031-evidence-driven-learner-knowledge-model.md)** (2026-11-06): actions carry an intent (assessment/remediation/reinforcement/advancement); insufficient evidence leads to assessment, not remediation; unknown beliefs are never scored as zero.
 

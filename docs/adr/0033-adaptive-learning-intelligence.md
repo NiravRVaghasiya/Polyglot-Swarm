@@ -124,7 +124,8 @@ coarse.
    - `predictions`;
    - `decisions`.
 
-   The existing `/plan` and its planner are unchanged.
+   The existing `/plan` and its planner were unchanged at first; see
+   *Single planner* below.
 9. **Evaluation in simulation, labelled as such** (`evals/adaptive`).
    - **Learners:** a documented simulated-learner model.
    - **Policies compared:** a static syllabus, the existing planner (the
@@ -155,6 +156,10 @@ coarse.
 - **Untuned parameters.** The value weights, target success, step bounds and
   leech thresholds are documented, explainable defaults. They were not tuned
   on real outcomes, and should be re-estimated once real evidence exists.
-- **Not yet migrated.** The old `/plan` endpoint and planner remain for
-  compatibility and as the comparison baseline. Migrating the frontend to
-  `/recommendations` is follow-up work.
+- **Single planner (2026-11-08).** The old curriculum planner was removed.
+  `/plan` (what the UI shows), `/insights` and `polyglot plan` now use this
+  engine through `src/adaptive/service.py`; `/plan` keeps its response shape
+  and records each served plan, like `/recommendations`. The simulation's
+  `existing_planner` policy went with it; paired differences are now taken
+  against `static`. Results recorded before then (in
+  `docs/adaptive-learning.md`) include the `existing_planner` column.

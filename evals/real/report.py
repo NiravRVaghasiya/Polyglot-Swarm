@@ -18,6 +18,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
+from evals.real.calibration import committed_calibration
 from evals.real.config import EvalConfig
 from evals.real.datasets import load_split
 from evals.real.metrics import (
@@ -272,6 +273,14 @@ def build_report(run_dir: Path, dev_run_dir: Path | None = None) -> dict[str, An
             "bare_list_sensitivity": _bare_list_sensitivity(
                 records, prov_key, gcases, seed=seed, samples=samples
             ),
+            "committed_calibration": committed_calibration(
+                prov_key,
+                records,
+                outs,
+                gcases,
+                split=manifest["datasets"].get("grammar", {}).get("split"),
+                dataset_version=manifest["datasets"].get("grammar", {}).get("version"),
+            ),
         }
     for prov_key, vouts in sorted(scored["vocabulary"].items()):
         per_provider.setdefault(prov_key, {})["vocabulary"] = vocabulary_metrics(vouts, vcases)
@@ -475,6 +484,20 @@ def render_markdown(report: dict[str, Any]) -> str:
                 )
             else:
                 lines.append(f"- fitted calibration: {fitted.get('status')} {fitted}")
+            cc = m.get("committed_calibration") or {}
+            if cc.get("status") == "evaluated_on_test":
+                before, after = cc["before"], cc["after"]
+                lines.append(
+                    f"- committed map ({cc['map']['method']}, fitted on dev run "
+                    f"{cc['map']['source_run']}, n={cc['map']['dev_predictions']}), applied "
+                    f"offline to this run: ECE {cc['ece_before']} -> {cc['ece_after']}; "
+                    f"false-correction rate {_fmt(before['false_correction_rate'])} -> "
+                    f"{_fmt(after['false_correction_rate'])}; precision "
+                    f"{_fmt(before['precision'])} -> {_fmt(after['precision'])}; recall "
+                    f"{_fmt(before['recall'])} -> {_fmt(after['recall'])}"
+                )
+            else:
+                lines.append(f"- committed calibration map: {cc.get('status', 'absent')}")
             d = m["downstream"]
             if d.get("surfaced_evidence"):
                 lines.append(

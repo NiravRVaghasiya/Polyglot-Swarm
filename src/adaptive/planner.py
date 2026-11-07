@@ -30,7 +30,7 @@ Pipeline
    uncertainty, coverage gap, urgency, difficulty fit and progression. The
    score is a weighted mean with an explicit weight table per intent
    (:data:`INTENT_WEIGHTS`), times a skill-balance factor and the
-   fatigue/time penalty from :class:`~src.curriculum.PlanConstraints`.
+   fatigue/time penalty from :class:`~src.adaptive.constraints.PlanConstraints`.
 4. **De-duplicate.** One recommendation per item or objective. When FSRS and
    the curriculum both want the same item, the review wins and the
    recommendation says both reasons.
@@ -67,6 +67,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from src.adaptive.constraints import GOAL_SKILL_WEIGHTS, PlanConstraints
 from src.adaptive.difficulty import TARGET_SUCCESS, DifficultyDecision, choose_difficulty
 from src.adaptive.learner_model import (
     LearnerEstimates,
@@ -83,7 +84,6 @@ from src.adaptive.memory import (
     replay_memory,
 )
 from src.adaptive.snapshot import CatalogObjective, LearnerSnapshot
-from src.curriculum.constraints import GOAL_SKILL_WEIGHTS, PlanConstraints
 from src.evidence.difficulty import CEFR_ORDER
 from src.learner.estimation import EvidenceStatus, status_rank
 
@@ -228,6 +228,22 @@ class Recommendation:
     def key(self) -> str:
         """De-duplication key: one recommendation per item/objective."""
         return self.objective_id or f"{self.skill}:{self.target}"
+
+    def as_action(self) -> dict[str, Any]:
+        """The compact form ``/learner/plan`` serves (``PlanAction``).
+
+        ``reason`` is the first rationale line (the full list is in
+        :meth:`as_dict`), and ``priority`` is the planner score.
+        """
+        return {
+            "type": self.activity,
+            "target": self.target,
+            "skill": self.skill,
+            "reason": self.rationale[0] if self.rationale else self.expected_benefit,
+            "priority": round(self.score, 3),
+            "estimated_minutes": self.estimated_minutes,
+            "intent": self.intent,
+        }
 
     def as_dict(self) -> dict[str, Any]:
         return {
