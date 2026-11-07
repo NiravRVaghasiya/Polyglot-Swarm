@@ -19,22 +19,26 @@ class TestRegistration:
         assert resp.status_code == 400
 
     def test_blank_username_is_rejected(self, client):
-        resp = client.post("/api/v1/auth/register", json={"username": "   ", "password": "pw"})
+        resp = client.post(
+            "/api/v1/auth/register", json={"username": "   ", "password": "pw-secret-1"}
+        )
         assert resp.status_code == 400
 
     def test_username_is_trimmed_for_register_and_login(self, client):
-        resp = client.post("/api/v1/auth/register", json={"username": " bob ", "password": "pw1"})
+        resp = client.post(
+            "/api/v1/auth/register", json={"username": " bob ", "password": "pw1-secret-1"}
+        )
         assert resp.status_code == 200
         assert (
             client.post(
-                "/api/v1/auth/login", json={"username": "bob", "password": "pw1"}
+                "/api/v1/auth/login", json={"username": "bob", "password": "pw1-secret-1"}
             ).status_code
             == 200
         )
         # The trimmed name is taken, so a padded duplicate is refused too.
         assert (
             client.post(
-                "/api/v1/auth/register", json={"username": "bob  ", "password": "pw2"}
+                "/api/v1/auth/register", json={"username": "bob  ", "password": "pw2-secret-1"}
             ).status_code
             == 400
         )

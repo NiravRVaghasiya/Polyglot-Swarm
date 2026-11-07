@@ -97,7 +97,7 @@ def list_sessions(
     where = " AND ".join(clauses)
     with get_connection() as conn:
         rows = conn.execute(
-            f"SELECT * FROM sessions WHERE {where} ORDER BY started_at DESC LIMIT ?",
+            f"SELECT * FROM sessions WHERE {where} ORDER BY started_at DESC LIMIT ?",  # noqa: S608
             (*params, limit),
         ).fetchall()
     return [dict(r) for r in rows]

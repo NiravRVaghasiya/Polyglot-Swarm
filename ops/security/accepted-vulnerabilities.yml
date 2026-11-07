@@ -1,0 +1,26 @@
+# Known dependency vulnerabilities accepted after review (ADR-0035).
+#
+# `python -m src.security.dependency_audit` fails CI on any vulnerability in
+# requirements.lock that is not listed here. An entry matches one exact
+# package *version*: upgrading or downgrading the package voids it, forcing
+# a re-review. Keep `review_by` short; revisit every entry by that date.
+accepted:
+  - package: pillow
+    version: "12.3.0"
+    reason: >-
+      39 advisories, all fixed in 13.0.0, but every gradio release pins
+      pillow<13. Pillow is only reached through the Gradio UI; the API never
+      decodes images, and the staging/production profile does not run Gradio.
+    mitigation: "Gradio UI not deployed in production; upgrade when gradio allows pillow>=13."
+    reviewed: "2026-11-07"
+    review_by: "2027-01-31"
+  - package: chromadb
+    version: "1.5.9"
+    reason: >-
+      Advisories affect ChromaDB's HTTP server and its RBAC authorization
+      provider. Polyglot Swarm runs ChromaDB embedded (PersistentClient),
+      never starts its server, and stores only static content embeddings.
+      No fixed release exists.
+    mitigation: "Embedded client only; never expose a Chroma server."
+    reviewed: "2026-11-07"
+    review_by: "2027-01-31"

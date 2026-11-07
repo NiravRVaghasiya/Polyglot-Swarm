@@ -36,7 +36,7 @@ def vocabulary_growth(
             clause += " AND language = ?"
             params.append(language)
         rows = conn.execute(
-            f"SELECT timestamp, new_words_learned FROM learning_sessions "
+            f"SELECT timestamp, new_words_learned FROM learning_sessions "  # noqa: S608
             f"WHERE {clause} ORDER BY timestamp",
             params,
         ).fetchall()
@@ -72,7 +72,7 @@ def top_weaknesses(
             clause += " AND language = ?"
             params.append(language)
         rows = conn.execute(
-            f"SELECT error_type, occurrences, last_occurrence FROM error_patterns "
+            f"SELECT error_type, occurrences, last_occurrence FROM error_patterns "  # noqa: S608
             f"WHERE {clause} ORDER BY occurrences DESC, last_occurrence DESC LIMIT ?",
             [*params, limit],
         ).fetchall()
@@ -93,7 +93,7 @@ def cefr_progression(user_id: str, language: str | None = None) -> list[dict[str
             clause += " AND language = ?"
             params.append(language)
         rows = conn.execute(
-            f"SELECT timestamp, cefr_estimate FROM learning_sessions "
+            f"SELECT timestamp, cefr_estimate FROM learning_sessions "  # noqa: S608
             f"WHERE {clause} ORDER BY timestamp",
             params,
         ).fetchall()
@@ -109,7 +109,7 @@ def _session_dates(user_id: str, language: str | None) -> list[str]:
             clause += " AND language = ?"
             params.append(language)
         rows = conn.execute(
-            f"SELECT DISTINCT substr(timestamp, 1, 10) AS day FROM learning_sessions "
+            f"SELECT DISTINCT substr(timestamp, 1, 10) AS day FROM learning_sessions "  # noqa: S608
             f"WHERE {clause} ORDER BY day",
             params,
         ).fetchall()
@@ -154,7 +154,8 @@ def progress_overview(user_id: str, language: str | None = None) -> dict[str, An
             clause += " AND language = ?"
             params.append(language)
         total_sessions = conn.execute(
-            f"SELECT COUNT(*) AS n FROM learning_sessions WHERE {clause}", params
+            f"SELECT COUNT(*) AS n FROM learning_sessions WHERE {clause}",  # noqa: S608
+            params,
         ).fetchone()["n"]
 
     return {

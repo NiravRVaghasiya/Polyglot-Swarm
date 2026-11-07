@@ -45,6 +45,7 @@ old ADR — we add a new one that supersedes it and mark the old one accordingly
 | [0032](0032-real-model-evaluation.md) | Real-model evaluation framework | Accepted |
 | [0033](0033-adaptive-learning-intelligence.md) | Adaptive learning intelligence: subskill model, predictions, difficulty, next-best activity, FSRS integration | Accepted |
 | [0034](0034-multimodal-assessment.md) | Multimodal (speech) assessment: ingestion, transcription, speaking and listening evidence, privacy | Accepted |
+| [0035](0035-production-maturity.md) | Production maturity: durable sessions, LLM budgets and timeouts, idempotency, verified backups, metrics and alerts, supply chain | Accepted |
 
 ## Creating a new ADR
 

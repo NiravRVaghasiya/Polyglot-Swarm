@@ -93,7 +93,7 @@ def get_runs_by_interaction_ids(interaction_ids: list[str]) -> list[dict[str, An
     placeholders = ",".join("?" * len(interaction_ids))
     with get_connection() as conn:
         rows = conn.execute(
-            f"SELECT * FROM model_runs WHERE interaction_id IN ({placeholders})",
+            f"SELECT * FROM model_runs WHERE interaction_id IN ({placeholders})",  # noqa: S608
             interaction_ids,
         ).fetchall()
     return [dict(r) for r in rows]
@@ -110,7 +110,7 @@ def delete_by_interaction_ids(interaction_ids: list[str]) -> int:
     placeholders = ",".join("?" * len(interaction_ids))
     with get_connection() as conn:
         cursor = conn.execute(
-            f"DELETE FROM model_runs WHERE interaction_id IN ({placeholders})",
+            f"DELETE FROM model_runs WHERE interaction_id IN ({placeholders})",  # noqa: S608
             interaction_ids,
         )
         return cursor.rowcount

@@ -15,6 +15,9 @@ import time
 from collections import defaultdict
 from dataclasses import dataclass, field
 
+#: Above this many tracked keys, expired windows are pruned on the next check.
+_MAX_TRACKED_KEYS = 10_000
+
 
 class RateLimitExceededError(Exception):
     """Raised when a caller has exceeded its rate limit.
@@ -60,6 +63,8 @@ class RateLimiter:
                 the current window.
         """
         now = time.monotonic() if now is None else now
+        if len(self._windows) > _MAX_TRACKED_KEYS:  # bound memory under key spraying
+            self.prune(now=now)
         window = self._windows[key]
         elapsed = now - window.window_start
         if elapsed >= self.window_seconds:
@@ -70,6 +75,14 @@ class RateLimiter:
             retry_after = self.window_seconds - elapsed
             raise RateLimitExceededError(max(0.0, retry_after))
         window.count += 1
+
+    def prune(self, *, now: float | None = None) -> int:
+        """Drop expired windows so memory stays bounded; returns how many."""
+        now = time.monotonic() if now is None else now
+        stale = [k for k, w in self._windows.items() if now - w.window_start >= self.window_seconds]
+        for key in stale:
+            self._windows.pop(key, None)
+        return len(stale)
 
     def reset(self, key: str | None = None) -> None:
         """Clear rate-limit state for ``key`` (or every key when ``None``).

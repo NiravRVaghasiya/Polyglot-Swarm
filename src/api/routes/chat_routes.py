@@ -10,8 +10,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from src.api import sessions
-from src.api.deps import get_current_user
+from src.api import idempotency, sessions
+from src.api.deps import get_current_user, rate_limited_user
 from src.api.schemas import (
     ChatRequest,
     ChatResponse,
@@ -21,7 +21,8 @@ from src.api.schemas import (
     StartSessionRequest,
     StartSessionResponse,
 )
-from src.orchestrator.lifecycle import build_initial_state, finalize_session
+from src.llm.governance import BudgetExceededError
+from src.orchestrator.lifecycle import build_initial_state
 from src.scenarios.loader import ScenarioError
 
 router = APIRouter(prefix="/api/v1", tags=["chat"])
@@ -31,11 +32,20 @@ router = APIRouter(prefix="/api/v1", tags=["chat"])
 MAX_MESSAGE_CHARS = 2000
 
 
+def budget_exceeded(exc: BudgetExceededError) -> HTTPException:
+    """429 for a budget stop, telling the learner it is a limit, not a fault."""
+    return HTTPException(
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        detail={"code": "budget_exceeded", "scope": exc.scope, "message": str(exc)},
+    )
+
+
 @router.post("/sessions/start", response_model=StartSessionResponse)
-def start_session(
-    req: StartSessionRequest, user_id: str = Depends(get_current_user)
+async def start_session(
+    req: StartSessionRequest, user_id: str = Depends(rate_limited_user)
 ) -> StartSessionResponse:
     """Start a new learning session for the authenticated user."""
+    await sessions.enforce_session_cap(user_id)
     try:
         state = build_initial_state(
             user_id,
@@ -75,19 +85,30 @@ def session_state(
 async def end_session(
     session_id: str, user_id: str = Depends(get_current_user)
 ) -> EndSessionResponse:
-    """End a session: run end-of-session agents, persist, and return the report."""
+    """End a session: run end-of-session agents, persist, and return the report.
+
+    Finalization happens once: a repeated or concurrent call gets 409.
+    """
     state = sessions.get_session(user_id, session_id)
     if state is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
 
-    result = await finalize_session(state)
-    sessions.drop_session(user_id, session_id)
+    result = await sessions.finalize(user_id, session_id, state=state)
+    if result is None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Session already ending")
     return EndSessionResponse(report=result["report"], persisted=result["persisted"])
 
 
 @router.post("/chat", response_model=ChatResponse)
-async def chat(req: ChatRequest, user_id: str = Depends(get_current_user)) -> ChatResponse:
-    """Send a message in an active session and get the reply + hidden feedback."""
+async def chat(
+    req: ChatRequest,
+    user_id: str = Depends(rate_limited_user),
+    key: str | None = Depends(idempotency.idempotency_key),
+) -> ChatResponse:
+    """Send a message in an active session and get the reply + hidden feedback.
+
+    With an ``Idempotency-Key`` header a retried message is not run twice.
+    """
     if not req.message.strip():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="message is empty")
     if len(req.message) > MAX_MESSAGE_CHARS:
@@ -99,10 +120,22 @@ async def chat(req: ChatRequest, user_id: str = Depends(get_current_user)) -> Ch
     if state is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
 
-    reply = await sessions.run_turn(state, req.message)
+    claim = idempotency.begin(user_id, key, "chat", req.model_dump())
+    if claim.replayed is not None:
+        return ChatResponse.model_validate(claim.replayed)
+    try:
+        reply = await sessions.run_turn(state, req.message)
+    except BudgetExceededError as exc:
+        claim.abandon()
+        raise budget_exceeded(exc) from exc
+    except Exception:
+        claim.abandon()
+        raise
     feedback = HiddenFeedback(
         grammar=[dict(e) for e in state.get("grammar_errors", [])],
         vocabulary=[dict(v) for v in state.get("new_vocabulary", [])],
         cultural=list(state.get("cultural_notes", [])),
     )
-    return ChatResponse(reply=reply, hidden_feedback=feedback)
+    response = ChatResponse(reply=reply, hidden_feedback=feedback)
+    claim.complete(response.model_dump())
+    return response

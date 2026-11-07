@@ -78,8 +78,7 @@ check: lint format-check typecheck test ## Run every quality gate locally.
 ci: check ## Alias used by CI.
 
 lock: ## Regenerate the dependency lockfile.
-	$(PYTHON) -m pip install -e ".[all]" && \
-		$(PYTHON) -m pip freeze --exclude-editable > requirements.lock
+	$(PYTHON) -m pip install -e ".[all]" && $(PYTHON) ops/relock.py
 
 clean: ## Remove caches and build artifacts.
 	$(PYTHON) -c "import shutil,glob,os; [shutil.rmtree(p, ignore_errors=True) for p in ['.ruff_cache','.mypy_cache','.pytest_cache','build','dist'] + glob.glob('**/__pycache__', recursive=True)]"

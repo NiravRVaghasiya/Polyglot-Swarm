@@ -7,8 +7,9 @@ connection creation so every store applies the same pragmas and row factory.
 
 from __future__ import annotations
 
+import functools
 import sqlite3
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -47,3 +48,35 @@ def get_connection() -> Iterator[sqlite3.Connection]:
         raise
     finally:
         conn.close()
+
+
+# --- schema setup, once per process per database (ADR-0035) -----------------
+# Every store used to re-run its CREATE TABLE IF NOT EXISTS scripts (and the
+# migration runner) on every call: ~10 times and 60+ connections per review
+# request, about 70% of its latency. Schema setup is idempotent, so it only
+# has to happen once per process for a given database file.
+_ready: set[tuple[str, str]] = set()
+
+
+def once_per_database(fn: Callable[[], None]) -> Callable[[], None]:
+    """Run a schema-ensuring function once per process per database file.
+
+    Re-runs if the database file disappeared (tests, a deleted file) or after
+    :func:`reset_schema_cache` (a restore may bring back an older schema).
+    """
+
+    @functools.wraps(fn)
+    def wrapper() -> None:
+        path = _db_path()
+        key = (f"{fn.__module__}.{fn.__qualname__}", str(path))
+        if key in _ready and path.exists():
+            return
+        fn()
+        _ready.add(key)
+
+    return wrapper
+
+
+def reset_schema_cache() -> None:
+    """Forget which databases were set up (after a restore)."""
+    _ready.clear()

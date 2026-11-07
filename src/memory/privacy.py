@@ -76,6 +76,10 @@ def export_user_data(user_id: str) -> dict[str, Any]:
         "adaptive_decisions": _safe(lambda: _export_adaptive(user_id)),
         # ADR-0034: speaking/listening submissions (derived data, retention).
         "media_submissions": _safe(lambda: _export_media(user_id)),
+        # ADR-0035: in-flight session snapshots, daily LLM usage, idempotency keys.
+        "active_sessions": _safe(lambda: _export_active_sessions(user_id)),
+        "llm_usage_daily": _safe(lambda: _export_rows("llm_usage_daily", "scope", user_id)),
+        "idempotency_keys": _safe(lambda: _export_rows("idempotency_keys", "user_id", user_id)),
         "assessments": assessments.all_assessments_for_user(user_id),
         "experiment_assignments": experiments.all_assignments_for_user(user_id),
         "outcomes": experiments.all_outcomes_for_user(user_id),
@@ -132,6 +136,9 @@ def delete_user_data(user_id: str) -> dict[str, Any]:
     result["learner_model_history"] = _safe(lambda: _delete_lkm_history(user_id))
     result["adaptive_decisions"] = _safe(lambda: _delete_adaptive(user_id))
     result["media_submissions"] = _safe(lambda: _delete_media(user_id))
+    result["active_sessions"] = _safe(lambda: _delete_active_sessions(user_id))
+    result["llm_usage_daily"] = _safe(lambda: _delete_rows("llm_usage_daily", "scope", user_id))
+    result["idempotency_keys"] = _safe(lambda: _delete_rows("idempotency_keys", "user_id", user_id))
     result["cultural_notes"] = _safe(lambda: _delete_cultural_notes(user_id))
     result["auth_tokens"] = _safe(lambda: auth.delete_tokens_for_user(user_id))
     result["audit_log_anonymized"] = _safe(lambda: anonymize_for_user(user_id))
@@ -187,6 +194,47 @@ def _export_media(user_id: str) -> list[dict[str, Any]]:
     from src.multimodal.store import export_for_user
 
     return export_for_user(user_id)
+
+
+def _export_active_sessions(user_id: str) -> list[dict[str, Any]]:
+    from src.api.sessions import export_for_user
+
+    return export_for_user(user_id)
+
+
+def _delete_active_sessions(user_id: str) -> int:
+    from src.api.sessions import delete_for_user
+
+    return delete_for_user(user_id)
+
+
+#: Tables exported/deleted by a single owner column (fixed names, never user input).
+_OWNED_TABLES = {("llm_usage_daily", "scope"), ("idempotency_keys", "user_id")}
+
+
+def _export_rows(table: str, column: str, user_id: str) -> list[dict[str, Any]]:
+    from src.memory.db import get_connection
+
+    assert (table, column) in _OWNED_TABLES
+    with get_connection() as conn:
+        rows = conn.execute(
+            f"SELECT * FROM {table} WHERE {column} = ?",  # noqa: S608 - fixed identifiers
+            (user_id,),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def _delete_rows(table: str, column: str, user_id: str) -> int:
+    from src.memory.db import get_connection
+
+    assert (table, column) in _OWNED_TABLES
+    with get_connection() as conn:
+        return int(
+            conn.execute(
+                f"DELETE FROM {table} WHERE {column} = ?",  # noqa: S608 - fixed identifiers
+                (user_id,),
+            ).rowcount
+        )
 
 
 def _delete_media(user_id: str) -> int:

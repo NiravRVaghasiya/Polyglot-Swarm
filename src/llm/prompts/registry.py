@@ -87,7 +87,7 @@ def _environment() -> Environment:
         undefined=StrictUndefined,  # fail loudly on a missing template variable
         trim_blocks=True,
         lstrip_blocks=True,
-        autoescape=False,  # prompts are plain text, not HTML
+        autoescape=False,  # prompts are plain text, not HTML  # noqa: S701
         keep_trailing_newline=True,
     )
 

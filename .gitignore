@@ -26,6 +26,10 @@ env/
 data/polyglot.db
 data/chroma/
 data/*.sqlite
+data/backups/
+data/media/
+data/*.db-wal
+data/*.db-shm
 
 # OS
 .DS_Store
@@ -43,3 +47,5 @@ logs/
 
 # Phase 4: external speech corpora (downloaded on demand, not redistributed here)
 evals/speech/external/
+.env.production
+.env.staging

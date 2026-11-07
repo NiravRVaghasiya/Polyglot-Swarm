@@ -1,0 +1,123 @@
+# Polyglot Swarm alert rules (ADR-0035). Load into Prometheus with
+#   rule_files: ["alerts.yml"]
+# and scrape the API's /metrics with the METRICS_TOKEN bearer token.
+# Every metric referenced here is checked to exist by
+# tests/test_production/test_observability.py. Thresholds come from
+# docs/production/service-objectives.md.
+groups:
+  - name: polyglot-availability
+    rules:
+      - alert: PolyglotApiDown
+        expr: up{job="polyglot-api"} == 0
+        for: 2m
+        labels: {severity: sev1}
+        annotations:
+          summary: "API is not answering scrapes"
+          runbook: "docs/production/operations-runbook.md#api-down"
+
+      - alert: PolyglotHigh5xxRate
+        expr: |
+          sum(rate(polyglot_http_requests_total{status=~"5.."}[5m]))
+            / clamp_min(sum(rate(polyglot_http_requests_total[5m])), 0.001) > 0.02
+        for: 10m
+        labels: {severity: sev2}
+        annotations:
+          summary: "More than 2% of requests fail with 5xx (SLO: 99.5% success)"
+          runbook: "docs/production/operations-runbook.md#elevated-errors"
+
+      - alert: PolyglotSlowApi
+        expr: |
+          histogram_quantile(0.95, sum by (le) (rate(
+            polyglot_http_request_duration_seconds_bucket{route!~"/api/v1/(chat|assessment/speaking|sessions/\\{session_id\\}/end)"}[10m]
+          ))) > 0.5
+        for: 15m
+        labels: {severity: sev3}
+        annotations:
+          summary: "p95 latency of non-LLM endpoints above 500 ms"
+          runbook: "docs/production/operations-runbook.md#slow-responses"
+
+      - alert: PolyglotSlowChat
+        expr: |
+          histogram_quantile(0.95, sum by (le) (rate(
+            polyglot_http_request_duration_seconds_bucket{route="/api/v1/chat"}[10m]
+          ))) > 20
+        for: 15m
+        labels: {severity: sev3}
+        annotations:
+          summary: "p95 chat-turn latency above 20 s"
+          runbook: "docs/production/operations-runbook.md#slow-responses"
+
+  - name: polyglot-providers
+    rules:
+      - alert: PolyglotLlmErrorRate
+        expr: |
+          sum(rate(polyglot_llm_calls_total{outcome!="success"}[10m]))
+            / clamp_min(sum(rate(polyglot_llm_calls_total[10m])), 0.001) > 0.2
+        for: 10m
+        labels: {severity: sev2}
+        annotations:
+          summary: "More than 20% of LLM attempts fail or time out"
+          runbook: "docs/production/operations-runbook.md#provider-outage"
+
+      - alert: PolyglotLlmFallbackActive
+        expr: sum(rate(polyglot_llm_fallbacks_total[15m])) > 0
+        for: 15m
+        labels: {severity: sev3}
+        annotations:
+          summary: "Requests are being answered by fallback models (evidence quality may differ)"
+          runbook: "docs/production/operations-runbook.md#provider-outage"
+
+      - alert: PolyglotDailySpendHigh
+        expr: sum(increase(polyglot_llm_cost_usd_total[24h])) > 0.8 * 50
+        labels: {severity: sev3}
+        annotations:
+          summary: "Estimated LLM spend passed 80% of the daily global budget (adjust 50 to LLM_GLOBAL_DAILY_BUDGET_USD)"
+          runbook: "docs/production/operations-runbook.md#budget-exhausted"
+
+      - alert: PolyglotBudgetRejections
+        expr: sum(increase(polyglot_llm_budget_rejections_total{scope="global"}[15m])) > 0
+        labels: {severity: sev2}
+        annotations:
+          summary: "The deployment-wide LLM budget is exhausted: learners get 429s"
+          runbook: "docs/production/operations-runbook.md#budget-exhausted"
+
+  - name: polyglot-learning
+    rules:
+      - alert: PolyglotSessionFinalizeFailures
+        expr: sum(increase(polyglot_session_events_total{event="finalize_failed"}[30m])) > 0
+        labels: {severity: sev2}
+        annotations:
+          summary: "Session finalization is failing; learner evidence is waiting in snapshots"
+          runbook: "docs/production/operations-runbook.md#finalization-failures"
+
+      - alert: PolyglotMaintenanceNotRunning
+        expr: sum(increase(polyglot_maintenance_runs_total{outcome="ok"}[1h])) == 0
+        for: 30m
+        labels: {severity: sev3}
+        annotations:
+          summary: "No successful maintenance run in the last hour (session recovery, purges)"
+          runbook: "docs/production/operations-runbook.md#maintenance"
+
+      - alert: PolyglotAssessmentErrors
+        expr: sum(increase(polyglot_assessments_total{status=~"error|failed"}[30m])) > 5
+        labels: {severity: sev3}
+        annotations:
+          summary: "Speech assessments are failing (recogniser or decoder)"
+          runbook: "docs/production/operations-runbook.md#speech-assessment-failures"
+
+  - name: polyglot-data
+    rules:
+      - alert: PolyglotBackupStale
+        expr: time() - polyglot_backup_last_success_timestamp_seconds > 26 * 3600
+        labels: {severity: sev2}
+        annotations:
+          summary: "No verified backup in the last 26 hours (RPO: 24 h)"
+          runbook: "docs/production/operations-runbook.md#backups"
+
+      - alert: PolyglotBackupMissing
+        expr: absent(polyglot_backup_last_success_timestamp_seconds)
+        for: 1h
+        labels: {severity: sev2}
+        annotations:
+          summary: "No verified backup set exists"
+          runbook: "docs/production/operations-runbook.md#backups"

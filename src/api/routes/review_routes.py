@@ -6,7 +6,8 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from src.api.deps import get_current_user
+from src.api import idempotency
+from src.api.deps import get_current_user, rate_limited_user
 from src.api.schemas import ReviewSubmitRequest
 from src.memory import vocabulary_db
 
@@ -28,9 +29,12 @@ def due(
 def submit(
     req: ReviewSubmitRequest,
     language: str = "Spanish",
-    user_id: str = Depends(get_current_user),
+    user_id: str = Depends(rate_limited_user),
+    key: str | None = Depends(idempotency.idempotency_key),
 ) -> dict[str, Any]:
     """Grade a review for a word: FSRS scheduling, evidence and learner model.
+
+    Send an ``Idempotency-Key`` header to make retries safe (one review).
 
     This goes through :func:`src.agents.review.grade_review`, the same path as
     in-app reviews. Before ADR-0033 it only bumped a counter, so a word
@@ -43,10 +47,21 @@ def submit(
         raise HTTPException(
             status_code=422, detail="rating and correct disagree (ratings 3-4 mean correct)"
         )
-    result = grade_review(user_id, language, req.word, rating=rating, mode=req.mode)
-    return {
-        "status": "recorded",
-        "correct": result["correct"],
-        "next_review": result["next_review"],
-        "event_id": result["event_id"],
-    }
+    claim = idempotency.begin(
+        user_id, key, "review.submit", {"req": req.model_dump(), "language": language}
+    )
+    if claim.replayed is not None:
+        return claim.replayed
+    try:
+        result = grade_review(user_id, language, req.word, rating=rating, mode=req.mode)
+    except Exception:
+        claim.abandon()
+        raise
+    return claim.complete(
+        {
+            "status": "recorded",
+            "correct": result["correct"],
+            "next_review": result["next_review"],
+            "event_id": result["event_id"],
+        }
+    )

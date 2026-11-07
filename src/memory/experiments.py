@@ -235,7 +235,8 @@ def get_outcomes(
     where = " AND ".join(clauses)
     with get_connection() as conn:
         rows = conn.execute(
-            f"SELECT * FROM outcomes WHERE {where} ORDER BY id ASC", params
+            f"SELECT * FROM outcomes WHERE {where} ORDER BY id ASC",  # noqa: S608
+            params,
         ).fetchall()
     return [_outcome_row_to_dict(r) for r in rows]
 

@@ -21,7 +21,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from src.api.deps import get_current_user
+from src.api.deps import rate_limited_user
 from src.api.schemas import (
     TranscribeRequest,
     TranscribeResponse,
@@ -37,7 +37,7 @@ router = APIRouter(prefix="/api/v1/voice", tags=["voice"])
 
 @router.post("/transcribe", response_model=TranscribeResponse)
 def transcribe(
-    req: TranscribeRequest, user_id: str = Depends(get_current_user)
+    req: TranscribeRequest, user_id: str = Depends(rate_limited_user)
 ) -> TranscribeResponse:
     """Transcribe base64-encoded audio to text (Whisper, local).
 
@@ -74,7 +74,7 @@ def transcribe(
 
 
 @router.post("/speak", response_model=TtsResponse)
-async def speak(req: TtsRequest, user_id: str = Depends(get_current_user)) -> TtsResponse:
+async def speak(req: TtsRequest, user_id: str = Depends(rate_limited_user)) -> TtsResponse:
     """Synthesize speech for ``text``, returning base64 MP3 audio (Edge TTS).
 
     Returns 503 when the voice extra is not installed. Empty text yields empty

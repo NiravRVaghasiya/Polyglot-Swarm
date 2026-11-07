@@ -269,7 +269,12 @@ def extract_from_state(state: dict[str, Any]) -> list[LearningEvent]:
     user_id = state["user_id"]
     language = state["language"]
     session_id = state.get("session_id")
-    provenance = Provenance(source=SOURCE, session_id=session_id)
+    # Which models produced the judgments (a fallback model is marked as such),
+    # so evidence quality stays traceable when providers fail over (ADR-0035).
+    models = state.get("llm_models") or []
+    provenance = Provenance(
+        source=SOURCE, session_id=session_id, model_version=", ".join(models) or None
+    )
     task_type = task_type_for_mode(state.get("mode"))
     messages = state.get("messages", [])
 

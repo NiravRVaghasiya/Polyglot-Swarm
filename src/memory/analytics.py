@@ -19,7 +19,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from src.memory.db import get_connection
+from src.memory.db import get_connection, once_per_database
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS error_patterns (
@@ -54,6 +54,7 @@ CREATE INDEX IF NOT EXISTS idx_session_user_lang
 """
 
 
+@once_per_database
 def init_db() -> None:
     """Create the analytics tables if they do not exist."""
     with get_connection() as conn:
@@ -146,7 +147,7 @@ def get_error_patterns(
     where = " AND ".join(clauses)
     with get_connection() as conn:
         rows = conn.execute(
-            f"SELECT * FROM error_patterns WHERE {where} "
+            f"SELECT * FROM error_patterns WHERE {where} "  # noqa: S608
             "ORDER BY occurrences DESC, last_occurrence DESC",
             params,
         ).fetchall()

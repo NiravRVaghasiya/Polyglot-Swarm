@@ -27,8 +27,9 @@ jobs:
           python-version: "3.12"
           cache: pip
 
+      # Pinned to the tested versions (ADR-0035): the lockfile is a constraints file.
       - name: Install dependencies
-        run: python -m pip install -e ".[dev]"
+        run: python -m pip install -c requirements.lock -e ".[dev]"
 
       - name: Lint (ruff)
         run: python -m ruff check .
@@ -68,6 +69,98 @@ jobs:
       - name: Type-check speech evaluation harness (mypy)
         run: python -m mypy --strict evals/speech
 
+      # Migrations: a fresh database reaches the expected schema, intact.
+      - name: Migration check
+        run: |
+          python -c "from src.memory import schema; schema.init_all()"
+          python -m src.cli ops db-check
+
+  security:
+    name: Security · Secrets · Dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install tools
+        run: python -m pip install -c requirements.lock -e . ruff pip-audit
+
+      - name: Secret scan (tracked files)
+        run: python -m src.security.secret_scan
+
+      # flake8-bandit rules. S101/S104/S311 are accepted project-wide
+      # (asserts, the 0.0.0.0 container bind, non-crypto random for
+      # pedagogy); every other finding is fixed or carries a reviewed noqa.
+      - name: Static security lint (ruff S rules)
+        run: python -m ruff check src --select S --ignore S101,S104,S311
+
+      # Fails on any vulnerability not accepted, by exact version, in
+      # ops/security/accepted-vulnerabilities.yml (with a review-by date).
+      - name: Dependency vulnerability gate (pip-audit)
+        run: python -m src.security.dependency_audit
+
+  container:
+    name: Container · Staging rehearsal
+    runs-on: ubuntu-latest
+    needs: [quality]
+    env:
+      METRICS: ci-metrics-token-0123456789abcdef
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build production image
+        run: docker build -t polyglot-swarm:ci .
+
+      - name: Staging configuration
+        run: |
+          cat > .env.staging <<EOF
+          APP_ENV=staging
+          LOG_FORMAT=json
+          API_DOCS_ENABLED=false
+          CORS_ORIGINS=https://staging.example.org
+          METRICS_TOKEN=${METRICS}
+          LLM_GLOBAL_DAILY_BUDGET_USD=5
+          OLLAMA_BASE_URL=http://127.0.0.1:11434
+          EOF
+          docker run --rm --env-file .env.staging polyglot-swarm:ci polyglot ops config-check
+
+      - name: Start (migrates the schema) and check readiness
+        run: |
+          docker volume create polyglot-ci-data
+          docker run -d --name api -p 8000:8000 --env-file .env.staging \
+            -v polyglot-ci-data:/data --read-only --tmpfs /tmp -e HOME=/data/.home \
+            polyglot-swarm:ci
+          for i in $(seq 1 30); do curl -fsS localhost:8000/health && break; sleep 2; done
+          curl -fsS localhost:8000/ready | tee ready.json
+          python3 -c "import json; d=json.load(open('ready.json')); assert d['checks']['database']['ok'], d"
+          test "$(curl -s -o /dev/null -w '%{http_code}' localhost:8000/docs)" = 404
+          test "$(curl -s -o /dev/null -w '%{http_code}' localhost:8000/metrics)" = 401
+          curl -fsS -H "Authorization: Bearer ${METRICS}" localhost:8000/metrics | grep -q polyglot_build_info
+          docker exec api id -u | grep -qv '^0$'   # not root
+
+      - name: Backup, verify and restore inside the container
+        run: |
+          docker exec api polyglot ops backup --label ci
+          SET=$(docker exec api sh -c 'ls -d /data/backups/polyglot-* | tail -1')
+          docker exec api polyglot ops verify "$SET"
+          docker stop api
+          docker run --rm --env-file .env.staging -v polyglot-ci-data:/data -e HOME=/data/.home \
+            polyglot-swarm:ci polyglot ops restore "$SET" --yes
+          docker start api
+          for i in $(seq 1 30); do curl -fsS localhost:8000/ready && break; sleep 2; done
+          docker exec api polyglot ops db-check
+
+      - name: Restart is idempotent (no migration, no data change)
+        run: |
+          docker restart api
+          for i in $(seq 1 30); do curl -fsS localhost:8000/ready && break; sleep 2; done
+          docker logs api 2>&1 | tail -20
+
   frontend:
     name: Frontend · Lint · Test
     runs-on: ubuntu-latest
@@ -82,11 +175,20 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Install dependencies
-        run: npm install
+      - name: Install dependencies (lockfile)
+        run: npm ci
+
+      # Blocks on critical advisories; the known high-severity PostCSS
+      # advisory (inside Next's build tooling) is tracked in the residual
+      # risk register (docs/production/readiness-audit.md).
+      - name: Dependency audit (npm)
+        run: npm audit --omit=dev --audit-level=critical
 
       - name: Type-check
         run: npx tsc --noEmit
 
       - name: Test (vitest)
         run: npm test
+
+      - name: Production build
+        run: npm run build

@@ -9,6 +9,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Production maturity baseline (ADR-0035).** The audit and risk register
+  are in `docs/production/`.
+  - **Durable chat sessions:** a snapshot after every turn, rehydration after
+    a restart, recovery that finalizes idle and abandoned sessions,
+    finalize-exactly-once claims, and a per-user active-session cap.
+  - **LLM governance:**
+    - per-attempt timeouts;
+    - per-user and deployment-wide daily budgets, plus call quotas;
+    - a per-turn call cap (runaway-loop guard), with `429 budget_exceeded`;
+    - the answering model, marked as a fallback where it was one, recorded
+      on session evidence.
+  - **`Idempotency-Key` support** on chat, review submission and the
+    assessment endpoints.
+  - **Environment profiles:** `APP_ENV=staging|production` fails fast on
+    unsafe configuration; `polyglot ops config-check` reports the problems.
+  - **Edge protections:**
+    - request ids and a structured access log;
+    - a request-body size limit and security headers;
+    - a per-user work rate limit;
+    - a JSON 500 handler that carries the request id;
+    - a minimum password length;
+    - readiness that checks the schema version.
+  - **Observability:** `/metrics` (Prometheus format, behind a token),
+    Prometheus alert rules and a Grafana dashboard under `ops/`, and an
+    operations runbook.
+  - **Backups as verified sets** (database, media and profiles, with a
+    checksum manifest):
+    - restore, retention, and automatic pre-migration backups;
+    - a nightly backup service in `docker-compose.prod.yml`;
+    - `polyglot ops backup | backups | verify | restore | maintenance |
+      db-check | config-check`.
+  - **Deployment:**
+    - `docker-compose.prod.yml` (API only, published on loopback, read-only
+      root filesystem);
+    - `.env.production.example`;
+    - a non-root image built against `requirements.lock`.
+  - **Supply chain in CI:**
+    - a secret scan, the ruff security rules, and a pip-audit gate with
+      version-pinned, dated acceptances;
+    - `npm ci` with an audit and a production build;
+    - a container job that rehearses a staging deploy, backup and restore.
+  - A load-test harness (`ops/loadtest.py`) and the performance report.
+
 - **Multimodal (speech) assessment (ADR-0034).**
   - **Pipeline** (`src/multimodal/`), with separate stages: ingestion
     (format sniffing, size and duration limits, ffmpeg decoding, signal
@@ -567,6 +610,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Architecture Decision Records under `docs/adr/`.
 
 ### Fixed
+
+- Schema setup (`init_all` and the store `init_db` functions) ran on every
+  store call: about 60 SQLite connections per review request. It now runs
+  once per process per database; a review request is about 3× faster.
+- `requirements.lock` had drifted far from the tested environment, and 13
+  pinned packages had known vulnerabilities. It is regenerated from the
+  tested environment: 11 of the 13 are fixed, and 2 are accepted with
+  documented reasons.
+- The frontend had no lockfile; `package-lock.json` is added.
+- The test suite could write to the developer's real `./data` (tests that
+  used the default database path). Every test process now gets a throw-away
+  data directory, and backup sets and media under `data/` are git-ignored.
 
 - **VAD on Python 3.13.** Voice-activity detection no longer uses
   `audioop`, which Python 3.13 removes (this was the source of the

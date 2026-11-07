@@ -73,8 +73,12 @@ class TestChat:
 
     def test_session_isolated_between_users(self, client, mock_llm):
         # User A starts a session; user B cannot access it.
-        a = client.post("/api/v1/auth/register", json={"username": "aa", "password": "pw"}).json()
-        b = client.post("/api/v1/auth/register", json={"username": "bb", "password": "pw"}).json()
+        a = client.post(
+            "/api/v1/auth/register", json={"username": "aa", "password": "pw-secret-1"}
+        ).json()
+        b = client.post(
+            "/api/v1/auth/register", json={"username": "bb", "password": "pw-secret-1"}
+        ).json()
         ha = {"Authorization": f"Bearer {a['access_token']}"}
         hb = {"Authorization": f"Bearer {b['access_token']}"}
 

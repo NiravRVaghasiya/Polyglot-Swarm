@@ -85,7 +85,7 @@ def interactions_for_session(session_id: str, user_id: str | None = None) -> lis
     where = " AND ".join(clauses)
     with get_connection() as conn:
         rows = conn.execute(
-            f"SELECT interaction_id FROM session_interactions WHERE {where} ORDER BY id ASC",
+            f"SELECT interaction_id FROM session_interactions WHERE {where} ORDER BY id ASC",  # noqa: S608
             params,
         ).fetchall()
     return [r["interaction_id"] for r in rows]

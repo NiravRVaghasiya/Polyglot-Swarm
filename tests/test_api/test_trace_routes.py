@@ -53,8 +53,12 @@ class TestTraceRoute:
         # User A's session trace must not be visible to user B, even for the
         # same session id (guards the model_runs join, which has no user
         # column of its own).
-        a = client.post("/api/v1/auth/register", json={"username": "trace-a", "password": "pw"})
-        b = client.post("/api/v1/auth/register", json={"username": "trace-b", "password": "pw"})
+        a = client.post(
+            "/api/v1/auth/register", json={"username": "trace-a", "password": "pw-secret-1"}
+        )
+        b = client.post(
+            "/api/v1/auth/register", json={"username": "trace-b", "password": "pw-secret-1"}
+        )
         ha = {"Authorization": f"Bearer {a.json()['access_token']}"}
         hb = {"Authorization": f"Bearer {b.json()['access_token']}"}
 

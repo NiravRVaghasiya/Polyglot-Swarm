@@ -11,6 +11,7 @@ import logging
 from typing import Any
 
 from src.llm.factory import get_provider
+from src.llm.governance import BudgetExceededError
 from src.llm.prompts import render_prompt
 from src.llm.provider import Message
 from src.orchestrator.state import LearnerState
@@ -179,6 +180,8 @@ async def conversation_node(state: LearnerState) -> dict[str, Any]:
     provider = get_provider("primary")
     try:
         reply = await provider.generate(messages, temperature=0.8, max_tokens=300)
+    except BudgetExceededError:
+        raise  # a budget stop is a policy answer, not an outage to paper over
     except Exception as exc:  # noqa: BLE001 - total provider outage must not crash the turn
         logger.error("All LLM providers failed for conversation turn: %s", exc)
         reply = _fallback_reply(language_name)

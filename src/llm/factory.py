@@ -33,6 +33,7 @@ from src.llm.reliability import (
     is_retryable,
 )
 from src.llm.router import resolve_tier
+from src.observability import metrics
 
 if TYPE_CHECKING:
     from pydantic import BaseModel
@@ -57,6 +58,10 @@ _PROVIDER_BUILDERS: dict[str, Callable[[], LLMProvider]] = {
     "openai": OpenAIProvider,
     "ollama": OllamaProvider,
 }
+
+
+class ProviderTimeoutError(TimeoutError):
+    """One provider attempt exceeded ``settings.llm_timeout_seconds`` (retryable)."""
 
 
 class NoProviderAvailableError(RuntimeError):
@@ -147,6 +152,9 @@ class RoutingProvider(LLMProvider):
                 "Check API keys / Ollama base URL in your environment."
             )
 
+        from src.llm import governance
+
+        governance.check_before_call()  # budget stops are never retried or failed over
         input_tokens = candidates[0].count_tokens(messages)
         last_error: Exception | None = None
         for index, provider in enumerate(candidates):
@@ -177,6 +185,12 @@ class RoutingProvider(LLMProvider):
                     )
                 continue
             self.circuit_breaker.record_success(provider.name)
+            fallback = index > 0 or provider is not self._chain[0]
+            if fallback:
+                metrics.LLM_FALLBACKS.inc(tier=str(self.tier), provider=provider.name)
+            governance.note_answer(
+                provider.name, getattr(provider, "model", None), fallback=fallback
+            )
             return result
 
         raise NoProviderAvailableError(
@@ -207,14 +221,29 @@ class RoutingProvider(LLMProvider):
         while True:
             with telemetry.Timer() as timer:
                 try:
-                    result = await provider.generate(
-                        messages,
-                        temperature=temperature,
-                        max_tokens=max_tokens,
-                        json_mode=json_mode,
+                    result = await asyncio.wait_for(
+                        provider.generate(
+                            messages,
+                            temperature=temperature,
+                            max_tokens=max_tokens,
+                            json_mode=json_mode,
+                        ),
+                        timeout=settings.llm_timeout_seconds,
                     )
                 except Exception as exc:  # noqa: BLE001 - retry/failover is intentional
-                    self._record(provider, timer, input_tokens, 0, success=False, error=str(exc))
+                    if isinstance(exc, TimeoutError):
+                        exc = ProviderTimeoutError(
+                            f"{provider.name} did not answer within {settings.llm_timeout_seconds}s"
+                        )
+                    self._record(
+                        provider,
+                        timer,
+                        input_tokens,
+                        0,
+                        success=False,
+                        error=str(exc),
+                        outcome="timeout" if isinstance(exc, ProviderTimeoutError) else "error",
+                    )
                     if attempt >= self.retry_policy.max_retries or not is_retryable(exc):
                         return _CallFailed(exc)
                     delay = self.retry_policy.delay_for(attempt)
@@ -242,11 +271,24 @@ class RoutingProvider(LLMProvider):
         *,
         success: bool,
         error: str | None = None,
+        outcome: str | None = None,
     ) -> None:
         """Emit a telemetry record for one provider attempt (never raises)."""
+        from src.llm import governance
         from src.observability.context import current_interaction
 
         model = getattr(provider, "model", None)
+        cost = telemetry.estimate_cost(model, input_tokens, output_tokens)
+        outcome = outcome or ("success" if success else "error")
+        metrics.LLM_CALLS.inc(provider=provider.name, tier=str(self.tier), outcome=outcome)
+        metrics.LLM_LATENCY.observe(
+            timer.elapsed_ms / 1000, provider=provider.name, tier=str(self.tier)
+        )
+        metrics.LLM_COST.inc(cost, provider=provider.name, tier=str(self.tier))
+        labels = {"provider": provider.name, "tier": str(self.tier)}
+        metrics.LLM_TOKENS.inc(input_tokens, direction="in", **labels)
+        metrics.LLM_TOKENS.inc(output_tokens, direction="out", **labels)
+        governance.record_usage(cost)
         telemetry.record(
             telemetry.ModelRun(
                 provider=provider.name,
@@ -255,7 +297,7 @@ class RoutingProvider(LLMProvider):
                 latency_ms=timer.elapsed_ms,
                 input_tokens=input_tokens,
                 output_tokens=output_tokens,
-                cost_usd=telemetry.estimate_cost(model, input_tokens, output_tokens),
+                cost_usd=cost,
                 success=success,
                 error=error,
                 interaction_id=current_interaction(),
