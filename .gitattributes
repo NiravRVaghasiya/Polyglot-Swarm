@@ -1,0 +1,5 @@
+# Real-model evaluation datasets are verified against SHA-256 checksums of
+# their exact bytes (evals/real/datasets/*/<version>/manifest.json). Keep them
+# LF on every platform, or a Windows checkout with core.autocrlf=true rewrites
+# them to CRLF and `python -m evals.real validate` reports a checksum mismatch.
+evals/real/datasets/** text eol=lf
