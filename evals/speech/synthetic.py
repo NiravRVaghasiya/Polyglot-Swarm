@@ -98,7 +98,7 @@ def _mix_noise(pcm: bytes, snr_db: float, seed: int) -> bytes:
 
 
 async def _tts(text: str, voice: str, rate: str) -> bytes:
-    import edge_tts
+    import edge_tts  # type: ignore[import-not-found, import-untyped, unused-ignore]
 
     audio = bytearray()
     async for chunk in edge_tts.Communicate(text, voice, rate=rate).stream():
