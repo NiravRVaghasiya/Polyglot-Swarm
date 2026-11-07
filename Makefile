@@ -10,7 +10,7 @@
 
 .DEFAULT_GOAL := help
 .PHONY: help install install-dev test lint format format-check typecheck \
-        benchmark eval eval-real-validate eval-real eval-real-report health results \
+        benchmark eval eval-real-validate eval-real eval-real-report eval-adaptive health results \
         check ci clean lock
 
 PYTHON ?= python
@@ -55,6 +55,11 @@ eval-real: ## Real-model benchmark: make eval-real PROVIDERS=ollama:llama3.1:lat
 
 eval-real-report: ## Score a real-model run: make eval-real-report RUN=<run_id>.
 	$(PYTHON) -m evals.real report "$(RUN)"
+
+eval-adaptive: ## SIMULATED adaptive-learning evaluation: learner models + planner outcomes.
+	$(PYTHON) -m evals.adaptive models --family continuous
+	$(PYTHON) -m evals.adaptive models --family bkt
+	$(PYTHON) -m evals.adaptive policies --name policies-main
 
 health: ## Report configuration + provider health.
 	$(PYTHON) -m src.cli health

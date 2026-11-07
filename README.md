@@ -210,6 +210,7 @@ Add `--help` to any command for its options.
 | 🌐 [Language packs](docs/language-packs.md) | Adding resources for a language |
 | 🧪 [Evaluation](docs/evaluation.md) · [Results](docs/results.md) | Test harnesses and their latest numbers |
 | 🔬 [Real-model evaluation](docs/real-model-evaluation.md) | How real LLMs score on the grammar and vocabulary benchmarks, and how to rerun them |
+| 🧭 [Adaptive learning](docs/adaptive-learning.md) | How the tutor predicts performance, picks the next activity and difficulty, and how that was evaluated (in simulation) |
 | 📝 [Decision records](docs/adr/README.md) | Why the system is built the way it is |
 
 ## Development

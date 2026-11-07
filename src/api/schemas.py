@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 # --- Auth ---
@@ -74,6 +74,10 @@ class EndSessionResponse(BaseModel):
 class ReviewSubmitRequest(BaseModel):
     word: str
     correct: bool
+    #: Optional FSRS rating (1=Again .. 4=Easy); defaults to 3 if correct, else 1.
+    rating: int | None = Field(default=None, ge=1, le=4)
+    #: What the review asked for: "recognition" or "production" (ADR-0033).
+    mode: Literal["recognition", "production"] | None = None
 
 
 # --- Voice ---

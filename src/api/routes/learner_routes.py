@@ -16,6 +16,7 @@ they are cheap and safe to serve synchronously like the progress routes.
 from __future__ import annotations
 
 from dataclasses import asdict
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -184,3 +185,107 @@ def insights(
         recommended_focus=[a.reason for a in actions[:3]],
         streak=overview.get("current_streak", 0),
     )
+
+
+# --- Adaptive learning (ADR-0033) ---------------------------------------------
+
+
+@router.get("/recommendations")
+def recommendations(
+    language: str = _DEFAULT_LANGUAGE,
+    minutes: float = 15.0,
+    goal: str = "conversational",
+    record: bool = True,
+    user_id: str = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Next-best learning activities from the adaptive engine, with full rationale.
+
+    Deterministic and LLM-free. Each served plan is recorded in the audit
+    trail (``record=false`` to preview without recording); the returned
+    ``decision_id`` points at that record.
+    """
+    from src.adaptive import audit
+    from src.adaptive.planner import plan as adaptive_plan
+    from src.adaptive.snapshot import snapshot_from_store
+    from src.curriculum import PlanConstraints
+
+    snapshot = snapshot_from_store(user_id, language, goal=goal)
+    result = adaptive_plan(
+        snapshot, constraints=PlanConstraints(time_available_minutes=minutes, goal=goal)
+    )
+    payload = result.as_dict()
+    decision_id = None
+    if record:
+        decision_id = audit.record_decision(
+            user_id,
+            language,
+            kind="recommendation",
+            engine=result.engine,
+            input_digest=result.input_digest,
+            payload=payload,
+        )
+    return {**payload, "decision_id": decision_id}
+
+
+@router.get("/path")
+def learning_path(
+    language: str = _DEFAULT_LANGUAGE,
+    goal: str = "conversational",
+    target: str | None = None,
+    record: bool = True,
+    user_id: str = Depends(get_current_user),
+) -> dict[str, Any]:
+    """The learner's personalized path, with changes since the previous one."""
+    from src.adaptive import audit
+    from src.adaptive.paths import build_path
+    from src.adaptive.snapshot import snapshot_from_store
+
+    snapshot = snapshot_from_store(user_id, language, goal=goal, target_cefr=target)
+    path = build_path(snapshot)
+    payload = path.as_dict()
+    decision_id = None
+    if record:
+        decision_id = audit.record_decision(
+            user_id,
+            language,
+            kind="path",
+            engine=path.version,
+            input_digest=path.input_digest,
+            payload=payload,
+        )
+    return {**payload, "decision_id": decision_id}
+
+
+@router.get("/predictions")
+def predictions(
+    skill: str,
+    subskill: str | None = None,
+    difficulty: float | None = None,
+    language: str = _DEFAULT_LANGUAGE,
+    user_id: str = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Predicted performance (never observed results) for a skill/subskill."""
+    from src.adaptive.prediction import predictions_for
+    from src.adaptive.snapshot import snapshot_from_store
+
+    if difficulty is not None and not 0.0 <= difficulty <= 1.0:
+        raise HTTPException(status_code=422, detail="difficulty must be in [0, 1]")
+    snapshot = snapshot_from_store(user_id, language)
+    return predictions_for(snapshot, skill=skill, subskill=subskill, difficulty=difficulty)
+
+
+@router.get("/decisions")
+def decisions(
+    language: str = _DEFAULT_LANGUAGE,
+    kind: str | None = None,
+    limit: int = 20,
+    user_id: str = Depends(get_current_user),
+) -> dict[str, Any]:
+    """The audit trail of recorded adaptive decisions, newest first."""
+    from src.adaptive import audit
+
+    return {
+        "decisions": audit.list_decisions(
+            user_id, language, kind=kind, limit=max(1, min(limit, 200))
+        )
+    }

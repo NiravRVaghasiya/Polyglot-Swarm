@@ -47,14 +47,14 @@ def _build_v6_database(monkeypatch) -> None:
 
 class TestMigration0007:
     def test_fresh_database_reaches_version_7(self, temp_storage):
-        assert schema.run_migrations() == schema.SCHEMA_VERSION == 7
+        assert schema.run_migrations() == schema.SCHEMA_VERSION >= 7
 
     def test_upgrade_from_v6_preserves_legacy_rows(self, temp_storage, monkeypatch):
         full = list(schema._MIGRATIONS)
         _build_v6_database(monkeypatch)
         monkeypatch.setattr(schema, "_MIGRATIONS", full)
 
-        assert schema.run_migrations() == 7
+        assert schema.run_migrations() == schema.SCHEMA_VERSION
 
         with get_connection() as conn:
             ev = dict(conn.execute("SELECT * FROM evidence WHERE event_id='legacy-1'").fetchone())
@@ -89,7 +89,7 @@ class TestMigration0007:
         # Re-running the migration body directly must not fail or duplicate.
         with get_connection() as conn:
             schema._migration_0007_evidence_lkm_v2(conn)
-        assert schema.run_migrations() == 7
+        assert schema.run_migrations() == schema.SCHEMA_VERSION
         with get_connection() as conn:
             assert conn.execute("SELECT COUNT(*) FROM evidence").fetchone()[0] == 1
 

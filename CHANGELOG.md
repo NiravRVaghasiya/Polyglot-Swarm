@@ -9,6 +9,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Adaptive learning intelligence (ADR-0033).**
+  - **Subskill learner model `lkm-subskill-v1`** (`src/adaptive/learner_model.py`)
+    on top of `lkm-evidence-v2`. It adds:
+    - construction-level estimates, with intervals;
+    - a performance pattern that separates a one-session dip from a
+      persistent decline or weakness;
+    - leakage-guarded success predictions;
+    - the posterior probability that an objective is mastered.
+  - **Adaptive difficulty:** targets ~75% predicted success. Steps are
+    bounded, a one-session dip holds the difficulty, and task difficulty is
+    kept apart from the content's CEFR level.
+  - **Next-best-activity engine `adaptive-nba-v1`:** deterministic and
+    LLM-free. It chooses among remediation, assessment, reviews,
+    reinforcement, progression, introduction, vocabulary expansion and
+    conversation. Each recommendation carries:
+    - a transparent component score;
+    - its rationale and expected benefit;
+    - its evidence ids;
+    - its uncertainty;
+    - its difficulty decision.
+  - **Personalized learning paths:** per-objective states, prerequisite
+    gaps, short- and long-term horizons, skill balance, recurrent errors, and
+    explained changes since the previous path.
+  - **Retention view:** FSRS memory states replayed from demonstrated recall,
+    for words and constructions. Exposure is never counted as recall,
+    recognition is weaker than production, and leeches are detected.
+  - **API:** new endpoints `GET /api/v1/learner/recommendations`, `/path`,
+    `/predictions` and `/decisions`. Migration 0008 adds the
+    `adaptive_decisions` audit table, which is included in privacy export
+    and deletion.
+  - **Evaluation:** `python -m evals.adaptive` (SIMULATED learners only)
+    runs two comparisons:
+    - learner models (legacy, v2, BKT, Elo, v1) on held-out learners;
+    - five planning policies, from a static syllabus to the full adaptive
+      engine, on immediate and delayed outcomes.
+
+    Results are in `docs/adaptive-learning.md`; none are real learner
+    outcomes.
+
 - **Real-model evaluation framework (ADR-0032).** A new package,
   `evals/real/` (`python -m evals.real`), measures whether real LLMs assess
   learner language correctly. It is separate from the offline
@@ -70,79 +109,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     Reports also re-score bare-list grammar answers as a diagnostic: the
     production parser reads them as "no errors", which hid most of llama3.1's
     output.
-
-### Fixed
-
-- **Vocabulary parser crash on off-contract JSON.** When a model answered the
-  vocabulary prompt with a bare JSON list, or with non-object items,
-  `_parse_vocabulary_response` raised `AttributeError` and broke the turn. It
-  now returns no words. Found by the real-model benchmark.
-
-### Changed
-
-- **Evidence-driven learner knowledge model (ADR-0031).** The learner model is
-  now a deterministic projection of immutable evidence that accounts for task
-  difficulty and uncertainty.
-  - Evidence records carry the skill, subskill, learning objective and item;
-    the task type; the task difficulty in [0, 1], with an explicit
-    `difficulty_basis` that keeps `unknown` apart from rated or measured
-    values; and the prompt, rubric and model versions. They also carry a
-    content fingerprint, a correlation id, and a `supersedes` link for
-    corrections. Corrections go into a new append-only
-    `evidence_supersessions` table and never edit a row.
-  - New pure engine `src/learner/estimation.py` (`lkm-evidence-v2`): a
-    weighted MAP Rasch-style ability for each skill.
-    - Each observation is weighted by reliability, recency (relative to the
-      skill's newest evidence, not the clock), a per-item repetition
-      discount, and an unknown-difficulty discount.
-    - Duplicate and correlated judgments merge into one observation, and
-      exposure counts toward coverage only.
-    - It reports mastery (`null` without graded evidence), an interval,
-      uncertainty, an ordinal evidence index (explicitly not a probability),
-      evidence quantity and quality, and coverage (practised, assessed,
-      demonstrated, and coverage of the grammar-pack catalog). It also
-      reports an evidence status (`insufficient_evidence` / `provisional` /
-      `estimated` / `validated`), plus the old engine's value as
-      `baseline_mastery`.
-  - `KnowledgeModel.recompute` replays the active evidence in a stable order.
-    It writes `skill_states` plus append-only `lkm_processing_runs` and
-    `mastery_updates` only when the evidence digest changes, so processing is
-    idempotent. `replay(run_id)` reproduces any past run, and `explain(skill)`
-    lists each event's contribution.
-  - The CEFR profile (`cefr-profile-v2`) is nullable and has explicit states:
-    no default level, a band only at `provisional` or better, an overall band
-    only when at least two skills are assessed, and unassessed skills listed
-    rather than treated as weak.
-  - The tutor's prompt level is now an explicit *working level*, separate
-    from the assessed level. It is never seeded, and it is logged only when a
-    session gives a signal. `user_profile.DEFAULT_WORKING_LEVEL` is used for
-    prompts only.
-  - The planner labels every action `assessment`, `remediation`,
-    `reinforcement` or `advancement`, and recommends assessment, not
-    remediation, when evidence is insufficient. Other changes:
-    - Assessments are scored by information value and capped while learning
-      actions still fit.
-    - Readiness is blocked only by a prerequisite the evidence shows is weak.
-    - Grammar coverage drives a `diagnostic_check` of the easiest
-      unassessed construction.
-    - FSRS scheduling is unchanged.
-  - Migration 0007 is additive: new nullable or defaulted columns on
-    `evidence`, `skill_states` and `assessments`, and three new tables.
-    Existing rows are preserved, and legacy evidence replays into the new
-    model.
-  - API: CEFR, band and mastery are nullable; `status`, the interval, counts,
-    coverage and `intent` fields are added; there are new
-    `GET /api/v1/learner/explain/{skill}` and `GET /api/v1/learner/history`
-    routes; and `insights` gains `overall_status` and `needs_assessment`.
-  - Clients: the React types and `TodaysPlan` show "not yet assessed", the
-    status, the mastery range and each action's intent. The dashboard labels
-    the session value "Working level". Gradio has a "My level" panel.
-    `polyglot assess` and `polyglot plan` show the status, interval and
-    intent.
-  - Privacy export now includes evidence, supersessions and the learner-model
-    history, and deletion removes the history.
-
-### Added
 
 - **10/10 gap closure.** Closed the three gaps a full audit against the plan's
   Definition of Done found still open after Phases 0-24 — Gate C (learning
@@ -559,6 +525,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **API reviews never rescheduled.** `POST /api/v1/review/submit` only bumped
+  a counter, so a word reviewed through the API stayed due forever. It now
+  goes through `grade_review`: FSRS scheduling, evidence and the learner
+  model. It also accepts an optional `rating` and a `mode`.
+- **New words counted as recalled.** Meeting a word was recorded as a
+  successful `Good` FSRS review. New cards are now unreviewed, so their first
+  review is the first real retrieval. They are still first due ten minutes
+  after the word is met.
+
+- **Vocabulary parser crash on off-contract JSON.** When a model answered the
+  vocabulary prompt with a bare JSON list, or with non-object items,
+  `_parse_vocabulary_response` raised `AttributeError` and broke the turn. It
+  now returns no words. Found by the real-model benchmark.
+
 - New learners no longer get an unsupported CEFR level. `default_profile()`
   seeded "A2", `build_cefr_profile` fell back to "A2", the session log
   recorded the default as an estimate, and `polyglot experiment measure`
@@ -628,6 +608,76 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (and the offline demo's `[fake:...]` prefix) as markup and dropped it.
 - The `httpx2` client used by current Anthropic/OpenAI SDKs and
   `google_genai` no longer log a line per request into the chat.
+
+### Changed
+
+- **Review mode.** `grade_review` accepts `mode="recognition" | "production"`.
+  - A recognition success is rated `Hard` for FSRS, and a production success
+    keeps the learner's rating.
+  - The mode is recorded as the evidence subskill and the mastery dimension.
+  - Without a mode, the legacy behaviour is unchanged.
+
+- **Evidence-driven learner knowledge model (ADR-0031).** The learner model is
+  now a deterministic projection of immutable evidence that accounts for task
+  difficulty and uncertainty.
+  - Evidence records carry the skill, subskill, learning objective and item;
+    the task type; the task difficulty in [0, 1], with an explicit
+    `difficulty_basis` that keeps `unknown` apart from rated or measured
+    values; and the prompt, rubric and model versions. They also carry a
+    content fingerprint, a correlation id, and a `supersedes` link for
+    corrections. Corrections go into a new append-only
+    `evidence_supersessions` table and never edit a row.
+  - New pure engine `src/learner/estimation.py` (`lkm-evidence-v2`): a
+    weighted MAP Rasch-style ability for each skill.
+    - Each observation is weighted by reliability, recency (relative to the
+      skill's newest evidence, not the clock), a per-item repetition
+      discount, and an unknown-difficulty discount.
+    - Duplicate and correlated judgments merge into one observation, and
+      exposure counts toward coverage only.
+    - It reports mastery (`null` without graded evidence), an interval,
+      uncertainty, an ordinal evidence index (explicitly not a probability),
+      evidence quantity and quality, and coverage (practised, assessed,
+      demonstrated, and coverage of the grammar-pack catalog). It also
+      reports an evidence status (`insufficient_evidence` / `provisional` /
+      `estimated` / `validated`), plus the old engine's value as
+      `baseline_mastery`.
+  - `KnowledgeModel.recompute` replays the active evidence in a stable order.
+    It writes `skill_states` plus append-only `lkm_processing_runs` and
+    `mastery_updates` only when the evidence digest changes, so processing is
+    idempotent. `replay(run_id)` reproduces any past run, and `explain(skill)`
+    lists each event's contribution.
+  - The CEFR profile (`cefr-profile-v2`) is nullable and has explicit states:
+    no default level, a band only at `provisional` or better, an overall band
+    only when at least two skills are assessed, and unassessed skills listed
+    rather than treated as weak.
+  - The tutor's prompt level is now an explicit *working level*, separate
+    from the assessed level. It is never seeded, and it is logged only when a
+    session gives a signal. `user_profile.DEFAULT_WORKING_LEVEL` is used for
+    prompts only.
+  - The planner labels every action `assessment`, `remediation`,
+    `reinforcement` or `advancement`, and recommends assessment, not
+    remediation, when evidence is insufficient. Other changes:
+    - Assessments are scored by information value and capped while learning
+      actions still fit.
+    - Readiness is blocked only by a prerequisite the evidence shows is weak.
+    - Grammar coverage drives a `diagnostic_check` of the easiest
+      unassessed construction.
+    - FSRS scheduling is unchanged.
+  - Migration 0007 is additive: new nullable or defaulted columns on
+    `evidence`, `skill_states` and `assessments`, and three new tables.
+    Existing rows are preserved, and legacy evidence replays into the new
+    model.
+  - API: CEFR, band and mastery are nullable; `status`, the interval, counts,
+    coverage and `intent` fields are added; there are new
+    `GET /api/v1/learner/explain/{skill}` and `GET /api/v1/learner/history`
+    routes; and `insights` gains `overall_status` and `needs_assessment`.
+  - Clients: the React types and `TodaysPlan` show "not yet assessed", the
+    status, the mastery range and each action's intent. The dashboard labels
+    the session value "Working level". Gradio has a "My level" panel.
+    `polyglot assess` and `polyglot plan` show the status, interval and
+    intent.
+  - Privacy export now includes evidence, supersessions and the learner-model
+    history, and deletion removes the history.
 
 ## [0.1.0] — Initial
 

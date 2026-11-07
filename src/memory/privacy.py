@@ -72,6 +72,8 @@ def export_user_data(user_id: str) -> dict[str, Any]:
         "evidence": _export_evidence(user_id),
         "evidence_supersessions": _export_supersessions(user_id),
         "learner_model_history": _export_lkm_history(user_id),
+        # ADR-0033: every adaptive recommendation and learning path recorded.
+        "adaptive_decisions": _safe(lambda: _export_adaptive(user_id)),
         "assessments": assessments.all_assessments_for_user(user_id),
         "experiment_assignments": experiments.all_assignments_for_user(user_id),
         "outcomes": experiments.all_outcomes_for_user(user_id),
@@ -126,6 +128,7 @@ def delete_user_data(user_id: str) -> dict[str, Any]:
     result["experiments"] = _safe(lambda: experiments.delete_for_user(user_id))
     result["evidence"] = _safe(lambda: _delete_evidence(user_id))
     result["learner_model_history"] = _safe(lambda: _delete_lkm_history(user_id))
+    result["adaptive_decisions"] = _safe(lambda: _delete_adaptive(user_id))
     result["cultural_notes"] = _safe(lambda: _delete_cultural_notes(user_id))
     result["auth_tokens"] = _safe(lambda: auth.delete_tokens_for_user(user_id))
     result["audit_log_anonymized"] = _safe(lambda: anonymize_for_user(user_id))
@@ -169,6 +172,18 @@ def _export_lkm_history(user_id: str) -> dict[str, list[dict[str, Any]]]:
             "SELECT * FROM mastery_updates WHERE user_id=? ORDER BY id", (user_id,)
         ).fetchall()
     return {"runs": [dict(r) for r in runs], "updates": [dict(u) for u in updates]}
+
+
+def _export_adaptive(user_id: str) -> list[dict[str, Any]]:
+    from src.adaptive.audit import all_for_user
+
+    return all_for_user(user_id)
+
+
+def _delete_adaptive(user_id: str) -> int:
+    from src.adaptive.audit import delete_for_user
+
+    return delete_for_user(user_id)
 
 
 def _delete_lkm_history(user_id: str) -> int:
