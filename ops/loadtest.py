@@ -14,6 +14,12 @@ model) plus the simulated wait, not a real provider's latency or quality.
 
     python ops/loadtest.py --levels 1 5 10 25 --journeys 3 --llm-latency-ms 0 600
     python ops/loadtest.py --out docs/production/loadtest-results.json
+    python ops/loadtest.py --levels 1 --llm-latency-ms 600 --think-ms 0 3000
+
+``--think-ms`` pauses between chat turns, standing in for the learner reading
+the reply and typing the next message. A turn's analysis runs after its reply
+(``src.api.sessions``) and the next turn waits for it, so with no pause the
+next turn absorbs that wait; with a realistic pause it overlaps the learner.
 """
 
 from __future__ import annotations
@@ -109,7 +115,9 @@ class Recorder:
         return resp
 
 
-async def journey(client: httpx.AsyncClient, rec: Recorder, token: str, n: int) -> None:
+async def journey(
+    client: httpx.AsyncClient, rec: Recorder, token: str, n: int, think_s: float = 0.0
+) -> None:
     h = {"Authorization": f"Bearer {token}"}
     await rec.call(client, "GET learner/plan", "GET", "/api/v1/learner/plan", headers=h)
     start = await rec.call(
@@ -120,6 +128,8 @@ async def journey(client: httpx.AsyncClient, rec: Recorder, token: str, n: int) 
         return
     sid = start.json()["session_id"]
     for i, msg in enumerate(("hola, quiero un café", "ayer fui al mercado", "me gusta leer")):
+        if i and think_s:
+            await asyncio.sleep(think_s)
         await rec.call(
             client, "POST chat", "POST", "/api/v1/chat",
             json={"session_id": sid, "message": f"{msg} ({n}.{i})"}, headers=h,
@@ -141,7 +151,7 @@ def _pct(values: list[float], q: float) -> float:
 
 
 async def run_level(
-    base: str, tokens: list[str], concurrency: int, journeys: int
+    base: str, tokens: list[str], concurrency: int, journeys: int, think_ms: float = 0.0
 ) -> dict[str, Any]:
     rec = Recorder()
     limits = httpx.Limits(max_connections=concurrency + 5)
@@ -150,7 +160,7 @@ async def run_level(
 
         async def user(u: int) -> None:
             for j in range(journeys):
-                await journey(client, rec, tokens[u], j)
+                await journey(client, rec, tokens[u], j, think_ms / 1000)
 
         await asyncio.gather(*(user(u) for u in range(concurrency)))
         wall = time.perf_counter() - t0
@@ -173,6 +183,7 @@ async def run_level(
     ]  # fmt: skip
     return {
         "concurrency": concurrency,
+        "think_ms": think_ms,
         "journeys": concurrency * journeys,
         "requests": total,
         "wall_s": round(wall, 2),
@@ -202,7 +213,9 @@ def _rss_mb(pid: int) -> float | None:
         return None
 
 
-def run(levels: list[int], journeys: int, latencies: list[float]) -> dict[str, Any]:
+def run(
+    levels: list[int], journeys: int, latencies: list[float], thinks: list[float]
+) -> dict[str, Any]:
     results: dict[str, Any] = {
         "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "host": {
@@ -233,13 +246,14 @@ def run(levels: list[int], journeys: int, latencies: list[float]) -> dict[str, A
                     time.sleep(0.5)
                 else:
                     raise RuntimeError("server did not become ready")
-                for level in levels:
-                    out = asyncio.run(run_level(base, tokens, level, journeys))
+                for think, level in ((t, lv) for t in thinks for lv in levels):
+                    out = asyncio.run(run_level(base, tokens, level, journeys, think))
                     out["llm_latency_ms"] = latency
                     out["server_rss_mb"] = _rss_mb(proc.pid)
                     results["runs"].append(out)
                     print(
-                        f"latency={latency:>5.0f}ms c={level:>3} rps={out['throughput_rps']:>7} "
+                        f"latency={latency:>5.0f}ms think={think:>5.0f}ms c={level:>3} "
+                        f"rps={out['throughput_rps']:>7} "
                         f"journeys/min={out['journeys_per_min']:>7} err={out['error_rate']:.2%} "
                         f"non-LLM p95={out['non_llm_p95_ms']}ms "
                         f"chat p95={out['endpoints'].get('POST chat', {}).get('p95_ms')}ms"
@@ -258,9 +272,12 @@ def main() -> None:
     ap.add_argument("--levels", type=int, nargs="+", default=[1, 5, 10, 25, 50])
     ap.add_argument("--journeys", type=int, default=2, help="journeys per virtual user")
     ap.add_argument("--llm-latency-ms", type=float, nargs="+", default=[0.0, 600.0])
+    ap.add_argument(
+        "--think-ms", type=float, nargs="+", default=[0.0], help="pause between chat turns"
+    )
     ap.add_argument("--out", type=Path, default=None)
     args = ap.parse_args()
-    results = run(args.levels, args.journeys, args.llm_latency_ms)
+    results = run(args.levels, args.journeys, args.llm_latency_ms, args.think_ms)
     if args.out:
         args.out.parent.mkdir(parents=True, exist_ok=True)
         args.out.write_text(json.dumps(results, indent=1) + "\n", encoding="utf-8")

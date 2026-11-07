@@ -33,14 +33,17 @@ def _available_scenarios() -> list[Scenario]:
 async def _run_turn(state: LearnerState, user_input: str) -> str:
     """Run a single conversation turn and return the reply.
 
-    Uses the API's turn runner, which waits for the analysis agents and the
-    evaluator, so this UI records learning evidence like the API does.
+    Uses the API's turn runner, then waits for the turn's analysis agents and
+    evaluator before returning: each Gradio call runs its own event loop, so
+    a background analysis would not outlive it. This UI therefore records
+    learning evidence like the API does, without the API's earlier reply.
     Durable persistence happens via persist_session at session end.
     """
-    from src.api.sessions import run_turn
+    from src.api.sessions import run_turn, wait_for_analysis
 
-    reply = await run_turn(state, user_input)
-    return reply if reply != "..." else "Lo siento, algo salió mal."
+    result = await run_turn(state, user_input)
+    await wait_for_analysis(state)
+    return result.reply if result.reply != "..." else "Lo siento, algo salió mal."
 
 
 def chat(

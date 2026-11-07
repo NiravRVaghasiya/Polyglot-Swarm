@@ -1,8 +1,28 @@
 """Active chat sessions for the API: durable, capped and recoverable.
 
 Holds each user's live :class:`LearnerState` between HTTP requests (keyed by
-``(user_id, session_id)``) and runs one conversation turn at a time through
-the compiled graph.
+``(user_id, session_id)``) and runs one conversation turn at a time.
+
+**Reply first, analysis after.** :func:`run_turn` returns as soon as the
+conversation node has replied. The analysis of that turn (grammar, vocabulary
+and cultural agents, then the evaluator and the adaptive-difficulty step)
+runs as a per-session background task:
+
+- before turn N+1 starts, and before the session is finalized, turn N's
+  analysis is awaited, so every turn is analyzed in order and the next reply
+  is pitched with the evaluator's signal, as before;
+- analysis results are merged into the state in one step when the analysis
+  finishes, so a cancelled analysis leaves no partial results. The snapshot
+  marks the turn as pending (``pending_analysis_turn``) until then; a session
+  rehydrated with that mark (after a restart) re-runs the analysis before its
+  next turn or its finalization;
+- an analysis failure is logged and skipped; it never fails a later turn;
+- the hidden feedback a reply carries therefore covers the turns analyzed
+  before it (``through_turn``): turn N's feedback arrives with the reply to
+  turn N+1, and all of it is in the end-of-session report.
+
+Database work on these paths runs in worker threads (``asyncio.to_thread``)
+so a turn's SQLite I/O does not block other requests.
 
 **Durability (ADR-0035, R1).** The in-memory dict is only a cache. After
 every turn the state is snapshotted to ``active_sessions``, so:
@@ -28,9 +48,11 @@ per user; starting another finalizes that user's least recently used one.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import time
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -39,18 +61,27 @@ from src.config import settings
 from src.llm import governance
 from src.observability import metrics
 from src.observability.context import interaction_scope
-from src.orchestrator.graph import compile_turn_graph
+from src.orchestrator.graph import REPLY_COMPONENTS, compile_analysis_graph, compile_turn_graph
 from src.orchestrator.state import LearnerState
 
 logger = logging.getLogger("polyglot.api.sessions")
 
 # Compiled once and reused across requests. No checkpointer: this registry owns
 # each session's state and resends it every turn (see compile_turn_graph).
-_graph = compile_turn_graph()
+# The reply graph is everything but analysis; the analysis graph is the
+# grammar/vocabulary/cultural fan-out and the evaluator.
+_reply_graph = compile_turn_graph(REPLY_COMPONENTS)
+_analysis_graph = compile_analysis_graph()
+
+_Key = tuple[str, str]
 
 # (user_id, session_id) -> LearnerState (a cache over ``active_sessions``)
-_active: dict[tuple[str, str], LearnerState] = {}
-_last_used: dict[tuple[str, str], float] = {}
+_active: dict[_Key, LearnerState] = {}
+_last_used: dict[_Key, float] = {}
+# The background analysis of each session's latest turn, while it runs.
+_pending: dict[_Key, asyncio.Task[None]] = {}
+# One turn at a time per session (a lock is bound to the loop that created it).
+_turn_locks: dict[_Key, tuple[asyncio.AbstractEventLoop, asyncio.Lock]] = {}
 
 
 def _now() -> str:
@@ -125,8 +156,13 @@ def get_session(user_id: str, session_id: str) -> LearnerState | None:
 
 
 def drop_session(user_id: str, session_id: str) -> None:
-    _active.pop((user_id, session_id), None)
-    _last_used.pop((user_id, session_id), None)
+    key = (user_id, session_id)
+    _active.pop(key, None)
+    _last_used.pop(key, None)
+    _turn_locks.pop(key, None)
+    task = _pending.pop(key, None)
+    if task is not None and not task.done():
+        task.cancel()
 
 
 def _active_ids(user_id: str) -> list[tuple[str, str]]:
@@ -145,7 +181,7 @@ async def enforce_session_cap(user_id: str) -> None:
     cap = settings.max_active_sessions_per_user
     if cap <= 0:
         return
-    active = _active_ids(user_id)
+    active = await asyncio.to_thread(_active_ids, user_id)
     for session_id, _ in active[: max(0, len(active) - cap + 1)]:
         await finalize(user_id, session_id)
         metrics.SESSION_EVENTS.inc(event="evicted")
@@ -190,23 +226,28 @@ async def finalize(
 ) -> dict[str, Any] | None:
     """Finalize a session exactly once; ``None`` if it was not claimable.
 
-    Runs :func:`src.orchestrator.lifecycle.finalize_session`, marks the
-    session ``finalized`` and clears its snapshot. On failure the claim is
-    released (status back to ``active``) and the error re-raised, so the
-    recovery task retries it.
+    Waits for the last turn's analysis first (see :func:`wait_for_analysis`),
+    so the report and the evidence include it. Then runs
+    :func:`src.orchestrator.lifecycle.finalize_session`, marks the session
+    ``finalized`` and clears its snapshot. On failure the claim is released
+    (status back to ``active``) and the error re-raised, so the recovery task
+    retries it.
     """
     from src.orchestrator.lifecycle import finalize_session
 
-    state = state or get_session(user_id, session_id)
-    if state is None or not _claim(user_id, session_id):
+    state = state or await asyncio.to_thread(get_session, user_id, session_id)
+    if state is None:
+        return None
+    await wait_for_analysis(state)
+    if not await asyncio.to_thread(_claim, user_id, session_id):
         return None
     try:
         result = await finalize_session(state)
     except Exception:
-        _set_status(user_id, session_id, "active", clear_state=False)
+        await asyncio.to_thread(_set_status, user_id, session_id, "active", clear_state=False)
         metrics.SESSION_EVENTS.inc(event="finalize_failed")
         raise
-    _set_status(user_id, session_id, "finalized", clear_state=True)
+    await asyncio.to_thread(_set_status, user_id, session_id, "finalized", clear_state=True)
     drop_session(user_id, session_id)
     metrics.SESSION_EVENTS.inc(event="finalized")
     return result
@@ -224,17 +265,22 @@ async def recover_idle_sessions(*, idle_hours: float | None = None) -> dict[str,
     now = datetime.now(UTC)
     idle_cutoff = (now - timedelta(hours=idle_hours)).isoformat()
     stuck_cutoff = (now - timedelta(hours=1)).isoformat()
-    with _conn() as conn:
-        released = conn.execute(
-            "UPDATE active_sessions SET status = 'active' "
-            "WHERE status = 'finalizing' AND updated_at < ?",
-            (stuck_cutoff,),
-        ).rowcount
-        rows = conn.execute(
-            "SELECT user_id, session_id FROM active_sessions "
-            "WHERE status = 'active' AND updated_at < ? ORDER BY updated_at",
-            (idle_cutoff,),
-        ).fetchall()
+
+    def _scan() -> tuple[int, list[Any]]:
+        with _conn() as conn:
+            released = conn.execute(
+                "UPDATE active_sessions SET status = 'active' "
+                "WHERE status = 'finalizing' AND updated_at < ?",
+                (stuck_cutoff,),
+            ).rowcount
+            rows = conn.execute(
+                "SELECT user_id, session_id FROM active_sessions "
+                "WHERE status = 'active' AND updated_at < ? ORDER BY updated_at",
+                (idle_cutoff,),
+            ).fetchall()
+        return int(released), list(rows)
+
+    released, rows = await asyncio.to_thread(_scan)
     outcome = {"released": released, "finalized": 0, "failed": 0}
     for row in rows:
         try:
@@ -250,63 +296,185 @@ async def recover_idle_sessions(*, idle_hours: float | None = None) -> dict[str,
 # --- turns ---------------------------------------------------------------------
 
 
-async def run_turn(state: LearnerState, user_input: str) -> str:
-    """Run one conversation turn through the graph, mutating ``state`` in place.
+@dataclass(frozen=True)
+class TurnResult:
+    """A turn's reply and the hidden feedback known when it was given."""
 
-    Streams graph node updates and stops once the conversation node has produced
-    its reply, merging each node's partial update back into ``state``. Returns
-    the assistant reply. The updated state is snapshotted before returning.
-    """
-    state["last_user_input"] = user_input
-    config = {
-        "configurable": {"thread_id": state["session_id"]},
-        "recursion_limit": 8,
+    reply: str
+    #: ``grammar``, ``vocabulary`` and ``cultural`` accumulated over the
+    #: session's analyzed turns, and ``through_turn``: how many turns that
+    #: covers (the current turn is still being analyzed).
+    feedback: dict[str, Any]
+
+
+def _turn_lock(key: _Key) -> asyncio.Lock:
+    loop = asyncio.get_running_loop()
+    entry = _turn_locks.get(key)
+    if entry is None or entry[0] is not loop:
+        entry = (loop, asyncio.Lock())
+        _turn_locks[key] = entry
+    return entry[1]
+
+
+def _merge(target: dict[str, Any], update: dict[str, Any]) -> None:
+    """Merge one node's partial update (``messages`` is append-only)."""
+    for key, value in update.items():
+        if key == "messages":
+            target["messages"] = target.get("messages", []) + value
+        else:
+            target[key] = value
+
+
+def _note_models(state: LearnerState, answered_by: list[str]) -> None:
+    models = state.get("llm_models", [])
+    state["llm_models"] = models + [m for m in answered_by if m not in models]
+
+
+def _feedback(state: LearnerState) -> dict[str, Any]:
+    return {
+        "grammar": [dict(e) for e in state.get("grammar_errors", [])],
+        "vocabulary": [dict(v) for v in state.get("new_vocabulary", [])],
+        "cultural": list(state.get("cultural_notes", [])),
+        "through_turn": state.get("analyzed_turns", 0),
     }
 
-    # Correlate every model run and evidence event produced while handling this
-    # turn under one interaction id, so the turn can be reconstructed as a trace
-    # (Phase 17 observability). The governance scope caps model calls per turn
-    # and records which models answered (ADR-0035).
-    with (
-        interaction_scope(session_id=state["session_id"]) as interaction_id,
-        governance.turn_scope() as answered_by,
-    ):
-        # Remember which interactions ran under this session so the trace
-        # assembler can join the session's model runs (model_runs has no
-        # session_id column). Also expose the id on the state for evidence.
-        state["interaction_id"] = interaction_id
-        _link_interaction(state["user_id"], state["session_id"], interaction_id, state)
-        reply = ""
-        saw_conversation = False
-        async for update in _graph.astream(state, config):
-            for node_update in update.values():
-                if not isinstance(node_update, dict):
-                    continue
-                for key, value in node_update.items():
-                    if key == "messages":
-                        state["messages"] = state.get("messages", []) + value
-                    else:
-                        state[key] = value  # type: ignore[literal-required]
-                if node_update.get("agent_response"):
-                    reply = node_update["agent_response"]
-            if "conversation" in update:
-                saw_conversation = True
-            # Stop after one full analysis cycle (conversation -> ... ->
-            # evaluator) so the evaluator's difficulty signal is available for
-            # adaptation.
-            if saw_conversation and "evaluator" in update:
-                break
 
+async def _analyze(state: LearnerState, turn: int, answered_by: list[str]) -> None:
+    """Analyze the latest turn and merge the results into ``state`` at once.
+
+    Runs the analysis graph (grammar, vocabulary, cultural, then evaluator)
+    and the adaptive-difficulty step on the state as the reply left it. A
+    failure is logged and the turn's analysis skipped; cancellation leaves
+    the state untouched, still marked pending, so it is re-run later.
+    """
+    config = {"configurable": {"thread_id": state["session_id"]}, "recursion_limit": 8}
+    updates: dict[str, Any] = {}
+    try:
+        async for update in _analysis_graph.astream(state, config):
+            for node_update in update.values():
+                if isinstance(node_update, dict):
+                    _merge(updates, node_update)
         # Adaptive difficulty: adjust the effective level/guidance from the
         # evaluator's signal so the next turn is calibrated to the learner.
-        adjustment = adaptive_node(state)
-        state["cefr_level"] = adjustment["cefr_level"]
-        state["current_scenario"] = adjustment["current_scenario"]
-        models = state.get("llm_models", [])
-        state["llm_models"] = models + [m for m in answered_by if m not in models]
+        adjustment = adaptive_node({**state, **updates})  # type: ignore[typeddict-item]
+    except Exception:
+        logger.exception(
+            "analysis of turn %d failed for session %s; skipped", turn, state["session_id"]
+        )
+        metrics.SESSION_EVENTS.inc(event="analysis_failed")
+        state.pop("pending_analysis_turn", None)
+        await asyncio.to_thread(persist_snapshot, state)
+        return
+    _merge(state, updates)  # type: ignore[arg-type]
+    state["cefr_level"] = adjustment["cefr_level"]
+    state["current_scenario"] = adjustment["current_scenario"]
+    _note_models(state, answered_by)
+    state["analyzed_turns"] = turn
+    state.pop("pending_analysis_turn", None)
+    await asyncio.to_thread(persist_snapshot, state)
 
-    persist_snapshot(state)
-    return reply or "..."
+
+async def wait_for_analysis(state: LearnerState) -> None:
+    """Make sure the session's latest turn has been analyzed.
+
+    Awaits the background analysis if it is running in this event loop.
+    If the turn is still marked pending without a running task (the process
+    restarted, or the task was cancelled), the analysis is run now.
+    """
+    key = (state["user_id"], state["session_id"])
+    task = _pending.pop(key, None)
+    if task is not None and not task.done() and task.get_loop() is asyncio.get_running_loop():
+        # asyncio.wait does not raise the task's exception or cancellation;
+        # it raises only if this caller is cancelled.
+        await asyncio.wait({task})
+    turn = state.get("pending_analysis_turn")
+    if turn is None:
+        return
+    with (
+        interaction_scope(session_id=state["session_id"]),
+        governance.turn_scope() as answered_by,
+    ):
+        await _analyze(state, turn, answered_by)
+
+
+async def run_turn(state: LearnerState, user_input: str) -> TurnResult:
+    """Run one turn: reply now, analyze in the background.
+
+    Waits for the previous turn's analysis, then runs the reply stage
+    (router, then review or conversation) and returns once the conversation
+    node has replied. The state (with the reply) is snapshotted before
+    returning, marked ``pending_analysis_turn``; the turn's analysis then runs
+    as a background task (see the module docstring). Callers that end the
+    process after a turn must call :func:`wait_for_analysis` first, or the
+    analysis re-runs when the session is next used.
+    """
+    key = (state["user_id"], state["session_id"])
+    async with _turn_lock(key):
+        await wait_for_analysis(state)
+        feedback = _feedback(state)
+        state["last_user_input"] = user_input
+        config = {
+            "configurable": {"thread_id": state["session_id"]},
+            "recursion_limit": 8,
+        }
+
+        # Correlate every model run and evidence event produced while handling
+        # this turn (its reply and its analysis) under one interaction id, so
+        # the turn can be reconstructed as a trace (Phase 17 observability).
+        # The governance scope caps model calls per turn and records which
+        # models answered (ADR-0035); the background analysis inherits both.
+        with (
+            interaction_scope(session_id=state["session_id"]) as interaction_id,
+            governance.turn_scope() as answered_by,
+        ):
+            # Remember which interactions ran under this session so the trace
+            # assembler can join the session's model runs (model_runs has no
+            # session_id column). Also expose the id on the state for evidence.
+            state["interaction_id"] = interaction_id
+            await asyncio.to_thread(
+                _link_interaction, state["user_id"], state["session_id"], interaction_id, state
+            )
+            reply = ""
+            replied = False
+            async for update in _reply_graph.astream(state, config):
+                for node_update in update.values():
+                    if not isinstance(node_update, dict):
+                        continue
+                    _merge(state, node_update)  # type: ignore[arg-type]
+                    if node_update.get("agent_response"):
+                        reply = node_update["agent_response"]
+                if "conversation" in update:
+                    replied = True
+                    break
+            _note_models(state, answered_by)
+            if replied:
+                turn = int(state.get("turn_count", 0))
+                state["pending_analysis_turn"] = turn
+                await asyncio.to_thread(persist_snapshot, state)
+                _pending[key] = asyncio.create_task(
+                    _analyze(state, turn, answered_by),
+                    name=f"analysis:{state['session_id']}:{turn}",
+                )
+            else:
+                await asyncio.to_thread(persist_snapshot, state)
+
+    return TurnResult(reply=reply or "...", feedback=feedback)
+
+
+async def drain_pending(timeout: float = 30.0) -> int:
+    """Wait (up to ``timeout``) for running analyses; returns how many ran.
+
+    Called at shutdown. Anything still running is cancelled; its turn stays
+    marked pending in the snapshot and is analyzed when the session is next
+    used.
+    """
+    tasks = [t for t in _pending.values() if not t.done()]
+    if not tasks:
+        return 0
+    _done, still = await asyncio.wait(tasks, timeout=timeout)
+    for task in still:
+        task.cancel()
+    return len(tasks)
 
 
 def _link_interaction(
@@ -335,7 +503,7 @@ def export_for_user(user_id: str) -> list[dict[str, Any]]:
 
 def delete_for_user(user_id: str) -> int:
     """Delete the user's snapshots and cached sessions (account deletion)."""
-    for key in [k for k in _active if k[0] == user_id]:
+    for key in [k for k in {*_active, *_pending} if k[0] == user_id]:
         drop_session(*key)
     with _conn() as conn:
         return int(
@@ -345,5 +513,10 @@ def delete_for_user(user_id: str) -> int:
 
 def reset() -> None:
     """Clear all cached sessions (used by tests for isolation)."""
+    for task in _pending.values():
+        if not task.done():
+            task.cancel()
+    _pending.clear()
+    _turn_locks.clear()
     _active.clear()
     _last_used.clear()

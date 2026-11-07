@@ -16,8 +16,12 @@ the graph and the state.
 User input
     │
     ▼
-conversation_node  ──▶ persona-driven reply (LLM, "primary" tier)
+router  ──▶ conversation, or a review mode, or session end
     │
+    ▼
+conversation_node  ──▶ persona-driven reply (LLM, "primary" tier)
+    │                  ── the reply is returned to the learner here ──
+    │  (background task, awaited before the next turn and at session end)
     ├──▶ grammar_node     (silent error detection, "fast" tier, JSON mode)
     ├──▶ vocabulary_node  (new-word extraction, "fast" tier, JSON mode)
     └──▶ cultural_node    (register/idiom notes, confidence-gated)
@@ -27,8 +31,15 @@ evaluator_node  ──▶ QA pass: accept/revise/abstain on grammar errors,
                     difficulty assessment, budget-aware tier escalation
     │
     ▼
-router  ──▶ next turn, or a review/drill mode, or session end
+adaptive step  ──▶ pitch for the next turn
 ```
+
+The turn runner (`src/api/sessions.py`, ADR
+[0036](adr/0036-reply-before-analysis.md)) runs the reply stage, returns the
+reply, and runs the analysis stage (`build_analysis_graph`) as a per-session
+background task. The next turn and finalization wait for it, so every turn is
+analyzed in order; the chat response's hidden feedback therefore covers the
+turns before it.
 
 At session end, `src/orchestrator/lifecycle.py`'s `finalize_session` runs the
 assessment and transfer agents, then `persist_session` writes everything to

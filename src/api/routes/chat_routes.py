@@ -3,10 +3,15 @@
 - POST /api/v1/sessions/start   — start a personalized session (optional scenario)
 - GET  /api/v1/sessions/{id}/state — current session state
 - POST /api/v1/sessions/{id}/end   — end session, run finalize, return report
-- POST /api/v1/chat             — send a message, get reply + hidden feedback
+- POST /api/v1/chat             — send a message, get the reply + hidden feedback
+  for the turns analyzed so far (the turn itself is analyzed after the reply)
+
+Database work runs in worker threads so it does not block the event loop.
 """
 
 from __future__ import annotations
+
+import asyncio
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
@@ -47,7 +52,8 @@ async def start_session(
     """Start a new learning session for the authenticated user."""
     await sessions.enforce_session_cap(user_id)
     try:
-        state = build_initial_state(
+        state = await asyncio.to_thread(
+            build_initial_state,
             user_id,
             req.language if req.scenario_id is None else None,
             scenario_id=req.scenario_id,
@@ -55,7 +61,7 @@ async def start_session(
     except ScenarioError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
-    sessions.register_session(user_id, state)
+    await asyncio.to_thread(sessions.register_session, user_id, state)
     scenario = state.get("current_scenario", {}) or {}
     return StartSessionResponse(
         session_id=state["session_id"],
@@ -87,9 +93,10 @@ async def end_session(
 ) -> EndSessionResponse:
     """End a session: run end-of-session agents, persist, and return the report.
 
+    Waits for the last turn's analysis, so the report includes it.
     Finalization happens once: a repeated or concurrent call gets 409.
     """
-    state = sessions.get_session(user_id, session_id)
+    state = await asyncio.to_thread(sessions.get_session, user_id, session_id)
     if state is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
 
@@ -107,6 +114,9 @@ async def chat(
 ) -> ChatResponse:
     """Send a message in an active session and get the reply + hidden feedback.
 
+    The reply is returned as soon as the tutor has answered; the turn's
+    grammar/vocabulary/cultural analysis runs afterwards, so ``hidden_feedback``
+    covers the turns before this one (see :class:`HiddenFeedback`).
     With an ``Idempotency-Key`` header a retried message is not run twice.
     """
     if not req.message.strip():
@@ -116,26 +126,23 @@ async def chat(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"message is too long (max {MAX_MESSAGE_CHARS} characters)",
         )
-    state = sessions.get_session(user_id, req.session_id)
+    state = await asyncio.to_thread(sessions.get_session, user_id, req.session_id)
     if state is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
 
-    claim = idempotency.begin(user_id, key, "chat", req.model_dump())
+    claim = await asyncio.to_thread(idempotency.begin, user_id, key, "chat", req.model_dump())
     if claim.replayed is not None:
         return ChatResponse.model_validate(claim.replayed)
     try:
-        reply = await sessions.run_turn(state, req.message)
+        result = await sessions.run_turn(state, req.message)
     except BudgetExceededError as exc:
-        claim.abandon()
+        await asyncio.to_thread(claim.abandon)
         raise budget_exceeded(exc) from exc
     except Exception:
-        claim.abandon()
+        await asyncio.to_thread(claim.abandon)
         raise
-    feedback = HiddenFeedback(
-        grammar=[dict(e) for e in state.get("grammar_errors", [])],
-        vocabulary=[dict(v) for v in state.get("new_vocabulary", [])],
-        cultural=list(state.get("cultural_notes", [])),
+    response = ChatResponse(
+        reply=result.reply, hidden_feedback=HiddenFeedback.model_validate(result.feedback)
     )
-    response = ChatResponse(reply=reply, hidden_feedback=feedback)
-    claim.complete(response.model_dump())
+    await asyncio.to_thread(claim.complete, response.model_dump())
     return response

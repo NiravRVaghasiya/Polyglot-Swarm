@@ -20,6 +20,7 @@ surfacing works end to end today.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import uuid
 from datetime import UTC, datetime
@@ -371,23 +372,24 @@ async def finalize_session(state: LearnerState, *, duration_minutes: float = 0.0
        the learner model; then persist the evidence-backed CEFR profile.
     4. Compile the enriched report.
 
-    Returns ``{"report": str, "persisted": {...counts...}}``.
+    Returns ``{"report": str, "persisted": {...counts...}}``. The SQLite work
+    (steps 1 and 3) runs in worker threads, off the event loop.
     """
     # 1. Working level (updates cefr_level on state + profile when the session
     #    gave a signal; never records a default).
-    state["cefr_level"] = update_working_level(state)
+    state["cefr_level"] = await asyncio.to_thread(update_working_level, state)
 
     # 2. Transfer (populates transfer_suggestions).
     transfer_update = await transfer_node(state)
     state["transfer_suggestions"] = transfer_update["transfer_suggestions"]
 
     # 3. Persist everything (evidence first, then the learner model).
-    counts = persist_session(state, duration_minutes=duration_minutes)
+    counts = await asyncio.to_thread(persist_session, state, duration_minutes=duration_minutes)
 
     # 3b. The evidence-backed CEFR profile, built *after* this session's
     #     evidence reached the learner model (it used to be built before, so
     #     the persisted profile lagged one session behind).
-    persist_evidence_profile(state["user_id"], state["language"])
+    await asyncio.to_thread(persist_evidence_profile, state["user_id"], state["language"])
 
     # 4. Report.
     report = build_session_report(state)

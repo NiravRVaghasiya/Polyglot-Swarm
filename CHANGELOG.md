@@ -9,6 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Reply before analysis (ADR-0036).** `POST /api/v1/chat` returns as soon
+  as the conversation node replies. The turn's grammar, vocabulary and
+  cultural analysis, the evaluator and the adaptive step run as a
+  per-session background task that the next turn and the session end wait
+  for, so evidence, vocabulary and the report are unchanged. A pending
+  analysis is marked in the session snapshot and re-run after a restart; an
+  analysis failure is logged and skipped.
+  - **API contract:** `hidden_feedback` covers the turns analyzed before
+    this one and adds `through_turn`. Turn N's feedback arrives with the
+    response to turn N+1 and in the end-of-session report.
+  - SQLite work on the chat and session paths (including finalization's
+    persistence) runs in worker threads.
+  - The CLI runs its session in one event loop, so analysis overlaps the
+    learner typing, and finalizes through the session registry, which marks
+    its snapshot finalized (it was left `active` before, so idle recovery
+    could finalize a CLI session a second time). The Gradio UI waits for
+    the analysis before returning, as before.
+  - `ops/loadtest.py` takes `--think-ms`, a pause between chat turns.
+  - Measured (600 ms per model call, one learner): chat p95 731 ms with a
+    3 s pause between turns, 1,391 ms with none (1,428 ms before), since the
+    next turn waits for the previous analysis. No gain from about 10
+    concurrent learners. See `docs/production/performance-report.md`.
+  - The `run_turn` docstring said the turn stopped once the conversation
+    node replied; it waited for the evaluator. It now does what it says.
 - **One planner.** `/learner/plan` (what the UI shows), `/learner/insights`
   and `polyglot plan` now use the adaptive next-best-activity engine
   (`adaptive-nba-v1`, ADR-0033), the one that was evaluated, through the new

@@ -1,7 +1,9 @@
 # Performance and capacity report
 
-Measured 2026-11-07 with [`ops/loadtest.py`](../../ops/loadtest.py). The
-raw results are in [`loadtest-results.json`](loadtest-results.json).
+Measured 2026-11-07 with [`ops/loadtest.py`](../../ops/loadtest.py), and
+re-measured 2026-11-08 after chat turns started replying before their
+analysis (ADR-0036). The raw results of the latest run are in
+[`loadtest-results.json`](loadtest-results.json).
 
 ## Method
 
@@ -24,11 +26,44 @@ raw results are in [`loadtest-results.json`](loadtest-results.json).
   - 600 ms simulated latency per model call (about five calls per chat
     turn), so concurrent turns wait the way they would on a real provider.
 - **Load.** Concurrency 1, 5, 10, 25 and 50 learners, two journeys each.
+- **Think time** (2026-11-08 run). A chat turn's analysis now runs after its
+  reply, and the next turn waits for it. The run therefore uses two pauses
+  between chat turns: 0 ms (the journey above, unchanged) and 3,000 ms (the
+  learner reads the reply and types).
 
 ## Results
 
 Each cell is p95 latency in ms. "Non-LLM" covers every route except chat
 and session end.
+
+### Reply before analysis (2026-11-08)
+
+Chat latency with 600 ms per simulated model call:
+
+| Concurrent learners | Chat p95 before (no pause) | Chat p95, no pause | Chat p95, 3 s pause | Session-end p95, 3 s pause |
+|---|---|---|---|---|
+| 1 | 1 428 | 1 391 | **731** | 758 |
+| 5 | 1 725 | 1 718 | **823** | 1 308 |
+| 10 | 2 116 | 2 142 | 2 644 | 2 633 |
+| 25 | 4 305 | 3 948 | 3 746 | 3 513 |
+| 50 | 7 881 | 9 853 | 11 378 | 9 820 |
+
+- **With a pause, the reply arrives after one model call.** At one learner,
+  chat p95 falls from 1,428 ms to 731 ms (p50 704 ms): the 600 ms
+  conversation call plus about 130 ms of application time. The analysis runs
+  while the learner reads and types.
+- **Without a pause there is no gain** (1,391 ms). Turn N+1 waits for the rest
+  of turn N's analysis before it starts, so the next reply absorbs it. Only
+  the first turn of a session is faster.
+- **Under load the gain disappears.** From 10 concurrent learners, the
+  background analyses compete with requests for the one process, and the
+  3-second-pause run was slower than the no-pause run at 10 and 50 learners
+  (one run each; the cause was not investigated). Capacity is unchanged:
+  the process is CPU-bound either way.
+- **Session end** now includes waiting for the last turn's analysis.
+- All 6,552 requests of this run succeeded.
+
+### Before reply-first (2026-11-07)
 
 | LLM latency | Concurrent learners | Throughput (req/s) | Journeys/min | Errors | Non-LLM p95 | Chat p95 | Session-end p95 |
 |---|---|---|---|---|---|---|---|
@@ -44,7 +79,8 @@ and session end.
 | 600 ms | 50 | 11.9 | 79 | 0% | 6 020 | 7 881 | 5 833 |
 
 All 3,276 requests succeeded. No `database is locked` errors occurred at 50
-concurrent learners.
+concurrent learners. The 2026-11-08 run (0 ms latency, no pause) gave 9.9 to
+15.4 req/s, the same saturation range.
 
 ## Bottleneck found and fixed
 

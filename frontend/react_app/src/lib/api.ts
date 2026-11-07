@@ -100,10 +100,14 @@ export interface Scenario {
   location: string;
 }
 
+// Feedback over the session's analyzed turns. A turn is analyzed after its
+// reply, so a chat response carries feedback through the previous turn
+// (`through_turn`); ADR-0036.
 export interface HiddenFeedback {
   grammar: Record<string, unknown>[];
   vocabulary: Record<string, unknown>[];
   cultural: string[];
+  through_turn: number;
 }
 
 export interface ChatResponse {

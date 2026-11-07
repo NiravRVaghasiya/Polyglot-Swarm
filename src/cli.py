@@ -175,16 +175,29 @@ def scenarios(language: str | None = typer.Option(None, help="Filter by code (es
     console.print(table)
 
 
-async def _run_turn(state: LearnerState, user_input: str) -> str:
-    """Run one conversation turn, returning the reply.
+async def _chat_loop(state: LearnerState, speaker: str) -> dict[str, Any] | None:
+    """Run the interactive session in one event loop, then finalize it.
 
-    Uses the API's turn runner, which waits for the grammar/vocabulary/cultural
-    analysis and the evaluator, so CLI sessions record learning evidence and
-    adapt difficulty exactly like API sessions.
+    Uses the API's turn runner: the reply prints as soon as the tutor answers,
+    and the turn's grammar/vocabulary/cultural analysis and the evaluator run
+    in the background while the learner types the next message. The next
+    turn and the finalization wait for it, so CLI sessions record learning
+    evidence and adapt difficulty exactly like API sessions.
     """
-    from src.api.sessions import run_turn
+    from src.api.sessions import finalize, run_turn
 
-    return await run_turn(state, user_input)
+    while True:
+        try:
+            user_input = await asyncio.to_thread(console.input, "[cyan]You:[/cyan] ")
+        except EOFError:
+            break
+        if user_input.strip().lower() in {"quit", "exit"}:
+            break
+        result = await run_turn(state, user_input)
+        console.print(f"[bold]{speaker}:[/bold] {escape(result.reply)}\n")
+
+    console.print("\n[dim]Ending session...[/dim]")
+    return await finalize(state["user_id"], state["session_id"], state=state)
 
 
 @app.command()
@@ -387,18 +400,17 @@ def chat(
         console.print(f"[bold]{speaker}:[/bold] {escape(opening)}")
     console.print("[dim](type 'quit' to end and see your report)[/dim]\n")
 
-    while True:
-        try:
-            user_input = console.input("[cyan]You:[/cyan] ")
-        except (EOFError, KeyboardInterrupt):
-            break
-        if user_input.strip().lower() in {"quit", "exit"}:
-            break
-        reply = asyncio.run(_run_turn(state, user_input))
-        console.print(f"[bold]{speaker}:[/bold] {escape(reply)}\n")
+    from src.api.sessions import finalize
 
-    console.print("\n[dim]Ending session...[/dim]")
-    result = asyncio.run(finalize_session(state))
+    try:
+        result = asyncio.run(_chat_loop(state, speaker))
+    except KeyboardInterrupt:
+        # Ctrl+C cancels the loop; a cut-short analysis re-runs in finalize.
+        console.print("\n[dim]Ending session...[/dim]")
+        result = asyncio.run(finalize(state["user_id"], state["session_id"], state=state))
+    if result is None:
+        # No turn was taken, so there is no snapshot to claim.
+        result = asyncio.run(finalize_session(state))
     console.print(result["report"])
 
 

@@ -51,6 +51,12 @@ class LearnerState(TypedDict):
     #: ``"claude:claude-sonnet-5-5"`` or ``"ollama:llama3.1:8b (fallback)"``;
     #: stamped on the session's evidence as ``model_version`` (ADR-0035).
     llm_models: NotRequired[list[str]]
+    #: Turns whose analysis has been merged into this state
+    #: (``src.api.sessions``; the reply comes before the analysis).
+    analyzed_turns: NotRequired[int]
+    #: The turn whose analysis has not been merged yet, if any; a session
+    #: rehydrated with it set re-runs that analysis before continuing.
+    pending_analysis_turn: NotRequired[int]
 
     # --- Conversation ---
     messages: Annotated[list[dict[str, Any]], add]  # Chat history (appended via reducer)
