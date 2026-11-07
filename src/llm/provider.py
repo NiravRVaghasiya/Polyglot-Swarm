@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal, TypeVar
 
 if TYPE_CHECKING:
@@ -47,6 +47,53 @@ class Message:
 
     role: Role
     content: str
+
+
+@dataclass(frozen=True)
+class Completion:
+    """A completion plus what the provider reported about producing it.
+
+    Used where the text alone is not enough — the real-model evaluation
+    runner records token usage and the model identity the provider *reported*
+    (which can differ from the requested alias). ``tokens_estimated`` is True
+    when the provider gave no usage and the counts are a heuristic.
+    """
+
+    text: str
+    input_tokens: int
+    output_tokens: int
+    tokens_estimated: bool
+    #: Model name as reported by the provider response, if any.
+    reported_model: str | None = None
+    #: Provider response metadata (finish reason, ids, ...), JSON-safe values only.
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+def completion_from_langchain(response: Any, messages: list[Message]) -> Completion:
+    """Build a :class:`Completion` from a LangChain ``AIMessage``-like response.
+
+    Reads ``usage_metadata`` (LangChain's provider-neutral usage block) when
+    present and falls back to the ~4-chars-per-token heuristic, flagged as an
+    estimate, when it is not.
+    """
+    text = normalize_content(getattr(response, "content", ""))
+    usage = getattr(response, "usage_metadata", None) or {}
+    meta_raw = getattr(response, "response_metadata", None) or {}
+    metadata = {
+        k: v
+        for k, v in dict(meta_raw).items()
+        if isinstance(v, (str, int, float, bool)) or v is None
+    }
+    reported = (
+        meta_raw.get("model_name") or meta_raw.get("model") if isinstance(meta_raw, dict) else None
+    )
+    in_tok = usage.get("input_tokens") if isinstance(usage, dict) else None
+    out_tok = usage.get("output_tokens") if isinstance(usage, dict) else None
+    if isinstance(in_tok, int) and isinstance(out_tok, int):
+        return Completion(text, in_tok, out_tok, False, reported, metadata)
+    est_in = max(1, sum(len(m.content) for m in messages) // 4)
+    est_out = max(1, len(text) // 4) if text else 0
+    return Completion(text, est_in, est_out, True, reported, metadata)
 
 
 class LLMProvider(ABC):
@@ -90,6 +137,29 @@ class LLMProvider(ABC):
             The model's completion as plain text.
         """
         ...
+
+    async def generate_detailed(
+        self,
+        messages: list[Message],
+        *,
+        temperature: float = 0.7,
+        max_tokens: int = 512,
+        json_mode: bool = False,
+    ) -> Completion:
+        """Like :meth:`generate`, but also return token usage and metadata.
+
+        The default wraps :meth:`generate` and estimates tokens (flagged as an
+        estimate); SDK-backed providers override it with reported usage.
+        """
+        text = await self.generate(
+            messages, temperature=temperature, max_tokens=max_tokens, json_mode=json_mode
+        )
+        return Completion(
+            text=text,
+            input_tokens=self.count_tokens(messages),
+            output_tokens=max(1, len(text) // 4) if text else 0,
+            tokens_estimated=True,
+        )
 
     async def generate_structured(
         self,

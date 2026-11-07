@@ -62,6 +62,9 @@ PROMPT_REGISTRY: dict[str, PromptSpec] = {
     # Core agent prompts (migrated from inline string constants in Gate B).
     "conversation": PromptSpec("conversation", 1, "conversation_v1.jinja2"),
     "grammar": PromptSpec("grammar", 1, "grammar_v1.jinja2"),
+    # Experimental, evaluation-only variant (not used by any agent): the
+    # grammar prompt plus the situational context. See evals/real.
+    "grammar_context": PromptSpec("grammar_context", 1, "grammar_context_v1.jinja2"),
     "vocabulary": PromptSpec("vocabulary", 1, "vocabulary_v1.jinja2"),
     "review": PromptSpec("review", 1, "review_v1.jinja2"),
     # Prompts that already lived as jinja2 templates — now registered/versioned

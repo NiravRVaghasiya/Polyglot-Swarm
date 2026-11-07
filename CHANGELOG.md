@@ -7,6 +7,77 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Real-model evaluation framework (ADR-0032).** A new package,
+  `evals/real/` (`python -m evals.real`), measures whether real LLMs assess
+  learner language correctly. It is separate from the offline
+  `python -m evals`.
+  - **Datasets:** versioned and checksummed, with group-hashed `dev`/`test`
+    splits, leakage checks, per-case annotation provenance, a labeling rubric,
+    and acceptable alternatives. `grammar-2026.11.0` has 98 cases in 5
+    languages and 10 categories (correct, incorrect, vocabulary misuse,
+    context-inappropriate register, acceptable alternative, regional, formal,
+    informal, ambiguous, adversarial). `vocabulary-2026.11.0` has 14 cases.
+    All cases are labelled `author_labeled` (written by the AI assistant),
+    not expert-validated, and reports say so.
+  - **Runner:**
+    - Builds each concrete provider directly, with no failover and no
+      synthetic substitution; the fake provider runs only with
+      `--allow-synthetic` and is labelled throughout.
+    - Probes availability (auth failure, unreachable, model missing, ...).
+    - Sends production-identical prompts and parameters, with timeouts,
+      retries and resume.
+    - Preserves every raw response together with its prompt, parameters,
+      reported model, token usage, latency and estimated cost.
+  - **Scoring:** replays the production parser, error policy and evidence
+    pipeline, and measures:
+    - grammar precision, recall, F1, false-correction and missed-error rates,
+      localization, correction and construction accuracy;
+    - acceptable-alternative, synonym, dialect and register handling, context
+      sensitivity, vocabulary misuse, ambiguity abstention, and adversarial
+      robustness;
+    - structured-output validity and missing/invalid fields;
+    - evidence extraction (skill, subskill and difficulty classification,
+      duplicates);
+    - vocabulary extraction;
+    - calibration: raw versus pipeline confidence, ECE, Brier, reliability,
+      risk–coverage, and Platt/histogram maps fitted on dev only;
+    - downstream evidence weighting;
+    - cross-provider agreement, κ and McNemar, plus systematic disagreements.
+  - **Statistics:** new `src/evaluation/statistics.py` provides Wilson,
+    bootstrap, exact McNemar, κ, Brier, AURC, Platt and histogram calibration,
+    and gate decisions based on confidence intervals.
+  - **Reports:** `report.json` + `report.md` per run, marking runs and
+    providers complete, partial, failed or unavailable.
+    `history.jsonl` tracks results over time. `compare` detects regressions
+    with a paired test and refuses incomparable runs.
+  - **Prompts:** an experimental `grammar_context@1` prompt (the situation
+    added to the grammar prompt), measured against production `grammar@1`.
+  - **Providers:** `LLMProvider.generate_detailed()` returns reported token
+    usage and model identity. The grammar and vocabulary agents' message
+    construction is extracted into `build_grammar_messages` /
+    `build_vocabulary_messages`; agent behaviour is unchanged.
+  - **CI:** validates the datasets and type-checks `evals/real` offline, and
+    an opt-in `real_model` pytest marker covers the provider tests. New
+    scheduled or manual workflow `real-model-eval.yml`, and new Makefile
+    targets `eval-real-validate`, `eval-real` and `eval-real-report`.
+  - **First real results (provisional).** Three local Ollama models
+    (llama3.1 8B, gemma2 2B, granite3.2 2B) were run on both splits; the
+    hosted providers were recorded as `auth_failed` and not evaluated. Results
+    are in `docs/real-model-evaluation.md`, with raw responses under
+    `evals/real/runs/`. No tested model passes the provisional gates.
+    Reports also re-score bare-list grammar answers as a diagnostic: the
+    production parser reads them as "no errors", which hid most of llama3.1's
+    output.
+
+### Fixed
+
+- **Vocabulary parser crash on off-contract JSON.** When a model answered the
+  vocabulary prompt with a bare JSON list, or with non-object items,
+  `_parse_vocabulary_response` raised `AttributeError` and broke the turn. It
+  now returns no words. Found by the real-model benchmark.
+
 ### Changed
 
 - **Evidence-driven learner knowledge model (ADR-0031).** The learner model is

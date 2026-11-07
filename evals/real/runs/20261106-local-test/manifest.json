@@ -1,0 +1,137 @@
+{
+  "run_id": "20261106-local-test",
+  "created_at": "2026-11-06T21:24:08.037696+00:00",
+  "resumed_at": "2026-11-07T01:42:11.245435+00:00",
+  "status": "complete",
+  "synthetic": false,
+  "config": {
+    "config_version": "real-eval-config-1.0",
+    "tasks": [
+      "grammar",
+      "vocabulary"
+    ],
+    "split": "test",
+    "grammar_prompts": [
+      "grammar@1",
+      "grammar_context@1"
+    ],
+    "variants_only_with_context": true,
+    "temperature": null,
+    "max_tokens_grammar": null,
+    "max_tokens_vocabulary": null,
+    "timeout_s": 900.0,
+    "max_retries": 1,
+    "retry_backoff_s": 2.0,
+    "concurrency": 1,
+    "repeats": 1,
+    "bootstrap_seed": 20261106,
+    "bootstrap_samples": 2000,
+    "regression_alpha": 0.05,
+    "gates": [
+      {
+        "metric": "grammar.false_correction_rate",
+        "threshold": 0.1,
+        "direction": "max"
+      },
+      {
+        "metric": "grammar.recall",
+        "threshold": 0.6,
+        "direction": "min"
+      },
+      {
+        "metric": "structured.schema_valid_rate",
+        "threshold": 0.95,
+        "direction": "min"
+      }
+    ]
+  },
+  "config_hash": "68921760d5b7",
+  "datasets": {
+    "grammar": {
+      "version": "grammar-2026.11.0",
+      "split": "test",
+      "sha256": "77b12262dab8dbbee9e772c80e4f095020efc377dbb46fa14b1b9037a9b6dfac",
+      "cases": 65,
+      "validation_status_counts": {
+        "author_labeled": 98
+      }
+    },
+    "vocabulary": {
+      "version": "vocabulary-2026.11.0",
+      "split": "test",
+      "sha256": "ec5dd0a8190019e008d502e56ae82577c6c9707ea5bd5e425fd735cd83571086",
+      "cases": 11,
+      "validation_status_counts": {
+        "author_labeled": 14
+      }
+    }
+  },
+  "prompts": {
+    "grammar@1": {
+      "template": "grammar_v1.jinja2",
+      "sha256": "6ff501d2815960267bbc5d4c66ce20302fdac9ebf98c0bc9aa49a6c298842fef"
+    },
+    "grammar_context@1": {
+      "template": "grammar_context_v1.jinja2",
+      "sha256": "66c0da6f923019863c104d58d211e98a309b0fd36d4c55faa7c5f977b5c7a7cb"
+    },
+    "vocabulary@1": {
+      "template": "vocabulary_v1.jinja2",
+      "sha256": "b32f6a06e69702c2ed25c4b60a7675eabc16d55df7ac8b6452d07539e054cd88"
+    }
+  },
+  "providers": [
+    {
+      "provider": "ollama",
+      "model": "llama3.1:latest",
+      "status": "available",
+      "detail": "",
+      "latency_ms": 7065.7,
+      "reported_model": "llama3.1:latest",
+      "synthetic": false
+    },
+    {
+      "provider": "ollama",
+      "model": "gemma2:2b",
+      "status": "available",
+      "detail": "",
+      "latency_ms": 26445.6,
+      "reported_model": "gemma2:2b",
+      "synthetic": false
+    },
+    {
+      "provider": "ollama",
+      "model": "granite3.2:2b",
+      "status": "available",
+      "detail": "",
+      "latency_ms": 20745.2,
+      "reported_model": "granite3.2:2b",
+      "synthetic": false
+    }
+  ],
+  "execution": {
+    "timeout_s": 900.0,
+    "max_retries": 1,
+    "concurrency": 1
+  },
+  "planned_calls_per_provider": 81,
+  "limit": null,
+  "git": {
+    "commit": "127bd878e73a1cbd3a407b0ac1bb4a1bb2b2827c",
+    "dirty": true
+  },
+  "environment": {
+    "python": "3.12.13",
+    "platform": "Windows-11-10.0.26300-SP0",
+    "deterministic_env": "",
+    "packages": {
+      "langchain-core": "1.7.6",
+      "langchain-anthropic": "1.7.10",
+      "langchain-openai": "1.7.4",
+      "langchain-google-genai": "4.4.3",
+      "langchain-ollama": "1.1.0",
+      "pydantic": "2.14.3"
+    }
+  },
+  "finished_at": "2026-11-07T02:56:55.666423+00:00"
+}
