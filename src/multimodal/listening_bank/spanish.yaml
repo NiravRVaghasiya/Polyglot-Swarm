@@ -1,0 +1,182 @@
+# Listening comprehension task bank — Spanish.
+# Provenance: written by the AI assistant (author_labeled), 2026-11-07.
+# NOT expert-validated. Scripts are synthesised at request time with the
+# given Edge TTS voice and rate; scoring never needs the audio.
+# Voices cover several regional accents; rates vary the listening load.
+language: Spanish
+provenance: author_labeled
+tasks:
+  - id: es-l-a1-cafe
+    cefr: A1
+    voice: es-ES-ElviraNeural
+    accent: Spain (Castilian)
+    rate: "-15%"
+    style: dialogue
+    script: "Hola, buenos días. Quiero un café con leche y un vaso de agua, por favor. Son tres euros."
+    questions:
+      - id: q1
+        kind: recognition
+        prompt: "¿Qué bebida pide además del café?"
+        options: ["un zumo", "un vaso de agua", "un té", "una cerveza"]
+        answers: ["un vaso de agua"]
+      - id: q2
+        kind: comprehension
+        prompt: "¿Cuánto cuesta en total?"
+        options: ["dos euros", "tres euros", "trece euros", "treinta euros"]
+        answers: ["tres euros"]
+      - id: q3
+        kind: recall
+        prompt: "Escribe qué tipo de café pide."
+        answers: ["café con leche", "con leche"]
+  - id: es-l-a1-familia
+    cefr: A1
+    voice: es-MX-JorgeNeural
+    accent: Mexico
+    rate: "+0%"
+    script: "Me llamo Carlos. Vivo en Guadalajara con mi esposa y mis dos hijas. Mi hija mayor tiene diez años."
+    questions:
+      - id: q1
+        kind: recognition
+        prompt: "¿En qué ciudad vive Carlos?"
+        options: ["Guadalajara", "Monterrey", "Guatemala", "Granada"]
+        answers: ["Guadalajara"]
+      - id: q2
+        kind: comprehension
+        prompt: "¿Cuántas hijas tiene Carlos?"
+        options: ["una", "dos", "tres", "ninguna"]
+        answers: ["dos"]
+      - id: q3
+        kind: recall
+        prompt: "¿Cuántos años tiene la hija mayor? (escribe el número)"
+        answers: ["diez", "10", "diez años"]
+  - id: es-l-a2-tren
+    cefr: A2
+    voice: es-ES-AlvaroNeural
+    accent: Spain (Castilian)
+    rate: "+0%"
+    style: announcement
+    script: "Atención, por favor. El tren con destino a Valencia saldrá con veinte minutos de retraso desde el andén cuatro."
+    questions:
+      - id: q1
+        kind: recognition
+        prompt: "¿Cuál es el destino del tren?"
+        options: ["Valencia", "Valladolid", "Vigo", "Toledo"]
+        answers: ["Valencia"]
+      - id: q2
+        kind: comprehension
+        prompt: "¿Qué problema tiene el tren?"
+        options: ["está cancelado", "sale tarde", "cambió de andén", "está lleno"]
+        answers: ["sale tarde"]
+      - id: q3
+        kind: recall
+        prompt: "¿De qué andén sale? (número)"
+        answers: ["cuatro", "4", "el cuatro", "andén cuatro"]
+  - id: es-l-a2-fin-de-semana
+    cefr: A2
+    voice: es-AR-ElenaNeural
+    accent: Argentina (Rioplatense)
+    rate: "+0%"
+    script: "El sábado fuimos a la costa con unos amigos. Hacía mucho calor, así que nos bañamos en el mar y después comimos pescado."
+    questions:
+      - id: q1
+        kind: recognition
+        prompt: "¿Adónde fueron el sábado?"
+        options: ["a la montaña", "a la costa", "al campo", "a la ciudad"]
+        answers: ["a la costa"]
+      - id: q2
+        kind: comprehension
+        prompt: "¿Por qué se bañaron en el mar?"
+        options: ["porque hacía calor", "porque llovía", "porque era de noche", "porque estaban aburridos"]
+        answers: ["porque hacía calor"]
+      - id: q3
+        kind: recall
+        prompt: "¿Qué comieron después?"
+        answers: ["pescado"]
+  - id: es-l-b1-trabajo
+    cefr: B1
+    voice: es-CO-SalomeNeural
+    accent: Colombia
+    rate: "+0%"
+    style: voicemail
+    script: "Hola Marta, te llamo porque la reunión de mañana se ha cambiado al jueves a las diez. Si no puedes venir, avísame antes del miércoles para buscar otra fecha."
+    questions:
+      - id: q1
+        kind: recognition
+        prompt: "¿Qué día es ahora la reunión?"
+        options: ["el martes", "el miércoles", "el jueves", "el viernes"]
+        answers: ["el jueves"]
+      - id: q2
+        kind: comprehension
+        prompt: "¿Qué tiene que hacer Marta si no puede ir?"
+        options: ["nada", "avisar antes del miércoles", "ir el viernes", "cancelar la reunión"]
+        answers: ["avisar antes del miércoles"]
+      - id: q3
+        kind: recall
+        prompt: "¿A qué hora es la reunión?"
+        answers: ["a las diez", "las diez", "diez", "10", "a las 10"]
+  - id: es-l-b1-receta
+    cefr: B1
+    voice: es-US-AlonsoNeural
+    accent: United States (Spanish)
+    rate: "+20%"
+    style: instructions
+    script: "Primero corta la cebolla en trozos pequeños. Luego fríela en aceite hasta que esté dorada y, por último, añade los tomates y deja cocinar diez minutos."
+    questions:
+      - id: q1
+        kind: recognition
+        prompt: "¿Qué se corta primero?"
+        options: ["el tomate", "la cebolla", "el ajo", "la patata"]
+        answers: ["la cebolla"]
+      - id: q2
+        kind: comprehension
+        prompt: "¿Cuándo se añaden los tomates?"
+        options: ["al principio", "antes de cortar la cebolla", "al final", "nunca"]
+        answers: ["al final"]
+      - id: q3
+        kind: recall
+        prompt: "¿Cuántos minutos se deja cocinar?"
+        answers: ["diez", "10", "diez minutos"]
+  - id: es-l-b2-noticia
+    cefr: B2
+    voice: es-ES-ElviraNeural
+    accent: Spain (Castilian)
+    rate: "+20%"
+    style: news
+    script: "El ayuntamiento ha anunciado que, a partir del próximo mes, el transporte público será gratuito para los menores de dieciocho años, una medida que pretende reducir el uso del coche en el centro."
+    questions:
+      - id: q1
+        kind: recognition
+        prompt: "¿Quién hizo el anuncio?"
+        options: ["el gobierno", "el ayuntamiento", "una empresa", "los estudiantes"]
+        answers: ["el ayuntamiento"]
+      - id: q2
+        kind: comprehension
+        prompt: "¿Cuál es el objetivo de la medida?"
+        options: ["ahorrar dinero", "reducir el uso del coche", "construir carreteras", "subir los precios"]
+        answers: ["reducir el uso del coche"]
+      - id: q3
+        kind: recall
+        prompt: "¿Para quién será gratuito el transporte?"
+        answers: ["los menores de dieciocho años", "menores de dieciocho", "menores de 18", "menores de 18 años", "los menores de 18 años"]
+  - id: es-l-b2-opinion
+    cefr: B2
+    voice: es-MX-DaliaNeural
+    accent: Mexico
+    rate: "-15%"
+    style: opinion
+    script: "Aunque el teletrabajo tiene muchas ventajas, a mí me parece que se pierde el contacto con los compañeros, y eso a la larga afecta la creatividad del equipo."
+    questions:
+      - id: q1
+        kind: recognition
+        prompt: "¿De qué tema habla?"
+        options: ["el transporte", "el teletrabajo", "las vacaciones", "la educación"]
+        answers: ["el teletrabajo"]
+      - id: q2
+        kind: comprehension
+        prompt: "¿Cuál es la opinión de la persona?"
+        options: ["solo tiene ventajas", "tiene ventajas, pero también un problema", "es imposible", "no tiene opinión"]
+        answers: ["tiene ventajas, pero también un problema"]
+      - id: q3
+        kind: recall
+        prompt: "¿Qué se pierde, según la persona?"
+        answers: ["el contacto con los compañeros", "contacto con los compañeros", "el contacto"]

@@ -111,6 +111,8 @@ MINUTES: dict[str, float] = {
     "vocabulary_expansion": 3.0,
     "conversation_practice": 8.0,
     "listening_check": 4.0,
+    "speaking_check": 3.0,
+    "read_aloud": 2.0,
     "reading": 6.0,
     "writing_exercise": 6.0,
 }
@@ -177,11 +179,14 @@ INTENT_ORDER = (
 
 #: Skill-level activities for skills without an objective catalog.
 _SKILL_ACTIVITY = {
+    # ADR-0034: listening and speaking now have graded assessments behind
+    # them (/api/v1/assessment/listening, /speaking).
     "listening": "listening_check",
+    "speaking": "speaking_check",
+    "pronunciation": "read_aloud",
     "reading": "reading",
     "writing": "writing_exercise",
     "pragmatics": "conversation_practice",
-    "speaking": "conversation_practice",
 }
 
 
@@ -855,7 +860,7 @@ def _vocabulary_candidates(ctx: _Context) -> list[Recommendation]:
 def _skill_candidates(ctx: _Context) -> list[Recommendation]:
     out: list[Recommendation] = []
     for skill, activity in _SKILL_ACTIVITY.items():
-        if skill in ctx.constraints.avoid_skills or skill == "speaking":
+        if skill in ctx.constraints.avoid_skills:
             continue
         est = ctx.estimates.skills.get(skill)
         if est is None or est.mastery is None or status_rank(est.status) == 0:

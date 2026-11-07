@@ -63,6 +63,11 @@ jobs:
       - name: Type-check adaptive evaluation harness (mypy)
         run: python -m mypy --strict evals/adaptive
 
+      # Speech benchmark harness (ADR-0034): strict typing only. Real-recogniser
+      # runs need the voice extra and external audio, so they are on demand.
+      - name: Type-check speech evaluation harness (mypy)
+        run: python -m mypy --strict evals/speech
+
   frontend:
     name: Frontend · Lint · Test
     runs-on: ubuntu-latest

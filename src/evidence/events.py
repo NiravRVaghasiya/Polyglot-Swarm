@@ -62,7 +62,7 @@ class DifficultyBasis(StrEnum):
 
 #: Bumped when the event schema gains fields. Rows stored before the
 #: provenance/difficulty overhaul (ADR-0031) read back as version 1.
-EVENT_SCHEMA_VERSION = 2
+EVENT_SCHEMA_VERSION = 3
 
 
 # Which skill each event type primarily informs (used to route evidence to the
@@ -133,6 +133,20 @@ class LearningEvent(BaseModel):
     schema_version: int = EVENT_SCHEMA_VERSION
 
     payload: dict[str, Any] = Field(default_factory=dict)
+
+    # Multimodal provenance (ADR-0034). ``modality`` is the channel the
+    # learner's performance came through ("text" | "audio" | ...).
+    # ``media_ref`` points at the captured asset and, when known, the
+    # segment (``{"asset_id", "start", "end"}``). ``processing`` records the
+    # machine stages that produced the observation (provider, model, latency).
+    # ``transcription_confidence`` is the *recogniser's* confidence for
+    # transcript-derived evidence; it is kept apart from ``confidence`` (the
+    # evaluator's confidence about the learner) and the learner model
+    # discounts by both.
+    modality: str = "text"
+    media_ref: dict[str, Any] | None = None
+    processing: dict[str, Any] | None = None
+    transcription_confidence: float | None = Field(default=None, ge=0.0, le=1.0)
     #: When the observation happened (ISO-8601, UTC).
     created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
 
@@ -159,6 +173,10 @@ class LearningEvent(BaseModel):
         correlation_id: str | None = None,
         supersedes: str | None = None,
         created_at: str | None = None,
+        modality: str = "text",
+        media_ref: dict[str, Any] | None = None,
+        processing: dict[str, Any] | None = None,
+        transcription_confidence: float | None = None,
     ) -> LearningEvent:
         """Build an event, defaulting ``skill`` from the event type if omitted.
 
@@ -206,6 +224,10 @@ class LearningEvent(BaseModel):
             correlation_id=correlation_id,
             supersedes=supersedes,
             payload=payload or {},
+            modality=modality,
+            media_ref=media_ref,
+            processing=processing,
+            transcription_confidence=transcription_confidence,
             **extra,
         )
 

@@ -44,6 +44,7 @@ old ADR — we add a new one that supersedes it and mark the old one accordingly
 | [0031](0031-evidence-driven-learner-knowledge-model.md) | Evidence-driven, difficulty- and uncertainty-aware learner knowledge model | Accepted |
 | [0032](0032-real-model-evaluation.md) | Real-model evaluation framework | Accepted |
 | [0033](0033-adaptive-learning-intelligence.md) | Adaptive learning intelligence: subskill model, predictions, difficulty, next-best activity, FSRS integration | Accepted |
+| [0034](0034-multimodal-assessment.md) | Multimodal (speech) assessment: ingestion, transcription, speaking and listening evidence, privacy | Accepted |
 
 ## Creating a new ADR
 

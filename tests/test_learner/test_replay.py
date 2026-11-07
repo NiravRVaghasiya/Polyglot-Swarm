@@ -7,7 +7,7 @@ import random
 import pytest
 
 from src.evidence import store
-from src.evidence.events import EventType, LearningEvent
+from src.evidence.events import EVENT_SCHEMA_VERSION, EventType, LearningEvent
 from src.evidence.provenance import Provenance
 from src.learner import KnowledgeModel
 from src.memory import lkm_history, skill_state
@@ -134,7 +134,7 @@ class TestTraceability:
         assert row["objective_id"] == "grammar.ser_vs_estar"
         assert row["difficulty"] == 0.25
         assert row["difficulty_basis"] == "measured"
-        assert row["schema_version"] == 2
+        assert row["schema_version"] == EVENT_SCHEMA_VERSION
         assert row["fingerprint"] == e.fingerprint()
         assert row["recorded_at"]
 

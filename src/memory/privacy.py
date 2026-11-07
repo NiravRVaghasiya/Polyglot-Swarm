@@ -74,6 +74,8 @@ def export_user_data(user_id: str) -> dict[str, Any]:
         "learner_model_history": _export_lkm_history(user_id),
         # ADR-0033: every adaptive recommendation and learning path recorded.
         "adaptive_decisions": _safe(lambda: _export_adaptive(user_id)),
+        # ADR-0034: speaking/listening submissions (derived data, retention).
+        "media_submissions": _safe(lambda: _export_media(user_id)),
         "assessments": assessments.all_assessments_for_user(user_id),
         "experiment_assignments": experiments.all_assignments_for_user(user_id),
         "outcomes": experiments.all_outcomes_for_user(user_id),
@@ -129,6 +131,7 @@ def delete_user_data(user_id: str) -> dict[str, Any]:
     result["evidence"] = _safe(lambda: _delete_evidence(user_id))
     result["learner_model_history"] = _safe(lambda: _delete_lkm_history(user_id))
     result["adaptive_decisions"] = _safe(lambda: _delete_adaptive(user_id))
+    result["media_submissions"] = _safe(lambda: _delete_media(user_id))
     result["cultural_notes"] = _safe(lambda: _delete_cultural_notes(user_id))
     result["auth_tokens"] = _safe(lambda: auth.delete_tokens_for_user(user_id))
     result["audit_log_anonymized"] = _safe(lambda: anonymize_for_user(user_id))
@@ -178,6 +181,18 @@ def _export_adaptive(user_id: str) -> list[dict[str, Any]]:
     from src.adaptive.audit import all_for_user
 
     return all_for_user(user_id)
+
+
+def _export_media(user_id: str) -> list[dict[str, Any]]:
+    from src.multimodal.store import export_for_user
+
+    return export_for_user(user_id)
+
+
+def _delete_media(user_id: str) -> int:
+    from src.multimodal.store import delete_for_user
+
+    return delete_for_user(user_id)
 
 
 def _delete_adaptive(user_id: str) -> int:

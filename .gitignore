@@ -40,3 +40,6 @@ htmlcov/
 # Logs
 *.log
 logs/
+
+# Phase 4: external speech corpora (downloaded on demand, not redistributed here)
+evals/speech/external/

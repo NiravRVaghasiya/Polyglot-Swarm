@@ -18,6 +18,73 @@ export class ApiError extends Error {
   }
 }
 
+// --- Multimodal assessment (ADR-0034) ---
+
+export type AssessmentStatus = "ok" | "partial" | "abstained" | "failed";
+
+export interface FeedbackItem {
+  type: string;
+  message: string;
+  word?: string;
+  heard?: string | null;
+  start?: number | null;
+  end?: number | null;
+}
+
+export interface DimensionResult {
+  dimension: string;
+  status: AssessmentStatus;
+  /** What the judgment rests on: acoustic | transcript | timing | response | acoustic_proxy. */
+  basis: string;
+  value: number | null;
+  confidence: number;
+  measures: Record<string, unknown>;
+  reason: string;
+  feedback: FeedbackItem[];
+}
+
+export interface AssessmentReport {
+  submission_id: string;
+  language: string;
+  task_type: string;
+  modality: string;
+  status: AssessmentStatus;
+  dimensions: DimensionResult[];
+  quality: Record<string, unknown>;
+  issues: string[];
+  evidence_ids: string[];
+  observations: Record<string, unknown>;
+}
+
+export interface ListeningQuestion {
+  question_id: string;
+  kind: "recognition" | "comprehension" | "recall";
+  prompt: string;
+  options: string[];
+}
+
+export interface ListeningTask {
+  task_id: string;
+  language: string;
+  cefr: string;
+  voice: string;
+  accent: string;
+  rate: string;
+  style: string;
+  difficulty: number;
+  questions: ListeningQuestion[];
+}
+
+export interface SpeakingRequest {
+  audio_base64: string;
+  audio_format?: string;
+  language?: string;
+  task_type?: "free_speech" | "read_aloud";
+  target_text?: string;
+  cefr?: string;
+  retain_audio?: boolean;
+}
+
 export interface TokenResponse {
   access_token: string;
   token_type: string;
@@ -322,4 +389,32 @@ export const api = {
       body: { text, language },
       token,
     }),
+
+  // --- Multimodal assessment (ADR-0034) ---
+  assessSpeaking: (token: string, body: SpeakingRequest) =>
+    request<AssessmentReport>("/api/v1/assessment/speaking", { method: "POST", body, token }),
+
+  listeningTasks: (token: string, language = "Spanish") =>
+    request<{ tasks: ListeningTask[] }>(
+      `/api/v1/assessment/listening/tasks?language=${encodeURIComponent(language)}`,
+      { token },
+    ).then((r) => r.tasks),
+
+  listeningAudio: (token: string, taskId: string) =>
+    request<{ task_id: string; audio_base64: string; audio_format: string }>(
+      `/api/v1/assessment/listening/tasks/${encodeURIComponent(taskId)}/audio`,
+      { token },
+    ),
+
+  submitListening: (token: string, taskId: string, answers: Record<string, string | null>) =>
+    request<AssessmentReport>(
+      `/api/v1/assessment/listening/tasks/${encodeURIComponent(taskId)}/answers`,
+      { method: "POST", body: { answers }, token },
+    ),
+
+  deleteSubmission: (token: string, submissionId: string) =>
+    request<{ deleted: string }>(
+      `/api/v1/assessment/submissions/${encodeURIComponent(submissionId)}`,
+      { method: "DELETE", token },
+    ),
 };

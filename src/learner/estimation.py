@@ -184,10 +184,33 @@ def _classify(row: dict[str, Any]) -> tuple[str, float | None]:
         return "exposure", None
     if assessment in _NEUTRAL_ASSESSMENTS:
         return "graded", 0.6
+    if assessment == "scored":
+        # A continuous score in [0, 1] (ADR-0034, e.g. fluency); without a
+        # usable score the row carries no graded outcome.
+        payload = row.get("payload")
+        score = payload.get("score") if isinstance(payload, dict) else None
+        if isinstance(score, (int, float)) and 0.0 <= float(score) <= 1.0:
+            return "graded", float(score)
+        return "ignored", None
     signal = _GRADED_SIGNAL.get(assessment)
     if signal is None:
         return "ignored", None
     return "graded", signal
+
+
+def _reliability(row: dict[str, Any]) -> float:
+    """Evaluator confidence, discounted by transcription confidence when the
+    evidence was derived from a machine transcript (ADR-0034).
+
+    The two are stored separately; only here are they combined, so a poor
+    recording lowers how much an observation counts without ever being read
+    as poor learner performance.
+    """
+    conf = max(0.0, min(1.0, float(row.get("confidence", 1.0) or 0.0)))
+    tc = row.get("transcription_confidence")
+    if isinstance(tc, (int, float)):
+        conf *= max(0.0, min(1.0, float(tc)))
+    return conf
 
 
 def to_observation(row: dict[str, Any]) -> Observation | None:
@@ -213,7 +236,7 @@ def to_observation(row: dict[str, Any]) -> Observation | None:
         skill=str(skill),
         kind=kind,
         signal=signal,
-        reliability=max(0.0, min(1.0, float(row.get("confidence", 1.0) or 0.0))),
+        reliability=_reliability(row),
         item_key=item_key,
         group_key=group_key,
         fingerprint=fingerprint,

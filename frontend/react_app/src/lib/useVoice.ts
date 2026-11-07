@@ -10,7 +10,7 @@
 // is set and the caller keeps working in text-only mode.
 
 import { useCallback, useRef, useState } from "react";
-import { api } from "./api";
+import { api, type AssessmentReport, type SpeakingRequest } from "./api";
 
 function blobToBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -35,6 +35,13 @@ export interface UseVoice {
   startRecording: () => Promise<void>;
   /** Stop recording and return the transcript (empty string on failure). */
   stopAndTranscribe: (language?: string) => Promise<string>;
+  /**
+   * Stop recording and send it for speaking assessment (ADR-0034). Returns the
+   * report (which may be "abstained"), or null on failure.
+   */
+  stopAndAssess: (
+    task: Omit<SpeakingRequest, "audio_base64" | "audio_format">,
+  ) => Promise<AssessmentReport | null>;
   /** Fetch + play synthesized speech for text; no-op on failure. */
   playReply: (text: string, language?: string) => Promise<void>;
 }
@@ -74,6 +81,40 @@ export function useVoice(token: string): UseVoice {
       setError(e instanceof Error ? e.message : "Could not access the microphone.");
     }
   }, []);
+
+  const stopRecording = useCallback(async (): Promise<Blob | null> => {
+    const recorder = recorderRef.current;
+    if (!recorder) return null;
+    setRecording(false);
+    const blob: Blob = await new Promise((resolve) => {
+      recorder.onstop = () => resolve(new Blob(chunksRef.current, { type: "audio/webm" }));
+      recorder.stop();
+    });
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    recorderRef.current = null;
+    return blob;
+  }, []);
+
+  const stopAndAssess = useCallback(
+    async (
+      task: Omit<SpeakingRequest, "audio_base64" | "audio_format">,
+    ): Promise<AssessmentReport | null> => {
+      const blob = await stopRecording();
+      if (!blob) return null;
+      setBusy(true);
+      try {
+        const base64 = await blobToBase64(blob);
+        return await api.assessSpeaking(token, { ...task, audio_base64: base64, audio_format: "webm" });
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Speaking assessment failed.");
+        return null;
+      } finally {
+        setBusy(false);
+      }
+    },
+    [token, stopRecording],
+  );
 
   const stopAndTranscribe = useCallback(
     async (language?: string): Promise<string> => {
@@ -130,6 +171,7 @@ export function useVoice(token: string): UseVoice {
     error,
     startRecording,
     stopAndTranscribe,
+    stopAndAssess,
     playReply,
   };
 }

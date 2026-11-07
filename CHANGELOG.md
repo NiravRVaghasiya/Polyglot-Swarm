@@ -9,6 +9,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Multimodal (speech) assessment (ADR-0034).**
+  - **Pipeline** (`src/multimodal/`), with separate stages: ingestion
+    (format sniffing, size and duration limits, ffmpeg decoding, signal
+    quality), speech-to-text behind a provider protocol (local Whisper with
+    word timing, word probabilities, language identification and retries),
+    speaking assessment, listening assessment, evidence mapping, and
+    storage.
+  - **Speaking dimensions,** each with an explicit basis and abstention:
+    - `fluency` from timing measures only (rate, pauses, run length,
+      repetitions), scored with a map fitted on expert ratings for English
+      read-aloud only, and measures-only exposure elsewhere;
+    - `intelligibility`: read-aloud target words the recogniser understood.
+      This is not phonetic accuracy. Because the recogniser was shown to
+      miss accented-but-correct words, there are no word-level corrections;
+    - a `pronunciation` acoustic proxy that abstains unless validated
+      against expert ratings for the language;
+    - `spoken_grammar` via the existing grammar agent, for confident
+      free-speech transcripts only.
+  - **Listening:** recognition, comprehension and recall questions, answered
+    by choosing or typing, so scores are independent of speech recognition
+    and of speaking. Includes an 8-task Spanish bank (A1–B2, five regional
+    voices, three speech rates; author-written, not expert-validated).
+  - **API:** `/api/v1/assessment/speaking`, the listening tasks, audio and
+    answers endpoints, and `/api/v1/assessment/submissions` (list, get,
+    delete).
+  - **Frontend:** a listening exercise on the home page, and
+    `useVoice.stopAndAssess`.
+  - **Evidence:**
+    - Schema v3 and migration 0009 add `modality`, `media_ref`, `processing`
+      and `transcription_confidence` (kept separate from the evaluator's
+      `confidence`) to evidence, plus a `media_submissions` table.
+    - The learner model discounts transcript-derived evidence by the
+      recogniser's confidence, and accepts continuous `scored` outcomes.
+  - **Privacy:** raw audio is not kept unless the learner consents, and is
+    then purged after 30 days. Submissions are covered by privacy export and
+    deletion. Neither audio nor transcripts are logged.
+  - **Benchmark:** `python -m evals.speech` runs the real recogniser on three
+    data types, kept separate: speechocean762 (external, expert-labelled,
+    English), synthetic Spanish (Edge TTS), and offline format and edge-case
+    checks. Results are in `docs/multimodal-assessment.md`; the benchmark
+    led to the fluency scope, the pronunciation proxy staying off, and a
+    gate for Whisper repetition loops.
+
 - **Adaptive learning intelligence (ADR-0033).**
   - **Subskill learner model `lkm-subskill-v1`** (`src/adaptive/learner_model.py`)
     on top of `lkm-evidence-v2`. It adds:
@@ -525,6 +568,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **VAD on Python 3.13.** Voice-activity detection no longer uses
+  `audioop`, which Python 3.13 removes (this was the source of the
+  long-standing pytest warning).
+
 - **API reviews never rescheduled.** `POST /api/v1/review/submit` only bumped
   a counter, so a word reviewed through the API stayed due forever. It now
   goes through `grade_review`: FSRS scheduling, evidence and the learner
@@ -610,6 +657,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `google_genai` no longer log a line per request into the chat.
 
 ### Changed
+
+- **Planner speaking activities.** The adaptive planner now proposes
+  `speaking_check` for speaking and `read_aloud` for pronunciation, backed by
+  the new assessments.
 
 - **Review mode.** `grade_review` accepts `mode="recognition" | "production"`.
   - A recognition success is rated `Hard` for FSRS, and a production success

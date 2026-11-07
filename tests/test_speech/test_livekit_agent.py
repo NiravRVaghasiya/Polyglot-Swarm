@@ -119,8 +119,13 @@ class TestDefaultSynthesizerFallback:
         audio = await _default_synthesizer("hola", "Spanish")
         assert audio == b"REAL_AUDIO"
 
-    async def test_pipeline_completes_turn_when_tts_unavailable(self):
+    async def test_pipeline_completes_turn_when_tts_unavailable(self, monkeypatch):
         """End-to-end: a full VoicePipeline turn survives a TTS outage."""
+        import sys
+
+        # Make `import edge_tts` fail even where the voice extra is installed
+        # (otherwise this would call the real TTS service over the network).
+        monkeypatch.setitem(sys.modules, "edge_tts", None)
 
         async def fake_transcribe(audio, language):
             return "hola"
@@ -135,8 +140,7 @@ class TestDefaultSynthesizerFallback:
             synthesize=_default_synthesizer,
         )
 
-        # No monkeypatch of tts.synthesize here: edge_tts is very likely not
-        # installed in the test environment, so this exercises the real
+        # No monkeypatch of tts.synthesize: this exercises the real
         # ImportError -> SpeechDependencyError -> fallback path end to end.
         result = await pipeline.handle_audio(b"raw-audio")
         assert result["transcript"] == "hola"

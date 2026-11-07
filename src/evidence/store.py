@@ -52,6 +52,10 @@ _COLUMNS = (
     "payload",
     "created_at",
     "recorded_at",
+    "modality",
+    "media_ref",
+    "processing",
+    "transcription_confidence",
 )
 
 
@@ -107,6 +111,10 @@ def record_events(events: list[LearningEvent]) -> int:
                 "payload": json.dumps(e.payload),
                 "created_at": e.created_at,
                 "recorded_at": recorded_at,
+                "modality": e.modality,
+                "media_ref": None if e.media_ref is None else json.dumps(e.media_ref),
+                "processing": None if e.processing is None else json.dumps(e.processing),
+                "transcription_confidence": e.transcription_confidence,
             }
             cursor = conn.execute(
                 f"INSERT OR IGNORE INTO evidence ({', '.join(_COLUMNS)}) VALUES ({placeholders})",
@@ -128,6 +136,11 @@ def _row_to_dict(row: Any) -> dict[str, Any]:
     data = dict(row)
     if isinstance(data.get("payload"), str):
         data["payload"] = json.loads(data["payload"])
+    for key in ("media_ref", "processing"):
+        if isinstance(data.get(key), str):
+            data[key] = json.loads(data[key])
+    if not data.get("modality"):
+        data["modality"] = "text"
     # Legacy (schema v1) rows predate these columns' defaults being meaningful.
     if not data.get("difficulty_basis"):
         data["difficulty_basis"] = DifficultyBasis.UNKNOWN.value
