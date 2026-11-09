@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main, master]
 
+# Least privilege: the jobs only read the repository.
+permissions:
+  contents: read
+
 # Cancel superseded runs on the same ref.
 concurrency:
   group: ci-${{ github.ref }}
@@ -170,19 +174,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Node 20
+      - name: Set up Node 24 (LTS)
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: Install dependencies (lockfile)
         run: npm ci
 
-      # Blocks on critical advisories; the known high-severity PostCSS
-      # advisory (inside Next's build tooling) is tracked in the residual
-      # risk register (docs/production/readiness-audit.md).
+      # Blocks on high or critical advisories in the shipped (non-dev)
+      # dependencies. Next's bundled PostCSS is lifted to a patched release
+      # by the `overrides` entry in package.json.
       - name: Dependency audit (npm)
-        run: npm audit --omit=dev --audit-level=critical
+        run: npm audit --omit=dev --audit-level=high
 
       - name: Type-check
         run: npx tsc --noEmit

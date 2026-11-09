@@ -60,7 +60,7 @@ with real learners.
 | R8 | Medium | Security | No minimum password length; no security headers; the browser stores a 30-day bearer token in `localStorage` with no CSP. | Minimum length 8 for new passwords; security headers on the API; CSP and headers on the Next app | **Mitigated**: minimum length 8; API and web headers; CSP `connect-src`. The token stays in `localStorage` (residual RR1). |
 | R9 | Medium | Operations | No per-request correlation id, access log, metrics or alert definitions; readiness responses echoed raw exception text. | Request-id middleware, structured access log, `/metrics`, alert rules, dashboard, sanitized readiness | **Fixed**: request ids, access log, `/metrics`, alerts, dashboard, runbook (`test_observability.py`) |
 | R10 | Medium | Configuration | No environment profiles: production could start in deterministic mode, with permissive CORS, public API docs and text logs. | `APP_ENV` with fail-fast production validation | **Fixed**: `APP_ENV` fail-fast and `ops config-check` (`TestProductionConfiguration`, staging rehearsal) |
-| R11 | Medium | Supply chain | The container runs as root and is not built from the lockfile; CI has no dependency, static-security or secret scanning; `ollama:latest` is unpinned. | Non-root, lockfile build, pip-audit, ruff security rules, a secret scan, npm audit, a container build in CI | **Mitigated**: non-root read-only container, locked builds, CI scans. 2 accepted Python advisories (RR2) and 1 npm advisory (RR3). |
+| R11 | Medium | Supply chain | The container runs as root and is not built from the lockfile; CI has no dependency, static-security or secret scanning; `ollama:latest` is unpinned. | Non-root, lockfile build, pip-audit, ruff security rules, a secret scan, npm audit, a container build in CI | **Mitigated**: non-root read-only container, locked builds, CI scans, Dependabot, least-privilege CI tokens, a pinned Ollama image. 2 accepted Python advisories (RR2); no npm advisory in shipped dependencies (RR3 resolved). |
 | R12 | Medium | Evidence quality | Provider fallback silently changes the model behind agent judgments, and chat evidence did not record the model. | Record the answering model on evidence; count fallbacks | **Mitigated**: fallback models recorded on evidence and counted. Their evidence keeps the same confidence (RR6). |
 | R13 | Medium | Duplicates | A client retry of `POST /review/submit` or a listening submission records it twice (for example, two FSRS reviews). | `Idempotency-Key` support on mutating learning endpoints | **Fixed**: `Idempotency-Key` (`TestIdempotency`) |
 | R14 | Low | Scalability | SQLite (single writer) and in-process state require a single API process. | Measured and documented capacity and scaling thresholds; accepted for now | **Measured**: capacity documented (`performance-report.md`); single process accepted (RR4) |
@@ -82,7 +82,7 @@ accepted by the operator, before real learners use the system.
 | RR6 | Medium | Evidence produced by a fallback model keeps full confidence | `model_version` marks it `(fallback)`; `PolyglotLlmFallbackActive` alert | discount or quarantine fallback evidence using Phase 2 per-model results |
 | RR4 | Medium | Single process: about 12 req/s saturation; speech assessment (about 5 s CPU) blocks the worker | rate limits; scaling thresholds; alerts | move speaking assessment to a background worker; shared state before multiple replicas |
 | RR2 | Medium | pillow 12.3.0 (39 advisories) pinned by gradio; chromadb 1.5.9 (no fix) | Gradio not deployed; Chroma embedded only; acceptances expire 2027-01-31 | upgrade when compatible releases exist |
-| RR3 | Low | PostCSS advisory inside Next.js build tooling (high, build-time) | it affects build-time CSS processing only; `npm audit` blocks on critical | upgrade Next to the fixed major |
+| RR3 | Low | ~~PostCSS advisory inside Next.js build tooling~~ **Resolved 2026-11-09**: an npm `overrides` entry lifts Next's PostCSS to 8.5.32; `npm audit --omit=dev` reports 0 and CI now blocks on high. Remaining advisories are in dev-only test tooling (vitest 2) | not shipped; Dependabot | upgrade vitest to its fixed major |
 | RR8 | Low | Budget checks are read-then-write: concurrent calls can overshoot a cap by a few calls | small overshoot; global cap and alerts | an atomic reservation if caps get tight |
 | RR9 | Low | Cost figures are token-estimate × price table, not invoices | the daily-spend alert fires at 80% | reconcile monthly with provider invoices |
 | RR10 | Low | Image size is 4.35 GB (ChromaDB/ONNX, Gradio) | — | slimmer runtime image without the Gradio UI |
@@ -103,3 +103,15 @@ accepted by the operator, before real learners use the system.
   learner model counts equal fingerprints once.
 - **Git history.** No committed credentials were found (scan for provider
   key formats and private keys); `.env` is ignored.
+
+## Follow-up review (2026-11-09)
+
+A second pass before opening the project to public use found and fixed:
+
+| Finding | Fix |
+|---|---|
+| `.dockerignore` excluded only `.env`, so an operator's `.env.production` or `.env.staging` (created next to the compose files, as the runbook says) was copied into the image during `docker compose -f docker-compose.prod.yml up --build`. | `.dockerignore` excludes every `.env*` file, local state, caches, tests, docs and the Next.js app. |
+| The image installed the package non-editable, so the `polyglot` command (used for `ops` tasks inside the container) ran from site-packages and could not find `languages/` or `evals/real/calibration/`: language packs and grammar calibration silently fell back to empty. | Editable install: the code always runs from `/app`. |
+| The local `docker-compose.yml` published the Gradio UI and Ollama (both unauthenticated) on every network interface. | Every port is bound to `127.0.0.1`; Ollama is pinned to a release. |
+| CI and Compose used Node 20, which reached end-of-life in April 2026. | Node 24 (LTS); `engines` requires Node 22+. |
+| Workflow tokens had default permissions; nothing proposed dependency updates; pre-commit pinned ruff/mypy versions far older than CI's. | `permissions: contents: read`, Dependabot (pip, npm, actions, Docker), pre-commit aligned with `requirements.lock`. |

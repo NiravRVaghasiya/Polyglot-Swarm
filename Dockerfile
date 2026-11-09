@@ -23,9 +23,12 @@ WORKDIR /app
 # Install dependencies first (better layer caching). requirements.lock is
 # used as a *constraints* file: every runtime dependency is pinned to the
 # locked version, but dev-only tools in the lock are not installed.
+# Installed in editable mode so the code runs from /app: the language packs
+# (/app/languages) and calibration maps (/app/evals/real/calibration) are
+# found relative to the source tree, including by the `polyglot` command.
 COPY pyproject.toml README.md requirements.lock ./
 COPY src ./src
-RUN pip install -c requirements.lock .
+RUN pip install -c requirements.lock -e .
 
 # Bring in the rest (scenarios, language packs, frontend assets, ...).
 COPY . .

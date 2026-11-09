@@ -50,6 +50,9 @@ from src.learner.estimation import (
     fit_ability,
     to_observation,
 )
+from src.util import logit as _logit
+from src.util import parse_timestamp as _parse_time
+from src.util import sigmoid as _sigmoid
 
 #: Method tag for subskill estimates and predictions.
 METHOD = "lkm-subskill-v1"
@@ -97,18 +100,6 @@ class Pattern:
     PERSISTENT_WEAKNESS = "persistent_weakness"
 
 
-def _sigmoid(x: float) -> float:
-    if x >= 0:
-        return 1.0 / (1.0 + math.exp(-x))
-    e = math.exp(x)
-    return e / (1.0 + e)
-
-
-def _logit(p: float) -> float:
-    p = min(1.0 - 1e-9, max(1e-9, p))
-    return math.log(p / (1.0 - p))
-
-
 def _phi(z: float) -> float:
     """Standard normal CDF."""
     return 0.5 * (1.0 + math.erf(z / math.sqrt(2.0)))
@@ -124,15 +115,6 @@ def difficulty_logit(difficulty: float | None, config: EngineConfig = DEFAULT_CO
 def logit_to_difficulty(b: float, config: EngineConfig = DEFAULT_CONFIG) -> float:
     """Inverse of :func:`difficulty_logit`, clipped to ``[0, 1]``."""
     return max(0.0, min(1.0, b / config.difficulty_scale + 0.5))
-
-
-def _parse_time(value: Any) -> float | None:
-    if not value:
-        return None
-    try:
-        return datetime.fromisoformat(str(value)).timestamp()
-    except ValueError:
-        return None
 
 
 def evidence_before(rows: list[dict[str, Any]], as_of: str | None) -> list[dict[str, Any]]:

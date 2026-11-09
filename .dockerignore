@@ -1,14 +1,33 @@
-.venv/
-__pycache__/
-*.pyc
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
+# Build context for the Python image. Keep secrets, local state and anything
+# the runtime never reads out of the image.
+
+# Secrets and local configuration: every .env file, including .env.production
+# and .env.staging, which operators create next to the compose files.
+.env
+.env.*
+
+# Local state and caches
 data/
 *.db
 *.db-wal
 *.db-shm
-frontend/react_app/node_modules/
-frontend/react_app/.next/
+*.log
+.venv/
+venv/
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+.coverage
+htmlcov/
+
+# Not used by the Python runtime (the web profile runs the Next.js app from
+# its own Node image; CI and tests run outside the container).
 .git/
-.env
+.github/
+tests/
+docs/
+frontend/react_app/
+evals/speech/external/

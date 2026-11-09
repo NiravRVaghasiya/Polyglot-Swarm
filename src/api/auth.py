@@ -37,6 +37,7 @@ import bcrypt
 from src.config import settings
 from src.memory.db import get_connection, once_per_database
 from src.security.rate_limit import RateLimiter
+from src.util import utc_now_iso as _now
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
@@ -77,10 +78,6 @@ def init_db() -> None:
     """Create the users and auth_tokens tables if they do not exist."""
     with get_connection() as conn:
         conn.executescript(_SCHEMA)
-
-
-def _now() -> str:
-    return datetime.now(UTC).isoformat()
 
 
 def _hash_password(password: str) -> str:

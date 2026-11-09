@@ -8,15 +8,11 @@ confidence" and later validated against expert ratings.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from typing import Any
 
 from src.memory.db import get_connection
 from src.memory.schema import init_all
-
-
-def _now() -> str:
-    return datetime.now(UTC).isoformat()
+from src.util import utc_now_iso as _now
 
 
 def record_assessment(

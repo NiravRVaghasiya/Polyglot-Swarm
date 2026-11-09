@@ -7,8 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **No secrets in the image.** `.dockerignore` now excludes every `.env*`
+  file (`.env.production` and `.env.staging` were copied into the image by
+  `docker compose ... up --build`), plus local state, caches, tests, docs and
+  the Next.js app.
+- **Local Compose publishes on `127.0.0.1` only.** The Gradio UI and Ollama
+  have no authentication; they were reachable from the network. Ollama is
+  pinned to `0.40.15`.
+- **Frontend dependency audit is clean.** An npm `overrides` entry lifts the
+  PostCSS bundled by Next.js to 8.5.32 (it carried a high-severity advisory,
+  RR3). CI's `npm audit --omit=dev` now blocks on high instead of critical.
+- **CI least privilege.** Both workflows run with `contents: read`;
+  Dependabot proposes pip, npm, GitHub Actions and Docker updates.
+
+### Fixed
+
+- **The container's `polyglot` command found no language packs.** The image
+  installed the package non-editable, so console scripts resolved the
+  repository root inside site-packages: language packs and the grammar
+  calibration maps silently loaded as empty. The image now installs in
+  editable mode and runs the code from `/app`.
+- Node 20 reached end-of-life: CI and the Compose `web` service use Node 24;
+  the frontend declares `engines.node >= 22`.
+- pre-commit ran ruff 0.6.9 and mypy 1.11.2 while CI runs ruff 0.17.4 and
+  mypy 2.4.1, so hooks and CI could disagree; the hook revisions now match
+  `requirements.lock`. The real-model eval workflow installs from the
+  lockfile like CI.
+
+### Removed
+
+- `src/agents/base.py` (an abstract `BaseAgent` nothing implemented or
+  imported) and `src/learner/skill_graph.py` (prerequisite helpers no planner
+  read since the single-planner refactor), with its tests.
+- The second, never-launched Gradio UI in `src/main.py`: it is now only the
+  launcher (backend preflight, `GRADIO_AUTH`) for `frontend/gradio_app.py`,
+  and the turn-history test exercises the UI that actually runs.
+
 ### Changed
 
+- Shared helpers in `src/util.py` (`utc_now_iso`, `parse_timestamp`,
+  `sigmoid`, `logit`) replace 21 copies across storage, API and model
+  modules.
+- The phased implementation plan moved from the repository root to
+  `docs/POLYGLOT_SWARM_10_10_IMPLEMENTATION_PLAN.md`, next to the other
+  historical design documents.
 - **Reply before analysis (ADR-0036).** `POST /api/v1/chat` returns as soon
   as the conversation node replies. The turn's grammar, vocabulary and
   cultural analysis, the evaluator and the adaptive step run as a

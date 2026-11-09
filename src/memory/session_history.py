@@ -9,10 +9,10 @@ can be aggregated per learner.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from typing import Any
 
 from src.memory.db import get_connection, once_per_database
+from src.util import utc_now_iso as _now
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS conversation_turns (
@@ -35,10 +35,6 @@ def init_db() -> None:
     """Create the conversation_turns table if it does not exist."""
     with get_connection() as conn:
         conn.executescript(_SCHEMA)
-
-
-def _now() -> str:
-    return datetime.now(UTC).isoformat()
 
 
 def record_turn(

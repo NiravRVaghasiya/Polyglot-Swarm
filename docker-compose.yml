@@ -7,6 +7,10 @@
 #
 # Copy .env.example to .env first and choose an LLM backend there (API key,
 # Ollama, or POLYGLOT_DETERMINISTIC=1 for an offline demo).
+#
+# Every port is published on 127.0.0.1 only: the Gradio UI and Ollama have no
+# authentication, so they must not be reachable from the network. To serve
+# other machines, use docker-compose.prod.yml behind a TLS reverse proxy.
 
 x-app-env: &app-env
   # Inside a container "localhost" is the container itself, so .env's
@@ -21,7 +25,7 @@ services:
     image: polyglot-swarm
     command: uvicorn src.api.app:app --host 0.0.0.0 --port 8000
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     env_file:
       - .env
     environment:
@@ -43,7 +47,7 @@ services:
     build: .
     command: python -m src.main
     ports:
-      - "7860:7860"
+      - "127.0.0.1:7860:7860"
     env_file:
       - .env
     environment:
@@ -62,7 +66,7 @@ services:
   # Optional React dashboard. Enable with: --profile web (first start installs
   # and builds, which takes a few minutes).
   web:
-    image: node:20-alpine
+    image: node:24-alpine
     profiles: ["web"]
     working_dir: /app
     command: sh -c "npm install --no-audit --no-fund && npm run build && npm start"
@@ -71,7 +75,7 @@ services:
       NEXT_PUBLIC_API_URL: http://localhost:8000
       NEXT_TELEMETRY_DISABLED: "1"
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     volumes:
       - ./frontend/react_app:/app
       - web-node-modules:/app/node_modules
@@ -82,10 +86,10 @@ services:
 
   # Optional local LLM for privacy mode. Enable with: --profile local-llm
   ollama:
-    image: ollama/ollama:latest
+    image: ollama/ollama:0.40.15
     profiles: ["local-llm"]
     ports:
-      - "11434:11434"
+      - "127.0.0.1:11434:11434"
     volumes:
       - ollama-models:/root/.ollama
     restart: unless-stopped

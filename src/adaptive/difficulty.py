@@ -37,7 +37,6 @@ Every decision records its inputs and a reason. It is deterministic.
 
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass
 from typing import Any
 
@@ -49,6 +48,7 @@ from src.adaptive.learner_model import (
 )
 from src.evidence.difficulty import difficulty_to_cefr
 from src.learner.estimation import EvidenceStatus
+from src.util import logit as _logit
 
 TARGET_SUCCESS = 0.75
 SUCCESS_ZONE = (0.65, 0.85)
@@ -58,10 +58,6 @@ MAX_STEP_UP = 0.08
 MAX_STEP_DOWN = 0.12
 #: Posterior-quantile factor: use ``theta - UNCERTAINTY_K * se``.
 UNCERTAINTY_K = 0.5
-
-
-def _logit(p: float) -> float:
-    return math.log(p / (1.0 - p))
 
 
 @dataclass(frozen=True)

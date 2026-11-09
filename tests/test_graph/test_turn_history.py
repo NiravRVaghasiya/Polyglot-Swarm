@@ -67,12 +67,12 @@ def recorder(monkeypatch):
 
 
 async def test_gradio_runner_sends_each_turn_once(temp_storage, recorder):
-    from src.main import _run_turn
+    from frontend.gradio_app import _turn
     from src.orchestrator.lifecycle import build_initial_state
 
     state = build_initial_state("u-gradio", "Spanish")
     for message in _SCRIPT:
-        await _run_turn(state, message)
+        await _turn(state, message)
 
     assert recorder.prompts[-1] == _EXPECTED_LAST_PROMPT
 

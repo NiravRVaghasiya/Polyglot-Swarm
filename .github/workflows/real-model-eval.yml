@@ -21,6 +21,10 @@ on:
   schedule:
     - cron: "0 5 * * 1" # Mondays 05:00 UTC
 
+# Least privilege: the jobs only read the repository.
+permissions:
+  contents: read
+
 concurrency:
   group: real-model-eval
   cancel-in-progress: false
@@ -44,7 +48,7 @@ jobs:
           cache: pip
 
       - name: Install dependencies
-        run: python -m pip install -e ".[dev]"
+        run: python -m pip install -c requirements.lock -e ".[dev]"
 
       - name: Validate datasets
         run: python -m evals.real validate

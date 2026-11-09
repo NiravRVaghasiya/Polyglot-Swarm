@@ -107,7 +107,7 @@ It tests your choice and ends with **Ready** when everything works. If something
 | 💬 Terminal chat | `polyglot chat --language Spanish` | — |
 | 🌐 Web app (chat + voice) | `python -m src.main` | http://localhost:7860 |
 | 🔌 REST API | `uvicorn src.api.app:app --reload` | http://localhost:8000/docs |
-| 📈 React dashboard | Start the REST API, then `cd frontend/react_app`, `npm install`, `npm run dev` ([Node.js 20+](https://nodejs.org)) | http://localhost:3000 |
+| 📈 React dashboard | Start the REST API, then `cd frontend/react_app`, `npm install`, `npm run dev` ([Node.js 22+](https://nodejs.org)) | http://localhost:3000 |
 
 Type `quit` in the terminal chat to end the session and see your report. Run `polyglot scenarios` to list the role-plays, then start one with `polyglot chat --scenario es_restaurant_ordering`.
 
