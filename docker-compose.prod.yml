@@ -9,8 +9,9 @@
 #   reverse proxy (Caddy, nginx, a cloud load balancer) in front of it;
 # - the Gradio UI is not run (it has no per-learner accounts; ADR-0035 R5);
 # - a read-only root filesystem, no added capabilities, resource limits;
-# - a nightly verified backup job writing into the same volume (copy the
-#   backups off-host as well; see the operations runbook).
+# - an hourly verified backup job (`backup`) and an hourly encrypted
+#   off-host copy of those sets (`offsite`, restic; ADR-0037). The config
+#   check refuses staging/production without RESTIC_REPOSITORY/RESTIC_PASSWORD.
 # Staging uses this same file with APP_ENV=staging and its own .env file:
 #   docker compose -f docker-compose.prod.yml --env-file .env.staging -p polyglot-staging up -d
 
@@ -56,15 +57,48 @@ services:
 
   backup:
     <<: *app
-    # A verified backup set every 24 h (RPO 24 h); retention per BACKUP_RETENTION_COUNT.
+    # A verified backup set every BACKUP_INTERVAL_SECONDS (default 1 h, so
+    # RPO 1 h); retention per BACKUP_RETENTION_COUNT. `$$` defers expansion
+    # to the container, which reads the value from the env file.
     entrypoint: ["/bin/sh", "-c"]
-    command: ["while true; do polyglot ops backup --label nightly || echo 'BACKUP FAILED'; sleep 86400; done"]
+    command: ["while true; do polyglot ops backup --label scheduled || echo 'BACKUP FAILED'; sleep $${BACKUP_INTERVAL_SECONDS:-3600}; done"]
     deploy:
       resources:
         limits: {cpus: "0.5", memory: 512m}
     depends_on:
       api:
         condition: service_healthy
+
+  offsite:
+    # Encrypted off-host copies of /data/backups (ADR-0037, RR7). restic
+    # encrypts client-side, so the storage provider never sees learner data.
+    # Restore drill: docs/production/operations-runbook.md#off-host-copies
+    image: restic/restic:0.19.1
+    user: "10001:10001"
+    entrypoint: ["/bin/sh", "/ops/offsite-backup.sh"]
+    env_file:
+      - ${POLYGLOT_ENV_FILE:-.env.production}
+    environment:
+      RESTIC_CACHE_DIR: /tmp/restic-cache
+    volumes:
+      - polyglot-data:/data
+      - ./ops/backup/offsite-backup.sh:/ops/offsite-backup.sh:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: {max-size: "20m", max-file: "5"}
+    deploy:
+      resources:
+        limits: {cpus: "0.5", memory: 512m}
+    depends_on:
+      backup:
+        condition: service_started
 
 volumes:
   polyglot-data:

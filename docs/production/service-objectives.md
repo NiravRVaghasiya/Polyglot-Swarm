@@ -33,13 +33,13 @@ exhausted:
 
 | Objective | Target | How it is met |
 |---|---|---|
-| **RPO** (data loss window) | **24 h** for the whole data volume; **0** for in-flight chat sessions after a process crash | nightly verified backup set; per-turn session snapshots on the volume |
-| **RTO** (time to restore service) | **1 h** after a volume loss; **minutes** after a process crash | `polyglot ops restore` from the newest off-host set (runbook); container restart with rehydration |
-| **Restore verification** | every backup verified when written; restore drill every CI run; manual staging restore monthly | `ops backup` verifies; `test_backup_restore.py`; CI container job |
+| **RPO** (data loss window) | **1 h** for the whole data volume, including loss of the host; **0** for in-flight chat sessions after a process crash | hourly verified backup set, copied off-host (encrypted) hourly; per-turn session snapshots on the volume |
+| **RTO** (time to restore service) | **1 h** after a volume loss with the host intact; **2 h** after losing the host; **minutes** after a process crash | `polyglot ops restore` from a local set, or from the off-host restic copy (runbook); container restart with rehydration |
+| **Restore verification** | every backup verified when written; every off-host copy followed by `restic check`; local and off-host restore drills every push to main; manual staging drill monthly | `ops backup` verifies; `test_backup_restore.py`; CI container job |
 
-An RPO below 24 h would need continuous replication of the SQLite file
-(for example Litestream). That is the first upgrade if the 24-hour window
-is too wide for real learners; the risk register lists it.
+An RPO below the backup interval would need continuous replication of the
+SQLite file (for example Litestream). Shortening `BACKUP_INTERVAL_SECONDS`
+and `OFFSITE_INTERVAL_SECONDS` is the cheaper first step.
 
 ## Critical workflows
 

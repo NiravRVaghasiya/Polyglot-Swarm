@@ -111,6 +111,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Off-host encrypted backups (ADR-0037, RR7).** The production stack
+  has an `offsite` service (pinned `restic/restic`) that copies the
+  verified backup sets every hour to an off-host restic repository,
+  encrypted client-side, prunes to 30 days, runs `restic check`, and
+  records success. New metric
+  `polyglot_offsite_backup_last_success_timestamp_seconds` with
+  `PolyglotOffsiteBackupStale`/`Missing` alerts; runbook procedures for
+  status, failure and restoring a lost host. Staging/production refuse
+  to start without `RESTIC_REPOSITORY` (non-local) and `RESTIC_PASSWORD`.
+- Backup sets every `BACKUP_INTERVAL_SECONDS` (default 1 h, was 24 h):
+  RPO 1 h, including loss of the host. `PolyglotBackupStale` fires after
+  3 h.
+- The CI container job copies to a throwaway REST server and rebuilds a
+  fresh volume from that copy alone (`ops/backup/offsite-drill.sh`).
+- **Launch checklist** (`docs/production/launch-checklist.md`): the
+  go/no-go list, with owned operator and legal sign-offs (RR5), and a
+  privacy notice template (`docs/legal/privacy-notice-template.md`)
+  built from the actual data flows.
+
 - **Calibrated correction confidence.** The grammar agent's `_select_errors`
   applies a per-model calibration map for the model that answered
   (`governance.last_answer()`), and its 0.5 threshold then applies to the

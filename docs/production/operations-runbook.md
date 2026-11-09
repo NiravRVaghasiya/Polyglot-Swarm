@@ -247,12 +247,11 @@ each step. A step that keeps failing shows as `{"error": ...}`.
 - **Verification.** Each set is verified when written
   (`PRAGMA integrity_check` and checksums). `polyglot ops verify <set>`
   re-checks one at any time.
-- **Schedule.** The `backup` service writes one set every 24 h. Sets are
-  kept per `BACKUP_RETENTION_COUNT` (14).
-- **Off-host copies.** The sets live on the same volume as the data, so a
-  lost volume loses them too. Copy `/data/backups/` off the host every day
-  (object storage with versioning). The storage must encrypt at rest:
-  sets contain learner data and are not encrypted by the application.
+- **Schedule.** The `backup` service writes one set every
+  `BACKUP_INTERVAL_SECONDS` (default 1 h, so RPO 1 h). Sets are kept on the
+  host per `BACKUP_RETENTION_COUNT` (48, two days).
+- **Off-host copies.** The `offsite` service copies them off the host,
+  encrypted; see [Off-host copies](#off-host-copies).
 - **Restore** (RTO target 1 h):
   ```bash
   docker compose -f docker-compose.prod.yml stop api backup
@@ -267,16 +266,57 @@ each step. A step that keeps failing shows as `{"error": ...}`.
   - `tests/test_production/test_backup_restore.py`, every CI run;
   - the container job, every push to main.
 
-  Also restore the newest off-host copy into staging monthly and run
-  `polyglot ops db-check`.
+  Also run the off-host restore drill below in staging every month.
 - **What is not backed up.** `chroma/` holds embeddings of static content.
   It is rebuilt on demand and is not learner data.
+
+### Off-host copies
+
+Alerts: `PolyglotOffsiteBackupStale`, `PolyglotOffsiteBackupMissing`.
+
+The `offsite` service (`ops/backup/offsite-backup.sh` in the pinned
+`restic/restic` image; ADR-0037) copies `/data/backups/` every
+`OFFSITE_INTERVAL_SECONDS` (1 h) to `RESTIC_REPOSITORY`, a restic
+repository on storage that is **not this host** (S3, B2, SFTP, a REST
+server). restic encrypts on this host with `RESTIC_PASSWORD`, so the
+storage provider never sees learner data. After each copy it applies the
+retention policy (hourly for 24 h, then daily for 30 days), runs
+`restic check`, and only then records success, which the API exports as
+`polyglot_offsite_backup_last_success_timestamp_seconds`.
+
+- **Setup.** Create the bucket or server account, put `RESTIC_REPOSITORY`,
+  `RESTIC_PASSWORD` and the backend credentials in `.env.production`, and
+  store `RESTIC_PASSWORD` in your password manager as well: **without it the
+  copies cannot be decrypted**. `polyglot ops config-check` refuses to start
+  staging/production without an off-host repository. The first run creates
+  the repository.
+- **Status.**
+  ```bash
+  docker compose -f docker-compose.prod.yml logs --tail 50 offsite
+  docker compose -f docker-compose.prod.yml run --rm offsite snapshots
+  ```
+- **Failure** (`OFFSITE BACKUP FAILED` in the log, or the alert): check the
+  backend credentials and reachability, then run one copy by hand:
+  `docker compose -f docker-compose.prod.yml run --rm offsite once`. A
+  wrong `RESTIC_PASSWORD` fails loudly; it never starts a second repository.
+- **Restore from off-host** (the host or its volume is lost; RTO target
+  2 h). On the new host, with the same `.env.production`:
+  ```bash
+  docker compose -f docker-compose.prod.yml run --rm offsite restore latest --target /data/offsite-restore
+  docker compose -f docker-compose.prod.yml run --rm api polyglot ops verify /data/offsite-restore/data/backups/<newest set>
+  docker compose -f docker-compose.prod.yml run --rm api polyglot ops restore /data/offsite-restore/data/backups/<newest set> --yes
+  docker compose -f docker-compose.prod.yml up -d
+  ```
+  The CI container job runs exactly this against a throwaway REST server
+  on every push to main.
 
 ### Data subject requests
 
 Learners can export (`GET /api/v1/privacy/export`) and delete
-(`DELETE /api/v1/privacy/data`) their own data in-app. An operator never
+(`DELETE /api/v1/privacy/data`) their own data through the API (the web
+app has no screens for these yet; `polyglot privacy` serves requests that
+arrive by email). An operator never
 needs database access for this. Deletion does not reach backups. Backup
-sets expire with retention (14 days), which is the documented upper bound
-for erased data to persist (see
+sets expire with retention (two days on the host, 30 days off-host),
+which is the documented upper bound for erased data to persist (see
 [security-privacy-review.md](security-privacy-review.md)).

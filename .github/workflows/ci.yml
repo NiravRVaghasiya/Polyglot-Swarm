@@ -130,6 +130,8 @@ jobs:
           METRICS_TOKEN=${METRICS}
           LLM_GLOBAL_DAILY_BUDGET_USD=5
           OLLAMA_BASE_URL=http://127.0.0.1:11434
+          RESTIC_REPOSITORY=rest:http://rest:8000/polyglot
+          RESTIC_PASSWORD=ci-restic-password-0123456789
           EOF
           docker run --rm --env-file .env.staging polyglot-swarm:ci polyglot ops config-check
 
@@ -146,6 +148,9 @@ jobs:
           test "$(curl -s -o /dev/null -w '%{http_code}' localhost:8000/metrics)" = 401
           curl -fsS -H "Authorization: Bearer ${METRICS}" localhost:8000/metrics | grep -q polyglot_build_info
           docker exec api id -u | grep -qv '^0$'   # not root
+          # A learner account, so the backup and restore checks compare real rows.
+          curl -fsS -X POST localhost:8000/api/v1/auth/register -H 'Content-Type: application/json' \
+            -d '{"username": "drill-learner", "password": "drill-password-123"}' >/dev/null
 
       - name: Backup, verify and restore inside the container
         run: |
@@ -158,6 +163,16 @@ jobs:
           docker start api
           for i in $(seq 1 30); do curl -fsS localhost:8000/ready && break; sleep 2; done
           docker exec api polyglot ops db-check
+
+      # ADR-0037: encrypted off-host copy to a throwaway REST server, then a
+      # rebuild of a fresh volume (a lost host) from that copy alone.
+      - name: Off-host copy and restore from it
+        run: bash ops/backup/offsite-drill.sh
+        env:
+          IMAGE: polyglot-swarm:ci
+          ENV_FILE: .env.staging
+          VOLUME: polyglot-ci-data
+          MIN_USERS: "1"
 
       - name: Restart is idempotent (no migration, no data change)
         run: |

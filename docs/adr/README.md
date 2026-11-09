@@ -47,6 +47,7 @@ old ADR — we add a new one that supersedes it and mark the old one accordingly
 | [0034](0034-multimodal-assessment.md) | Multimodal (speech) assessment: ingestion, transcription, speaking and listening evidence, privacy | Accepted |
 | [0035](0035-production-maturity.md) | Production maturity: durable sessions, LLM budgets and timeouts, idempotency, verified backups, metrics and alerts, supply chain | Accepted |
 | [0036](0036-reply-before-analysis.md) | Reply before analysis | Accepted |
+| [0037](0037-offsite-encrypted-backups.md) | Off-host encrypted backups | Accepted |
 
 ## Creating a new ADR
 

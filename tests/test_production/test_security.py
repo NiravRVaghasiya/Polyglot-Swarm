@@ -164,6 +164,8 @@ def _prod(**overrides) -> Settings:
         "log_format": "json",
         "metrics_token": "m" * 32,
         "llm_global_daily_budget_usd": 50.0,
+        "restic_repository": "s3:https://s3.example.org/backups/polyglot",
+        "restic_password": "p" * 24,
     }
     return Settings(**{**base, **overrides})
 
@@ -183,6 +185,10 @@ class TestProductionConfiguration:
             ({"llm_global_daily_budget_usd": 0.0}, "BUDGET"),
             ({"telemetry_enabled": False}, "TELEMETRY_ENABLED"),
             ({"app_env": "prod"}, "APP_ENV"),
+            ({"restic_repository": ""}, "RESTIC_REPOSITORY"),
+            ({"restic_repository": "/data/offsite"}, "RESTIC_REPOSITORY"),
+            ({"restic_repository": "local:/mnt/backup"}, "RESTIC_REPOSITORY"),
+            ({"restic_password": "short"}, "RESTIC_PASSWORD"),
         ],
     )
     def test_unsafe_settings_are_reported(self, monkeypatch, override, fragment):

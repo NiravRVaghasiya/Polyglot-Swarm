@@ -211,7 +211,7 @@ Add `--help` to any command for its options.
 | 🧪 [Evaluation](docs/evaluation.md) · [Results](docs/results.md) | Test harnesses and their latest numbers |
 | 🔬 [Real-model evaluation](docs/real-model-evaluation.md) | How real LLMs score on the grammar and vocabulary benchmarks, and how to rerun them |
 | 🎙️ [Multimodal assessment](docs/multimodal-assessment.md) | How speaking and listening are assessed from audio, what is kept, and how it was benchmarked |
-| 🛡️ [Production operations](docs/production/operations-runbook.md) | Deploying, monitoring, backups and incident response; see also the [readiness audit](docs/production/readiness-audit.md) and [security review](docs/production/security-privacy-review.md) |
+| 🛡️ [Production operations](docs/production/operations-runbook.md) | Deploying, monitoring, backups and incident response; before real learners, work through the [launch checklist](docs/production/launch-checklist.md); see also the [readiness audit](docs/production/readiness-audit.md) and [security review](docs/production/security-privacy-review.md) |
 | 🧭 [Adaptive learning](docs/adaptive-learning.md) | How the tutor predicts performance, picks the next activity and difficulty, and how that was evaluated (in simulation) |
 | 📝 [Decision records](docs/adr/README.md) | Why the system is built the way it is |
 

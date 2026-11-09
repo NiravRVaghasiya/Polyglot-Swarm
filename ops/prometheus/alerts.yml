@@ -108,10 +108,10 @@ groups:
   - name: polyglot-data
     rules:
       - alert: PolyglotBackupStale
-        expr: time() - polyglot_backup_last_success_timestamp_seconds > 26 * 3600
+        expr: time() - polyglot_backup_last_success_timestamp_seconds > 3 * 3600
         labels: {severity: sev2}
         annotations:
-          summary: "No verified backup in the last 26 hours (RPO: 24 h)"
+          summary: "No verified backup in the last 3 hours (hourly backups; RPO: 1 h)"
           runbook: "docs/production/operations-runbook.md#backups"
 
       - alert: PolyglotBackupMissing
@@ -121,3 +121,18 @@ groups:
         annotations:
           summary: "No verified backup set exists"
           runbook: "docs/production/operations-runbook.md#backups"
+
+      - alert: PolyglotOffsiteBackupStale
+        expr: time() - polyglot_offsite_backup_last_success_timestamp_seconds > 3 * 3600
+        labels: {severity: sev2}
+        annotations:
+          summary: "No successful off-host backup copy in the last 3 hours"
+          runbook: "docs/production/operations-runbook.md#off-host-copies"
+
+      - alert: PolyglotOffsiteBackupMissing
+        expr: absent(polyglot_offsite_backup_last_success_timestamp_seconds)
+        for: 2h
+        labels: {severity: sev2}
+        annotations:
+          summary: "No off-host backup copy has ever succeeded"
+          runbook: "docs/production/operations-runbook.md#off-host-copies"

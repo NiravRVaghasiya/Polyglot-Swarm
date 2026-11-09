@@ -4,9 +4,11 @@
 > with `APP_ENV=staging|production`, which refuses to start on unsafe
 > settings. Start from [`.env.production.example`](../.env.production.example)
 > and follow the [operations runbook](production/operations-runbook.md):
-> deploy, rollback, backups and restore, alerts and incidents. The other
+> deploy, rollback, backups and restore (including the encrypted off-host
+> copy, which production requires), alerts and incidents. The other
 > production documents:
 >
+> - [launch checklist](production/launch-checklist.md) (go/no-go before real learners);
 > - [readiness audit and risk register](production/readiness-audit.md);
 > - [security and privacy review](production/security-privacy-review.md);
 > - [service objectives](production/service-objectives.md);
