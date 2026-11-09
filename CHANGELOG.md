@@ -24,6 +24,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The service worker served stale files.** It cached every static GET
+  cache-first under a fixed name, so files without a content hash (the
+  manifest, icons) never updated after a deploy, old releases' assets were
+  never removed, and other origins' responses could be cached. Now only
+  `/_next/static/` (content-hashed) is cache-first; other same-origin files
+  are network-first with an offline fallback; the cache version is bumped so
+  old caches are deleted; and the worker is not registered in development.
+
 - **The container's `polyglot` command found no language packs.** The image
   installed the package non-editable, so console scripts resolved the
   repository root inside site-packages: language packs and the grammar
@@ -46,6 +54,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and the turn-history test exercises the UI that actually runs.
 
 ### Changed
+
+- **Plain-language plan.** Each activity gets a learner-facing title and
+  description ("Quick check: Gender agreement — a few short questions to
+  find your level here") built from the plan's structured fields; the
+  planner's technical reason moved behind "Why?", and the priority score is
+  no longer shown. Skills, mistakes and evidence states are worded for
+  learners ("not enough practice yet · 2 answers").
+- **Session summary.** `POST /sessions/{id}/end` returns `summary`, the
+  report as data (corrections, new words, culture notes, level, scenario
+  outcome, transfers); `report` is now rendered from it, unchanged. The web
+  app shows corrections, word chips and the level instead of preformatted
+  text.
+- **Your data.** Learners can download their data as JSON and delete their
+  account (after typing DELETE) in the app; it uses the existing
+  `/api/v1/privacy/*` endpoints.
+- Chat shows errors (a failed send, a budget limit) instead of failing
+  silently, a typing indicator, and scrolls to the newest message.
+- Listening: styled answer options, a visible text field and real buttons;
+  "rate -15%" reads "slower speech".
+- The plan and progress views refresh after a session ends or listening
+  answers are scored (they kept the old numbers until a reload).
 
 - Shared helpers in `src/util.py` (`utc_now_iso`, `parse_timestamp`,
   `sigmoid`, `logit`) replace 21 copies across storage, API and model

@@ -19,7 +19,7 @@ export interface PlanData {
 export function usePlan(
   token: string | null,
   language?: string,
-  opts: { minutes?: number; goal?: string } = {},
+  opts: { minutes?: number; goal?: string; refreshKey?: number } = {},
 ): PlanData {
   const [plan, setPlan] = useState<PlanResponse | null>(null);
   const [cefr, setCefr] = useState<CEFRProfile | null>(null);
@@ -27,7 +27,7 @@ export function usePlan(
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { minutes, goal } = opts;
+  const { minutes, goal, refreshKey } = opts;
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -47,7 +47,8 @@ export function usePlan(
     } finally {
       setLoading(false);
     }
-  }, [token, language, minutes, goal]);
+    // refreshKey: a change means the learner model changed; fetch again.
+  }, [token, language, minutes, goal, refreshKey]);
 
   useEffect(() => {
     void load();

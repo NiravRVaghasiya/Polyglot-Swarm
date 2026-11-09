@@ -75,8 +75,59 @@ class SessionStateResponse(BaseModel):
     cefr_level: str
 
 
+class Correction(BaseModel):
+    original: str
+    correction: str
+    explanation: str = ""
+
+
+class LevelSummary(BaseModel):
+    #: Evidence-backed CEFR estimate; ``None`` until the evidence supports one.
+    estimate: str | None
+    #: Evidence status ("insufficient evidence", "provisional", ...); ``None``
+    #: if the learner model was unavailable.
+    status: str | None
+    #: The tutor's working level (not an assessment).
+    working_level: str
+
+
+class ScenarioOutcome(BaseModel):
+    id: str
+    passed: bool
+    objectives_completed: bool
+    vocab_coverage: float
+    grammar_ok: bool
+    failure_reasons: list[str] = Field(default_factory=list)
+
+
+class FalseFriend(BaseModel):
+    language: str
+    word: str
+    warning: str
+
+
+class TransferSuggestion(BaseModel):
+    word: str
+    cognates: dict[str, str] = Field(default_factory=dict)
+    false_friends: list[FalseFriend] = Field(default_factory=list)
+
+
+class SessionSummary(BaseModel):
+    """The end-of-session report as data (``report`` is the same, as text)."""
+
+    correction_count: int
+    corrections: list[Correction]
+    new_word_count: int
+    new_words: list[str]
+    cultural_notes: list[str]
+    level: LevelSummary
+    scenario: ScenarioOutcome | None = None
+    transfers: list[TransferSuggestion] = Field(default_factory=list)
+
+
 class EndSessionResponse(BaseModel):
     report: str
+    summary: SessionSummary
     persisted: dict[str, int]
 
 

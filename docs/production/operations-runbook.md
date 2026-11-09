@@ -313,9 +313,9 @@ retention policy (hourly for 24 h, then daily for 30 days), runs
 ### Data subject requests
 
 Learners can export (`GET /api/v1/privacy/export`) and delete
-(`DELETE /api/v1/privacy/data`) their own data through the API (the web
-app has no screens for these yet; `polyglot privacy` serves requests that
-arrive by email). An operator never
+(`DELETE /api/v1/privacy/data`) their own data in the web app, under
+*Your data*; `polyglot privacy` serves requests that arrive by email. An
+operator never
 needs database access for this. Deletion does not reach backups. Backup
 sets expire with retention (two days on the host, 30 days off-host),
 which is the documented upper bound for erased data to persist (see
