@@ -166,5 +166,11 @@ class TestEndSession:
         body = resp.json()
         assert "Session Report" in body["report"]
         assert "vocabulary" in body["persisted"]
+        # The same report as data, for the web app (the text is rendered from it).
+        summary = body["summary"]
+        assert summary["correction_count"] == len(summary["corrections"])
+        assert summary["level"]["working_level"]
+        if summary["new_words"]:
+            assert ", ".join(summary["new_words"]) in body["report"]
         # Session removed after ending.
         assert client.get(f"/api/v1/sessions/{sid}/state", headers=headers).status_code == 404

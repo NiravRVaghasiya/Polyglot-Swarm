@@ -62,7 +62,7 @@ describe("TodaysPlan with nullable CEFR", () => {
     expect(screen.getByTestId("overall-level").textContent).toContain("not yet assessed");
     expect(screen.getByTestId("overall-level").textContent).toContain("not enough evidence");
     expect(screen.getByTestId("action-intent").textContent).toBe("find your level");
-    expect(screen.getByText(/Still finding your level in: grammar, speaking/)).toBeTruthy();
+    expect(screen.getByText(/Not assessed yet: Grammar, Speaking/)).toBeTruthy();
     // No default band rendered anywhere.
     expect(screen.queryByText("A2")).toBeNull();
   });

@@ -1,8 +1,16 @@
 // Minimal app-shell service worker (Gate E: PWA/offline).
 //
-// Strategy: cache-first for the app shell (so it opens offline / instantly),
-// network-first pass-through for everything else. API calls (which need auth
-// and fresh data) are never cached — only navigations and static assets are.
+// Strategy:
+// - Next's build assets (/_next/static/) have content-hashed names and never
+//   change, so they are served cache-first.
+// - Everything else from this origin (pages, manifest, icons) is
+//   network-first, falling back to the cache when offline, so a deploy is
+//   picked up on the next load.
+// - API calls (authenticated, must be fresh), other origins and non-GET
+//   requests are never touched.
+//
+// Bump CACHE when the caching rules change: activation deletes every other
+// cache, which also clears assets of earlier releases.
 
 const CACHE = "polyglot-shell-v2";
 const SHELL = ["/", "/manifest.json"];
@@ -25,30 +33,40 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+function store(request, response) {
+  if (response.ok && response.type === "basic") {
+    const copy = response.clone();
+    caches.open(CACHE).then((cache) => cache.put(request, copy));
+  }
+  return response;
+}
+
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Never cache API traffic — it is authenticated and must be fresh.
-  if (url.pathname.startsWith("/api/")) return;
   if (request.method !== "GET") return;
+  if (url.origin !== self.location.origin) return;
+  if (url.pathname.startsWith("/api/")) return;
 
-  // Navigations: try the network, fall back to the cached shell when offline.
-  if (request.mode === "navigate") {
-    event.respondWith(fetch(request).catch(() => caches.match("/")));
+  // Immutable, content-hashed build assets: cache-first.
+  if (url.pathname.startsWith("/_next/static/")) {
+    event.respondWith(
+      caches.match(request).then((cached) => cached || fetch(request).then((res) => store(request, res))),
+    );
     return;
   }
 
-  // Other GETs: cache-first, then network (and cache the result).
+  // Pages and other files: network-first; the cache (or the shell, for a
+  // page) only when offline.
   event.respondWith(
-    caches.match(request).then(
-      (cached) =>
-        cached ||
-        fetch(request).then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE).then((cache) => cache.put(request, copy));
-          return res;
-        }),
-    ),
+    fetch(request)
+      .then((res) => store(request, res))
+      .catch(() =>
+        caches
+          .match(request)
+          .then((cached) => cached || (request.mode === "navigate" ? caches.match("/") : undefined))
+          .then((res) => res || Response.error()),
+      ),
   );
 });

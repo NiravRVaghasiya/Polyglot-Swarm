@@ -27,6 +27,18 @@ const TABS: readonly TabDef<TabId>[] = [
 ];
 
 const isTab = (v: string): v is TabId => TABS.some((t) => t.id === v);
+import { PrivacyPanel } from "@/components/PrivacyPanel";
+
+function Header({ onLogout }: { onLogout: () => void }) {
+  return (
+    <header className="flex items-center justify-between">
+      <h1 className="text-xl font-bold sm:text-2xl">🌍 Polyglot Swarm</h1>
+      <button className="rounded-md px-2 py-1 text-sm text-slate-500 hover:bg-slate-100" onClick={onLogout}>
+        Log out
+      </button>
+    </header>
+  );
+}
 
 export default function HomePage() {
   const { token, loading, logout } = useAuth();
@@ -35,6 +47,10 @@ export default function HomePage() {
   const [profileLoading, setProfileLoading] = useState(true);
   const [tab, setTab] = useState<TabId>("today");
   const [direction, setDirection] = useState(1);
+  // Bumped when the learner model changes (a session ends, answers are
+  // scored), so the plan and progress views fetch again.
+  const [refreshKey, setRefreshKey] = useState(0);
+  const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
 
   // Auth guard: send unauthenticated users to /login once auth state is known.
   useEffect(() => {
@@ -113,6 +129,7 @@ export default function HomePage() {
     return (
       <main className="mx-auto max-w-3xl space-y-6 p-4 sm:p-6">
         {header}
+        <Header onLogout={logout} />
         <Onboarding token={token} onComplete={onOnboarded} />
       </main>
     );
@@ -185,6 +202,38 @@ function ShellSkeleton() {
         <Skeleton className="h-32 w-full rounded-2xl" />
         <Skeleton className="h-48 w-full rounded-2xl" />
       </div>
+    <main className="mx-auto max-w-3xl space-y-8 p-4 sm:p-6">
+      <Header onLogout={logout} />
+
+      <section>
+        <h2 className="mb-2 text-lg font-semibold">Today</h2>
+        <TodaysPlan
+          token={token}
+          language={language}
+          goal={profile?.goals?.[0]}
+          refreshKey={refreshKey}
+        />
+      </section>
+
+      <section>
+        <h2 className="mb-2 text-lg font-semibold">Practice</h2>
+        <ChatPanel token={token} onSessionEnd={refresh} />
+      </section>
+
+      <section>
+        <h2 className="mb-2 text-lg font-semibold">Listening</h2>
+        <ListeningExercise token={token} language={language} onSubmitted={refresh} />
+      </section>
+
+      <section>
+        <h2 className="mb-2 text-lg font-semibold">Progress</h2>
+        <ProgressDashboard token={token} refreshKey={refreshKey} />
+      </section>
+
+      <section>
+        <h2 className="mb-2 text-lg font-semibold">Your data</h2>
+        <PrivacyPanel token={token} onDeleted={logout} />
+      </section>
     </main>
   );
 }

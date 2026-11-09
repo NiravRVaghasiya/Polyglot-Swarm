@@ -4,12 +4,23 @@
 // offline (Gate E: PWA/mobile). No-op when the browser has no service-worker
 // support or in a non-secure context; failures are swallowed so a registration
 // problem never breaks the app.
+//
+// Production builds only: the dev server's assets are not content-hashed, so
+// a worker would serve stale code. In development any earlier registration is
+// removed.
 
 import { useEffect } from "react";
 
 export function ServiceWorkerRegistrar() {
   useEffect(() => {
     if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
+    if (process.env.NODE_ENV !== "production") {
+      navigator.serviceWorker
+        .getRegistrations()
+        .then((regs) => regs.forEach((r) => void r.unregister()))
+        .catch(() => undefined);
+      return;
+    }
     const register = () => {
       navigator.serviceWorker.register("/sw.js").catch(() => {
         // Registration is best-effort; the app works without it.

@@ -115,6 +115,43 @@ export interface ChatResponse {
   hidden_feedback: HiddenFeedback;
 }
 
+// The end-of-session report as data (`report` is the same, as text).
+export interface SessionSummary {
+  correction_count: number;
+  corrections: { original: string; correction: string; explanation: string }[];
+  new_word_count: number;
+  new_words: string[];
+  cultural_notes: string[];
+  level: {
+    /** Evidence-backed CEFR estimate; null until the evidence supports one. */
+    estimate: string | null;
+    /** Evidence status, or null if the learner model was unavailable. */
+    status: string | null;
+    /** The tutor's working level (how it pitches its language), not an assessment. */
+    working_level: string;
+  };
+  scenario: {
+    id: string;
+    passed: boolean;
+    objectives_completed: boolean;
+    vocab_coverage: number;
+    grammar_ok: boolean;
+    failure_reasons: string[];
+  } | null;
+  transfers: {
+    word: string;
+    cognates: Record<string, string>;
+    false_friends: { language: string; word: string; warning: string }[];
+  }[];
+}
+
+export interface EndSessionResponse {
+  report: string;
+  /** Absent from servers older than this client. */
+  summary?: SessionSummary;
+  persisted: Record<string, number>;
+}
+
 export interface StartSessionResponse {
   session_id: string;
   language: string;
@@ -331,10 +368,10 @@ export const api = {
     }),
 
   endSession: (token: string, session_id: string) =>
-    request<{ report: string; persisted: Record<string, number> }>(
-      `/api/v1/sessions/${session_id}/end`,
-      { method: "POST", token },
-    ),
+    request<EndSessionResponse>(`/api/v1/sessions/${session_id}/end`, {
+      method: "POST",
+      token,
+    }),
 
   progressOverview: (token: string, language?: string) =>
     request<ProgressOverview>(
@@ -424,6 +461,17 @@ export const api = {
       `/api/v1/assessment/listening/tasks/${encodeURIComponent(taskId)}/answers`,
       { method: "POST", body: { answers }, token },
     ),
+
+  // --- Privacy: the caller's own data only ---
+  exportData: (token: string) =>
+    request<{ data: Record<string, unknown> }>("/api/v1/privacy/export", { token }),
+
+  /** Permanently deletes the account and all its data; the token stops working. */
+  deleteData: (token: string) =>
+    request<{ deleted: Record<string, unknown> }>("/api/v1/privacy/data", {
+      method: "DELETE",
+      token,
+    }),
 
   deleteSubmission: (token: string, submissionId: string) =>
     request<{ deleted: string }>(

@@ -274,92 +274,146 @@ def _evaluate_scenario_outcome(state: LearnerState, scenario_id: str) -> dict[st
     return evaluate_success(scenario, messages, grammar_error_rate=error_rate)
 
 
-def _level_line(state: LearnerState) -> str:
-    """The report's level line: the evidence-backed CEFR estimate and its status,
-    kept apart from the tutor's working level (ADR-0031)."""
+def _level_summary(state: LearnerState) -> dict[str, Any]:
+    """The evidence-backed CEFR estimate and its status, kept apart from the
+    tutor's working level (ADR-0031). ``estimate`` is ``None`` until the
+    evidence supports a level; ``status`` is ``None`` if the model is unavailable."""
     working = state.get("cefr_level", "unknown")
     try:
         from src.assessment.cefr_profile import build_cefr_profile
 
         profile = build_cefr_profile(state["user_id"], state["language"])
     except Exception:  # noqa: BLE001 - the report must render even if the model can't
-        return f"📈 Level estimate: unavailable · tutor working level {working}"
-    status = profile.overall_status.replace("_", " ")
-    if profile.overall is None:
-        return f"📈 Level estimate: not yet ({status}) · tutor working level {working}"
-    return f"📈 Level estimate: {profile.overall} ({status}) · tutor working level {working}"
+        return {"estimate": None, "status": None, "working_level": working}
+    return {
+        "estimate": profile.overall,
+        "status": profile.overall_status.replace("_", " "),
+        "working_level": working,
+    }
 
 
-def build_session_report(state: LearnerState) -> str:
-    """Compile the end-of-session report from all agents' outputs.
+def build_session_summary(state: LearnerState) -> dict[str, Any]:
+    """The end-of-session report as data, one section per agent.
 
-    Includes grammar corrections, new vocabulary, cultural notes, the
-    evidence-backed CEFR estimate (or "not yet") next to the tutor's working
-    level, and cross-language transfer suggestions — one section per agent.
+    Grammar corrections, new vocabulary, cultural notes, the level estimate
+    next to the tutor's working level, the scenario outcome, and
+    cross-language transfer suggestions. The API serves it as ``summary``;
+    :func:`build_session_report` renders the same data as text.
     """
     grammar_errors = state.get("grammar_errors", [])
     new_vocab = state.get("new_vocabulary", [])
-    cultural_notes = state.get("cultural_notes", [])
-    transfers = state.get("transfer_suggestions", [])
-
-    lines = ["\n" + "━" * 50, "📊 Session Report", "━" * 50]
-
-    # Grammar
-    if grammar_errors:
-        lines.append(f"🔤 Grammar — {len(grammar_errors)} correction(s):")
-        for e in grammar_errors[:10]:
-            lines.append(f"   • {e.get('original', '')} → {e.get('correction', '')}")
-    else:
-        lines.append("🔤 Grammar — no errors detected")
-
-    # Vocabulary
-    if new_vocab:
-        words = ", ".join(v.get("word", "") for v in new_vocab[:15])
-        lines.append(f"📚 New vocabulary ({len(new_vocab)}): {words}")
-    else:
-        lines.append("📚 New vocabulary — none this session")
-
-    # Cultural
-    if cultural_notes:
-        lines.append(f"🌍 Cultural notes ({len(cultural_notes)}):")
-        for note in cultural_notes[:5]:
-            lines.append(f"   • {note}")
-
-    # CEFR
-    lines.append(_level_line(state))
-
-    # Scenario outcome (Phase 13): did the learner meet the scenario's goals?
-    scenario_ctx = state.get("current_scenario") or {}
-    scenario_id = scenario_ctx.get("scenario_id")
+    scenario: dict[str, Any] | None = None
+    scenario_id = (state.get("current_scenario") or {}).get("scenario_id")
     if scenario_id:
         outcome = _evaluate_scenario_outcome(state, scenario_id)
         if outcome is not None:
-            status = "✅ passed" if outcome["passed"] else "◻ not yet"
-            lines.append(f"🎯 Scenario '{scenario_id}': {status}")
-            lines.append(
-                f"   objectives {'✓' if outcome['objectives_completed'] else '✗'}"
-                f" | target vocab {int(outcome['vocab_coverage'] * 100)}%"
-                f" | grammar {'ok' if outcome['grammar_ok'] else 'high error rate'}"
-            )
-            for reason in outcome.get("failure_reasons", []):
-                lines.append(f"   ⚠ failure: {reason}")
+            scenario = {
+                "id": scenario_id,
+                "passed": bool(outcome["passed"]),
+                "objectives_completed": bool(outcome["objectives_completed"]),
+                "vocab_coverage": float(outcome["vocab_coverage"]),
+                "grammar_ok": bool(outcome["grammar_ok"]),
+                "failure_reasons": [str(r) for r in outcome.get("failure_reasons", [])],
+            }
+    return {
+        "correction_count": len(grammar_errors),
+        "corrections": [
+            {
+                "original": str(e.get("original", "")),
+                "correction": str(e.get("correction", "")),
+                "explanation": str(e.get("explanation") or ""),
+            }
+            for e in grammar_errors[:10]
+        ],
+        "new_word_count": len(new_vocab),
+        "new_words": [str(v.get("word", "")) for v in new_vocab[:15]],
+        "cultural_notes": [str(n) for n in state.get("cultural_notes", [])[:5]],
+        "level": _level_summary(state),
+        "scenario": scenario,
+        "transfers": [
+            {
+                "word": str(t.get("word", "")),
+                "cognates": {str(k): str(v) for k, v in (t.get("cognates") or {}).items()},
+                "false_friends": [
+                    {
+                        "language": str(ff.get("language", "")),
+                        "word": str(ff.get("word", "")),
+                        "warning": str(ff.get("warning", "")),
+                    }
+                    for ff in t.get("false_friends", [])
+                ],
+            }
+            for t in state.get("transfer_suggestions", [])[:10]
+        ],
+    }
 
-    # Cross-language transfer
-    if transfers:
+
+def _level_line(level: dict[str, Any]) -> str:
+    working = level["working_level"]
+    if level["status"] is None:
+        return f"📈 Level estimate: unavailable · tutor working level {working}"
+    if level["estimate"] is None:
+        return f"📈 Level estimate: not yet ({level['status']}) · tutor working level {working}"
+    return (
+        f"📈 Level estimate: {level['estimate']} ({level['status']})"
+        f" · tutor working level {working}"
+    )
+
+
+def render_session_report(summary: dict[str, Any]) -> str:
+    """The text form of :func:`build_session_summary` (CLI, Gradio, API ``report``)."""
+    lines = ["\n" + "━" * 50, "📊 Session Report", "━" * 50]
+
+    if summary["corrections"]:
+        lines.append(f"🔤 Grammar — {summary['correction_count']} correction(s):")
+        for e in summary["corrections"]:
+            lines.append(f"   • {e['original']} → {e['correction']}")
+    else:
+        lines.append("🔤 Grammar — no errors detected")
+
+    if summary["new_words"]:
+        words = ", ".join(summary["new_words"])
+        lines.append(f"📚 New vocabulary ({summary['new_word_count']}): {words}")
+    else:
+        lines.append("📚 New vocabulary — none this session")
+
+    if summary["cultural_notes"]:
+        lines.append(f"🌍 Cultural notes ({len(summary['cultural_notes'])}):")
+        for note in summary["cultural_notes"]:
+            lines.append(f"   • {note}")
+
+    lines.append(_level_line(summary["level"]))
+
+    scenario = summary["scenario"]
+    if scenario is not None:
+        status = "✅ passed" if scenario["passed"] else "◻ not yet"
+        lines.append(f"🎯 Scenario '{scenario['id']}': {status}")
+        lines.append(
+            f"   objectives {'✓' if scenario['objectives_completed'] else '✗'}"
+            f" | target vocab {int(scenario['vocab_coverage'] * 100)}%"
+            f" | grammar {'ok' if scenario['grammar_ok'] else 'high error rate'}"
+        )
+        for reason in scenario["failure_reasons"]:
+            lines.append(f"   ⚠ failure: {reason}")
+
+    if summary["transfers"]:
         lines.append("🔗 Cross-language transfer:")
-        for t in transfers[:10]:
-            cognates = t.get("cognates", {})
-            if cognates:
-                pairs = ", ".join(f"{lang}: {w}" for lang, w in cognates.items())
+        for t in summary["transfers"]:
+            if t["cognates"]:
+                pairs = ", ".join(f"{lang}: {w}" for lang, w in t["cognates"].items())
                 lines.append(f"   • {t['word']} → {pairs}")
-            for ff in t.get("false_friends", []):
+            for ff in t["false_friends"]:
                 lines.append(
-                    f"   ⚠ false friend — {ff.get('language')}: "
-                    f"{ff.get('word')} ({ff.get('warning', '')})"
+                    f"   ⚠ false friend — {ff['language']}: {ff['word']} ({ff['warning']})"
                 )
 
     lines.append("━" * 50 + "\n")
     return "\n".join(lines)
+
+
+def build_session_report(state: LearnerState) -> str:
+    """Compile the end-of-session report text from all agents' outputs."""
+    return render_session_report(build_session_summary(state))
 
 
 async def finalize_session(state: LearnerState, *, duration_minutes: float = 0.0) -> dict[str, Any]:
@@ -372,7 +426,7 @@ async def finalize_session(state: LearnerState, *, duration_minutes: float = 0.0
        the learner model; then persist the evidence-backed CEFR profile.
     4. Compile the enriched report.
 
-    Returns ``{"report": str, "persisted": {...counts...}}``. The SQLite work
+    Returns ``{"report": str, "summary": {...}, "persisted": {...counts...}}``. The SQLite work
     (steps 1 and 3) runs in worker threads, off the event loop.
     """
     # 1. Working level (updates cefr_level on state + profile when the session
@@ -391,9 +445,10 @@ async def finalize_session(state: LearnerState, *, duration_minutes: float = 0.0
     #     the persisted profile lagged one session behind).
     await asyncio.to_thread(persist_evidence_profile, state["user_id"], state["language"])
 
-    # 4. Report.
-    report = build_session_report(state)
+    # 4. Report, as data and as text.
+    summary = build_session_summary(state)
+    report = render_session_report(summary)
     state["agent_response"] = report
     state["should_end_session"] = True
 
-    return {"report": report, "persisted": counts}
+    return {"report": report, "summary": summary, "persisted": counts}
