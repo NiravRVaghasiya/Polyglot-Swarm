@@ -111,8 +111,8 @@ token hashing/expiry, encrypted secrets, and the audit log. See
 review, progress, scenarios, profile, learner-model, trace, privacy, and cost
 routes, every one of them scoped to the caller's own `user_id`.
 
-**Frontends** — `src/main.py` + `frontend/gradio_app.py` (a Gradio MVP with
-chat and voice), and `frontend/react_app/` (a Next.js dashboard that talks to
+**Frontends** — `frontend/gradio_app.py` (a Gradio MVP with chat and voice,
+launched by `python -m src.main`), and `frontend/react_app/` (a Next.js dashboard that talks to
 the FastAPI backend via `frontend/react_app/src/lib/api.ts`).
 
 **Observability** (`src/observability/`) — `context.py` carries an

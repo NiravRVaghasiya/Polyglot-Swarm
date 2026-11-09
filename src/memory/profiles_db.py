@@ -13,17 +13,13 @@ callers pass/receive plain dicts of the profile fields.
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
 from typing import Any
 
 from src.memory.db import get_connection
 from src.memory.schema import init_all
+from src.util import utc_now_iso as _now
 
 _JSON_FIELDS = ("target_languages", "cefr_by_language", "goals", "interests", "preferences")
-
-
-def _now() -> str:
-    return datetime.now(UTC).isoformat()
 
 
 def _row_to_dict(row: Any) -> dict[str, Any]:

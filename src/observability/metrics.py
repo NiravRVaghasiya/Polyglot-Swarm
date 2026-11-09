@@ -282,6 +282,14 @@ def _last_backup() -> Iterable[tuple[dict[str, str], float]]:
         yield {}, ts
 
 
+def _last_offsite_backup() -> Iterable[tuple[dict[str, str], float]]:
+    from src.ops.backup import last_offsite_backup_time
+
+    ts = last_offsite_backup_time()
+    if ts is not None:
+        yield {}, ts
+
+
 SESSIONS_ACTIVE = _gauge(
     "polyglot_sessions_active", "Chat sessions held in memory.", (), _active_sessions
 )
@@ -290,6 +298,12 @@ BACKUP_LAST_SUCCESS = _gauge(
     "Unix time of the newest verified backup set.",
     (),
     _last_backup,
+)
+OFFSITE_BACKUP_LAST_SUCCESS = _gauge(
+    "polyglot_offsite_backup_last_success_timestamp_seconds",
+    "Unix time of the last successful, checked off-host (restic) copy.",
+    (),
+    _last_offsite_backup,
 )
 PROCESS_START = _gauge("polyglot_process_start_time_seconds", "Process start time.")
 PROCESS_START.set(_START)

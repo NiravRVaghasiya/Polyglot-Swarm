@@ -26,10 +26,7 @@ from typing import Any
 
 from src.memory.db import get_connection
 from src.memory.schema import init_all
-
-
-def _now() -> str:
-    return datetime.now(UTC).isoformat()
+from src.util import utc_now_iso as _now
 
 
 def create_experiment(

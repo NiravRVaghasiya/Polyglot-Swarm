@@ -14,10 +14,10 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from datetime import UTC, datetime
 from typing import Any
 
 from src.memory.db import get_connection, once_per_database
+from src.util import utc_now_iso as _now
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS vocabulary (
@@ -80,10 +80,6 @@ def init_db() -> None:
     """Create the vocabulary table and indexes if they do not exist."""
     with get_connection() as conn:
         conn.executescript(_SCHEMA)
-
-
-def _now() -> str:
-    return datetime.now(UTC).isoformat()
 
 
 def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:

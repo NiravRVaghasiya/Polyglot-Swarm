@@ -50,12 +50,13 @@ import hashlib
 import math
 from collections import defaultdict
 from dataclasses import asdict, dataclass, field
-from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
 from src.learner.cefr_bands import mastery_to_cefr
 from src.learner.mastery_engine import MasteryEngine, SkillBelief
+from src.util import parse_timestamp as _parse_time
+from src.util import sigmoid as _sigmoid
 
 #: Method tag stored with every materialized estimate and history row.
 METHOD = "lkm-evidence-v2"
@@ -162,15 +163,6 @@ class Observation:
     difficulty_basis: str
     created_at: str
     timestamp: float | None  # POSIX seconds, None if unparseable
-
-
-def _parse_time(value: Any) -> float | None:
-    if not value:
-        return None
-    try:
-        return datetime.fromisoformat(str(value)).timestamp()
-    except ValueError:
-        return None
 
 
 def _classify(row: dict[str, Any]) -> tuple[str, float | None]:
@@ -412,13 +404,6 @@ class SkillEstimate:
 
 def _r(value: float | None) -> float | None:
     return None if value is None else round(value, 4)
-
-
-def _sigmoid(x: float) -> float:
-    if x >= 0:
-        return 1.0 / (1.0 + math.exp(-x))
-    e = math.exp(x)
-    return e / (1.0 + e)
 
 
 @dataclass

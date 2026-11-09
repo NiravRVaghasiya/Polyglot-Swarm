@@ -53,14 +53,14 @@ with real learners.
 | R1 | Critical | Data loss | Chat-session evidence, vocabulary and the turn log were persisted only when the client called `/sessions/{id}/end`. A restart, crash or abandoned tab lost the whole session. Finalizing twice was not guarded. | Durable per-turn session snapshots; rehydration after restart; recovery that finalizes idle sessions; a `finalizing` claim so a session is finalized once | **Fixed**: snapshots, rehydration, recovery, claims (`test_reliability.py::TestDurableSessions`; container restart in the staging rehearsal) |
 | R2 | Critical | Reliability / cost | No timeout on LLM calls; a hung provider holds a worker for minutes. | Per-attempt timeout (retryable), surfaced in telemetry | **Fixed**: `LLM_TIMEOUT_SECONDS` per attempt (`test_a_hung_provider_times_out_and_fails_over`) |
 | R3 | High | Cost / abuse | No per-user or global LLM budget, no quota, no rate limit on LLM or upload endpoints; the only loop guard was LangGraph's recursion limit. | Per-user and global daily budgets, a per-turn call cap, per-user rate limits, typed 429s | **Fixed**: budgets, quotas, turn cap, per-user rate limit (`TestBudgets`, `test_per_user_work_rate_limit`) |
-| R4 | High | Data loss | Backups were manual, never verified, had no restore path or retention, and covered only the SQLite file. Migrations ran at startup with no backup first. | Verified backup sets (database + media + profiles), restore, retention, a pre-migration backup, and a tested restore drill | **Fixed**: verified sets, restore, retention, pre-migration backup, nightly job (`test_backup_restore.py`, staging rehearsal). The off-host copy is an operator procedure (runbook). |
+| R4 | High | Data loss | Backups were manual, never verified, had no restore path or retention, and covered only the SQLite file. Migrations ran at startup with no backup first. | Verified backup sets (database + media + profiles), restore, retention, a pre-migration backup, and a tested restore drill | **Fixed**: verified sets, restore, retention, pre-migration backup, nightly job (`test_backup_restore.py`, staging rehearsal). Off-host encrypted copies are automated since 2026-11-09 (RR7). |
 | R5 | High | Security | The Gradio UI (published on :7860 by Compose) has no authentication; anyone who can reach it uses the operator's LLM budget. | The production profile does not run it; it refuses to start in production without `GRADIO_AUTH` | **Fixed**: not in the production profile; refuses to start without `GRADIO_AUTH` |
 | R6 | High | Security / DoS | No request-body size limit (JSON bodies were unbounded). | Body-size middleware (413) | **Fixed**: `MAX_REQUEST_BYTES` (413) |
 | R7 | Medium | DoS | Unbounded active sessions per user; unbounded rate-limiter memory. | Per-user active-session cap; idle eviction; limiter pruning | **Fixed**: session cap with eviction, limiter pruning |
 | R8 | Medium | Security | No minimum password length; no security headers; the browser stores a 30-day bearer token in `localStorage` with no CSP. | Minimum length 8 for new passwords; security headers on the API; CSP and headers on the Next app | **Mitigated**: minimum length 8; API and web headers; CSP `connect-src`. The token stays in `localStorage` (residual RR1). |
 | R9 | Medium | Operations | No per-request correlation id, access log, metrics or alert definitions; readiness responses echoed raw exception text. | Request-id middleware, structured access log, `/metrics`, alert rules, dashboard, sanitized readiness | **Fixed**: request ids, access log, `/metrics`, alerts, dashboard, runbook (`test_observability.py`) |
 | R10 | Medium | Configuration | No environment profiles: production could start in deterministic mode, with permissive CORS, public API docs and text logs. | `APP_ENV` with fail-fast production validation | **Fixed**: `APP_ENV` fail-fast and `ops config-check` (`TestProductionConfiguration`, staging rehearsal) |
-| R11 | Medium | Supply chain | The container runs as root and is not built from the lockfile; CI has no dependency, static-security or secret scanning; `ollama:latest` is unpinned. | Non-root, lockfile build, pip-audit, ruff security rules, a secret scan, npm audit, a container build in CI | **Mitigated**: non-root read-only container, locked builds, CI scans. 2 accepted Python advisories (RR2) and 1 npm advisory (RR3). |
+| R11 | Medium | Supply chain | The container runs as root and is not built from the lockfile; CI has no dependency, static-security or secret scanning; `ollama:latest` is unpinned. | Non-root, lockfile build, pip-audit, ruff security rules, a secret scan, npm audit, a container build in CI | **Mitigated**: non-root read-only container, locked builds, CI scans, Dependabot, least-privilege CI tokens, a pinned Ollama image. 2 accepted Python advisories (RR2); no npm advisory in shipped dependencies (RR3 resolved). |
 | R12 | Medium | Evidence quality | Provider fallback silently changes the model behind agent judgments, and chat evidence did not record the model. | Record the answering model on evidence; count fallbacks | **Mitigated**: fallback models recorded on evidence and counted. Their evidence keeps the same confidence (RR6). |
 | R13 | Medium | Duplicates | A client retry of `POST /review/submit` or a listening submission records it twice (for example, two FSRS reviews). | `Idempotency-Key` support on mutating learning endpoints | **Fixed**: `Idempotency-Key` (`TestIdempotency`) |
 | R14 | Low | Scalability | SQLite (single writer) and in-process state require a single API process. | Measured and documented capacity and scaling thresholds; accepted for now | **Measured**: capacity documented (`performance-report.md`); single process accepted (RR4) |
@@ -71,21 +71,23 @@ with real learners.
 ## Residual risks (prioritised)
 
 These remain open after Phase 5. None is a known data-loss or
-access-control defect, but the first two must be resolved, or explicitly
-accepted by the operator, before real learners use the system.
+access-control defect. RR7 was resolved on 2026-11-09 (ADR-0037); RR5
+cannot be resolved in code and must be signed off in the
+[launch checklist](launch-checklist.md) before real learners use the
+system.
 
 | Id | Severity | Risk | Mitigation now | Follow-up |
 |---|---|---|---|---|
-| RR5 | High | **No legal or regulatory assessment**: GDPR/UK GDPR, minors (COPPA, age-appropriate design), voice data | data minimised, in-app export and deletion, `LOCAL_ONLY` mode | an assessment by qualified counsel before launch; decide whether minors are admitted |
-| RR7 | High | **Backups are on the same volume and unencrypted by the app**; RPO 24 h | verified nightly sets; the runbook requires daily off-host copies to encrypted storage | automate the off-host copy; continuous replication (Litestream) for RPO near 0 |
+| RR5 | High | **No legal or regulatory assessment**: GDPR/UK GDPR, minors (COPPA, age-appropriate design), voice data | data minimised, export and deletion through the API, `LOCAL_ONLY` mode; a go/no-go [launch checklist](launch-checklist.md) with owned legal sign-offs and a [privacy notice template](../legal/privacy-notice-template.md) built from the actual data flows | an assessment by qualified counsel before launch; decide whether minors are admitted (the checklist blocks launch until both are signed) |
+| RR7 | ~~High~~ Resolved | ~~Backups are on the same volume and unencrypted by the app; RPO 24 h~~ **Resolved 2026-11-09 (ADR-0037)**: hourly verified sets, copied hourly by the `offsite` service to an off-host restic repository, encrypted client-side, `restic check`ed, monitored (`PolyglotOffsiteBackup*` alerts); staging/production refuse to start without it; the CI container job restores from it. RPO 1 h | Litestream if an RPO below 1 h is needed |
 | RR1 | Medium | Bearer token in `localStorage` (30-day TTL by default) | CSP `connect-src` limits exfiltration; production template sets 7 days | move to `HttpOnly` cookie sessions with CSRF protection |
 | RR6 | Medium | Evidence produced by a fallback model keeps full confidence | `model_version` marks it `(fallback)`; `PolyglotLlmFallbackActive` alert | discount or quarantine fallback evidence using Phase 2 per-model results |
 | RR4 | Medium | Single process: about 12 req/s saturation; speech assessment (about 5 s CPU) blocks the worker | rate limits; scaling thresholds; alerts | move speaking assessment to a background worker; shared state before multiple replicas |
 | RR2 | Medium | pillow 12.3.0 (39 advisories) pinned by gradio; chromadb 1.5.9 (no fix) | Gradio not deployed; Chroma embedded only; acceptances expire 2027-01-31 | upgrade when compatible releases exist |
-| RR3 | Low | PostCSS advisory inside Next.js build tooling (high, build-time) | it affects build-time CSS processing only; `npm audit` blocks on critical | upgrade Next to the fixed major |
+| RR3 | Low | ~~PostCSS advisory inside Next.js build tooling~~ **Resolved 2026-11-09**: an npm `overrides` entry lifts Next's PostCSS to 8.5.32; `npm audit --omit=dev` reports 0 and CI now blocks on high. Remaining advisories are in dev-only test tooling (vitest 2) | not shipped; Dependabot | upgrade vitest to its fixed major |
 | RR8 | Low | Budget checks are read-then-write: concurrent calls can overshoot a cap by a few calls | small overshoot; global cap and alerts | an atomic reservation if caps get tight |
 | RR9 | Low | Cost figures are token-estimate × price table, not invoices | the daily-spend alert fires at 80% | reconcile monthly with provider invoices |
-| RR10 | Low | Image size is 4.35 GB (ChromaDB/ONNX, Gradio) | — | slimmer runtime image without the Gradio UI |
+| RR10 | Low | Image size was 4.35 GB (ChromaDB/ONNX, Gradio); 1.99 GB since 2026-11-09 (editable install, tighter build context) | — | slimmer runtime image without the Gradio UI |
 
 ## What was already in place (verified, kept)
 
@@ -103,3 +105,15 @@ accepted by the operator, before real learners use the system.
   learner model counts equal fingerprints once.
 - **Git history.** No committed credentials were found (scan for provider
   key formats and private keys); `.env` is ignored.
+
+## Follow-up review (2026-11-09)
+
+A second pass before opening the project to public use found and fixed:
+
+| Finding | Fix |
+|---|---|
+| `.dockerignore` excluded only `.env`, so an operator's `.env.production` or `.env.staging` (created next to the compose files, as the runbook says) was copied into the image during `docker compose -f docker-compose.prod.yml up --build`. | `.dockerignore` excludes every `.env*` file, local state, caches, tests, docs and the Next.js app. |
+| The image installed the package non-editable, so the `polyglot` command (used for `ops` tasks inside the container) ran from site-packages and could not find `languages/` or `evals/real/calibration/`: language packs and grammar calibration silently fell back to empty. | Editable install: the code always runs from `/app`. |
+| The local `docker-compose.yml` published the Gradio UI and Ollama (both unauthenticated) on every network interface. | Every port is bound to `127.0.0.1`; Ollama is pinned to a release. |
+| CI and Compose used Node 20, which reached end-of-life in April 2026. | Node 24 (LTS); `engines` requires Node 22+. |
+| Workflow tokens had default permissions; nothing proposed dependency updates; pre-commit pinned ruff/mypy versions far older than CI's. | `permissions: contents: read`, Dependabot (pip, npm, actions, Docker), pre-commit aligned with `requirements.lock`. |

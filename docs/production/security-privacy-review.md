@@ -54,10 +54,10 @@ an operator must assess are listed at the end.
 - **Frontend dependencies.**
   - Locked in `package-lock.json` (added in this phase) and installed with
     `npm ci`.
-  - `npm audit --omit=dev --audit-level=critical` runs in CI.
-  - One known high-severity advisory: PostCSS inside Next's build tooling.
-    It affects build-time CSS processing, not the running app. The fix is a
-    Next major upgrade, listed as follow-up work.
+  - `npm audit --omit=dev --audit-level=high` runs in CI and reports no
+    advisories: an npm `overrides` entry lifts the PostCSS bundled by Next
+    to a patched release. Advisories remain in dev-only test tooling
+    (vitest 2), which is not shipped.
 - **Container.** Runs as a non-root user with a read-only root filesystem
   (production compose), with all capabilities dropped and
   `no-new-privileges`.
@@ -67,12 +67,12 @@ an operator must assess are listed at the end.
 | Class | Examples | Where | Retention | Deletion |
 |---|---|---|---|---|
 | **Credentials** | password hashes, token hashes | `users`, `auth_tokens` | account lifetime; tokens until expiry (purged by maintenance) | account deletion |
-| **Learner content** | chat messages, typed answers, transcripts | `session_history`, `active_sessions` snapshots (cleared at finalization), `media_submissions.report` | account lifetime | in-app export and delete |
+| **Learner content** | chat messages, typed answers, transcripts | `session_history`, `active_sessions` snapshots (cleared at finalization), `media_submissions.report` | account lifetime | export and delete through the API (`/api/v1/privacy/*`) or `polyglot privacy`; the web app has no screens for them yet |
 | **Raw audio** | speaking recordings | not stored by default; with explicit `retain_audio` consent, `media/<user>/` | **30 days**, then purged | purge, submission delete, account delete |
 | **Derived learning data** | evidence, mastery, plans, reviews, adaptive decisions | `evidence`, `skill_states`, `vocabulary`, `adaptive_decisions`, … | account lifetime (it is the learning record) | account delete |
 | **Operational telemetry** | model runs (tokens, latency, cost), daily usage counters, idempotency keys | `model_runs`, `llm_usage_daily` (90 days), `idempotency_keys` (24 h) | as listed | maintenance; account delete covers per-user rows |
 | **Logs** | access lines, errors | container stdout (5 × 20 MB rotation) | rotation | not per user; they hold no content |
-| **Backups** | full copies of the above | `/data/backups/` and the off-host copy | 14 sets (about 14 days) | expire by retention; **an account deletion is not propagated into existing backups** (it persists at most until those sets expire) |
+| **Backups** | full copies of the above | `/data/backups/` and the off-host restic copy (encrypted client-side, ADR-0037) | 48 hourly sets on the host (2 days); 30 days off-host | expire by retention; **an account deletion is not propagated into existing backups** (it persists at most until those sets expire) |
 
 **Minimisation.**
 

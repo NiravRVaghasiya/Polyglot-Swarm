@@ -4,9 +4,11 @@
 > with `APP_ENV=staging|production`, which refuses to start on unsafe
 > settings. Start from [`.env.production.example`](../.env.production.example)
 > and follow the [operations runbook](production/operations-runbook.md):
-> deploy, rollback, backups and restore, alerts and incidents. The other
+> deploy, rollback, backups and restore (including the encrypted off-host
+> copy, which production requires), alerts and incidents. The other
 > production documents:
 >
+> - [launch checklist](production/launch-checklist.md) (go/no-go before real learners);
 > - [readiness audit and risk register](production/readiness-audit.md);
 > - [security and privacy review](production/security-privacy-review.md);
 > - [service objectives](production/service-objectives.md);
@@ -53,13 +55,18 @@ ChromaDB directory. The `ui` service waits on the API's Docker healthcheck
 (`GET /health`) before starting, and sets `GRADIO_SERVER_NAME=0.0.0.0` so the
 UI is reachable from outside its container.
 
+Every port is published on `127.0.0.1` only, so the stack is reachable from
+this machine but not from the network: the Gradio UI and Ollama have no
+authentication. To serve other machines, use `docker-compose.prod.yml`
+(below) behind a TLS-terminating reverse proxy.
+
 Both services override `OLLAMA_BASE_URL` to `http://ollama:11434` (the
 `local-llm` container), because `localhost` inside a container is the
 container itself. To use an Ollama running on the host instead, change it to
 `http://host.docker.internal:11434` at the top of `docker-compose.yml`.
 
 The `web` service (`profiles: ["web"]`) runs the React dashboard from a
-`node:20-alpine` image, installing and building on first start.
+`node:24-alpine` image, installing and building on first start.
 
 The `ollama` service is opt-in (`profiles: ["local-llm"]`) — it is not
 started by a plain `docker compose up`, since most self-hosters either use a
@@ -120,7 +127,7 @@ connection should not receive traffic.
 ## The React frontend
 
 `frontend/react_app/` is a separate Next.js app (Compose runs it only with
-`--profile web`). Run it independently with Node.js 20+:
+`--profile web`). Run it independently with Node.js 22+:
 
 ```bash
 cd frontend/react_app

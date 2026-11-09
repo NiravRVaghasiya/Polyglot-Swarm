@@ -12,18 +12,14 @@ they want it; the API enables it at startup.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from src.memory.db import get_connection
 from src.memory.schema import init_all
+from src.util import utc_now_iso as _now
 
 if TYPE_CHECKING:
     from src.llm.telemetry import ModelRun
-
-
-def _now() -> str:
-    return datetime.now(UTC).isoformat()
 
 
 def record_run(run: ModelRun) -> int:

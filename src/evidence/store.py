@@ -15,12 +15,12 @@ the learner model replays (ADR-0031).
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
 from typing import Any
 
 from src.evidence.events import DifficultyBasis, LearningEvent, evidence_fingerprint
 from src.memory.db import get_connection
 from src.memory.schema import init_all
+from src.util import utc_now_iso as _now
 
 #: Columns written for every event, in insert order.
 _COLUMNS = (
@@ -57,10 +57,6 @@ _COLUMNS = (
     "processing",
     "transcription_confidence",
 )
-
-
-def _now() -> str:
-    return datetime.now(UTC).isoformat()
 
 
 def record_event(event: LearningEvent) -> None:

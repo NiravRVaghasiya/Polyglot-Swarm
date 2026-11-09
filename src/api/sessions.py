@@ -63,6 +63,7 @@ from src.observability import metrics
 from src.observability.context import interaction_scope
 from src.orchestrator.graph import REPLY_COMPONENTS, compile_analysis_graph, compile_turn_graph
 from src.orchestrator.state import LearnerState
+from src.util import utc_now_iso as _now
 
 logger = logging.getLogger("polyglot.api.sessions")
 
@@ -82,10 +83,6 @@ _last_used: dict[_Key, float] = {}
 _pending: dict[_Key, asyncio.Task[None]] = {}
 # One turn at a time per session (a lock is bound to the loop that created it).
 _turn_locks: dict[_Key, tuple[asyncio.AbstractEventLoop, asyncio.Lock]] = {}
-
-
-def _now() -> str:
-    return datetime.now(UTC).isoformat()
 
 
 def _conn() -> Any:

@@ -3,3 +3,6 @@
 # LF on every platform, or a Windows checkout with core.autocrlf=true rewrites
 # them to CRLF and `python -m evals.real validate` reports a checksum mismatch.
 evals/real/datasets/** text eol=lf
+
+# Shell scripts run inside Linux containers (bind-mounted from the checkout).
+*.sh text eol=lf

@@ -56,7 +56,6 @@ a phoneme-level analysis, and the feedback says so.
 
 from __future__ import annotations
 
-import math
 import re
 import unicodedata
 from dataclasses import dataclass
@@ -65,6 +64,7 @@ from typing import Any
 
 from src.multimodal.contracts import DimensionResult, Status
 from src.multimodal.transcription import Transcript, Word
+from src.util import sigmoid as _sigmoid
 
 PAUSE_S = 0.25
 LONG_PAUSE_S = 1.0
@@ -161,10 +161,6 @@ def fluency_measures(words: list[Word]) -> dict[str, float]:
         "repetitions": float(repetitions),
         "filled_pauses": float(fillers),
     }
-
-
-def _sigmoid(x: float) -> float:
-    return 1.0 / (1.0 + math.exp(-x)) if x >= 0 else math.exp(x) / (1.0 + math.exp(x))
 
 
 def fluency_value(measures: dict[str, float], fmap: dict[str, Any] | None = None) -> float | None:

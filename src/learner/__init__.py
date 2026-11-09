@@ -7,7 +7,6 @@ say-so. It sits between the evidence pipeline (what happened) and the planner
 
 Modules:
 - :mod:`uncertainty`    — confidence/uncertainty helpers.
-- :mod:`skill_graph`    — skill/construction prerequisite relations.
 - :mod:`estimation`     — the evidence-driven engine (ADR-0031): difficulty-
   aware, duplicate/correlation-aware ability estimates with uncertainty,
   evidence quality, coverage, and explicit evidence states.

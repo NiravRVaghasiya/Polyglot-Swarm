@@ -23,8 +23,10 @@ embeddings of static content, not learner data.
   an open WAL database).
 - :func:`prune_backups` keeps the newest ``settings.backup_retention_count``.
 
-Backups are **not encrypted** by this module. Encryption at rest is the
-storage layer's job (an encrypted volume or bucket); see the runbook.
+Backups are **not encrypted** by this module. The ``offsite`` service of
+``docker-compose.prod.yml`` (``ops/backup/offsite-backup.sh``, ADR-0037)
+copies the sets to an off-host restic repository, encrypted client-side,
+and touches :data:`OFFSITE_STATUS` after each verified copy.
 """
 
 from __future__ import annotations
@@ -44,6 +46,8 @@ MANIFEST = "manifest.json"
 DB_NAME = "polyglot.db"
 _TREES = ("media", "user_profiles")
 _COUNTED_TABLES = ("users", "evidence", "vocabulary", "sessions", "media_submissions")
+#: Touched by the off-host copy job after each successful, checked copy.
+OFFSITE_STATUS = ".offsite-last-success"
 
 
 class BackupError(RuntimeError):
@@ -159,6 +163,12 @@ def last_verified_backup_time() -> float | None:
     """Unix time of the newest set's manifest (its verification time)."""
     sets = list_backup_sets()
     return (sets[0] / MANIFEST).stat().st_mtime if sets else None
+
+
+def last_offsite_backup_time() -> float | None:
+    """Unix time of the last successful off-host copy, if one was recorded."""
+    marker = Path(settings.data_dir) / OFFSITE_STATUS
+    return marker.stat().st_mtime if marker.exists() else None
 
 
 def prune_backups(keep: int | None = None) -> list[Path]:

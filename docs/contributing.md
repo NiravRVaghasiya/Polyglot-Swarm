@@ -21,8 +21,9 @@ conventions, and the PR process — lives at the repository root:
 ## Documentation conventions
 
 - Document what is **actually implemented**, grounded in the code — not
-  aspirational design. `DESIGN.md` and `RESEARCH.md` in this directory are
-  the original product research and vision; they are not kept in sync with
+  aspirational design. `DESIGN.md`, `RESEARCH.md` and
+  `POLYGLOT_SWARM_10_10_IMPLEMENTATION_PLAN.md` in this directory are the
+  original product research, vision and phased plan; they are not kept in sync with
   the implementation and should not be treated as a spec.
 - A structural or architectural decision gets an ADR
   (`docs/adr/NNNN-title.md`, copied from `docs/adr/template.md`) in the same

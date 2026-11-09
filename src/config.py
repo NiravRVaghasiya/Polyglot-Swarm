@@ -150,6 +150,13 @@ class Settings(BaseSettings):
     gradio_auth: str = ""
     #: Backup sets kept by ``polyglot ops backup`` (oldest pruned first).
     backup_retention_count: int = 14
+    #: Off-host, encrypted copy of the backup sets (ADR-0037): a restic
+    #: repository URL (``s3:``, ``b2:``, ``sftp:``, ``rest:``, ``azure:``,
+    #: ``gs:``...). Used by the ``offsite`` service of docker-compose.prod.yml;
+    #: required in staging/production.
+    restic_repository: str = ""
+    #: The restic repository's encryption password (required with it).
+    restic_password: str = ""
     #: Seconds between in-process maintenance runs (0 disables the loop).
     maintenance_interval_seconds: float = 900.0
 
@@ -270,7 +277,22 @@ def _production_problems(s: Settings) -> list[str]:
         problems.append("USER_RATE_LIMIT_PER_MINUTE must be positive.")
     if not s.telemetry_enabled:
         problems.append("TELEMETRY_ENABLED must be true (cost and budget tracking need it).")
+    problems.extend(_offsite_backup_problems(s))
     return problems
+
+
+def _offsite_backup_problems(s: Settings) -> list[str]:
+    """Backups must leave the host, encrypted (ADR-0037, RR7)."""
+    repo = s.restic_repository.strip()
+    scheme = repo.split(":", 1)[0].lower() if ":" in repo else ""
+    if not repo or scheme in {"", "local"} or repo.startswith(("/", ".", "~")):
+        return [
+            "RESTIC_REPOSITORY must name an off-host restic repository "
+            "(s3:, b2:, sftp:, rest:, azure:, gs:...), not a local path."
+        ]
+    if len(s.restic_password) < 16:
+        return ["RESTIC_PASSWORD must be set (at least 16 characters)."]
+    return []
 
 
 def export_deterministic_mode(s: Settings) -> None:

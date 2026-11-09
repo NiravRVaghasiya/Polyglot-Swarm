@@ -3,7 +3,7 @@ and the persist_session integration."""
 
 from __future__ import annotations
 
-from src.learner import KnowledgeModel, MasteryEngine, SkillBelief, skill_graph, uncertainty
+from src.learner import KnowledgeModel, MasteryEngine, SkillBelief, uncertainty
 
 
 def _events(skill, assessment, n, confidence=0.9):
@@ -86,29 +86,6 @@ class TestMasteryEngine:
         )
         assert 0.0 <= post.mastery <= 1.0
         assert 0.0 <= post.uncertainty <= 1.0
-
-
-class TestSkillGraph:
-    def test_grammar_has_no_prerequisites(self):
-        assert skill_graph.skill_prerequisites("grammar") == ()
-
-    def test_speaking_depends_on_vocab_and_grammar(self):
-        prereqs = skill_graph.skill_prerequisites("speaking")
-        assert "vocabulary" in prereqs and "grammar" in prereqs
-
-    def test_readiness(self):
-        assert skill_graph.is_ready("grammar", {})  # no prereqs
-        assert not skill_graph.is_ready("speaking", {"vocabulary": 0.1, "grammar": 0.1})
-        assert skill_graph.is_ready("speaking", {"vocabulary": 0.6, "grammar": 0.6})
-
-    def test_unmet_prerequisites(self):
-        unmet = skill_graph.unmet_prerequisites("writing", {"vocabulary": 0.6, "grammar": 0.1})
-        assert "grammar" in unmet
-        assert "vocabulary" not in unmet
-
-    def test_construction_prerequisites_from_pack(self):
-        prereqs = skill_graph.construction_prerequisites("Spanish", "preterite_vs_imperfect")
-        assert "gender_agreement" in prereqs
 
 
 class TestKnowledgeModel:

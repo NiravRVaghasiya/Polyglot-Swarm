@@ -107,7 +107,7 @@ It tests your choice and ends with **Ready** when everything works. If something
 | 💬 Terminal chat | `polyglot chat --language Spanish` | — |
 | 🌐 Web app (chat + voice) | `python -m src.main` | http://localhost:7860 |
 | 🔌 REST API | `uvicorn src.api.app:app --reload` | http://localhost:8000/docs |
-| 📈 React dashboard | Start the REST API, then `cd frontend/react_app`, `npm install`, `npm run dev` ([Node.js 20+](https://nodejs.org)) | http://localhost:3000 |
+| 📈 React dashboard | Start the REST API, then `cd frontend/react_app`, `npm install`, `npm run dev` ([Node.js 22+](https://nodejs.org)) | http://localhost:3000 |
 
 Type `quit` in the terminal chat to end the session and see your report. Run `polyglot scenarios` to list the role-plays, then start one with `polyglot chat --scenario es_restaurant_ordering`.
 
@@ -211,7 +211,7 @@ Add `--help` to any command for its options.
 | 🧪 [Evaluation](docs/evaluation.md) · [Results](docs/results.md) | Test harnesses and their latest numbers |
 | 🔬 [Real-model evaluation](docs/real-model-evaluation.md) | How real LLMs score on the grammar and vocabulary benchmarks, and how to rerun them |
 | 🎙️ [Multimodal assessment](docs/multimodal-assessment.md) | How speaking and listening are assessed from audio, what is kept, and how it was benchmarked |
-| 🛡️ [Production operations](docs/production/operations-runbook.md) | Deploying, monitoring, backups and incident response; see also the [readiness audit](docs/production/readiness-audit.md) and [security review](docs/production/security-privacy-review.md) |
+| 🛡️ [Production operations](docs/production/operations-runbook.md) | Deploying, monitoring, backups and incident response; before real learners, work through the [launch checklist](docs/production/launch-checklist.md); see also the [readiness audit](docs/production/readiness-audit.md) and [security review](docs/production/security-privacy-review.md) |
 | 🧭 [Adaptive learning](docs/adaptive-learning.md) | How the tutor predicts performance, picks the next activity and difficulty, and how that was evaluated (in simulation) |
 | 📝 [Decision records](docs/adr/README.md) | Why the system is built the way it is |
 
