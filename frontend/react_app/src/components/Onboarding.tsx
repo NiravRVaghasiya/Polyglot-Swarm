@@ -7,7 +7,12 @@
 // normally.
 
 import { useState } from "react";
+import { AnimatePresence, m } from "motion/react";
 import { api, UserProfile } from "@/lib/api";
+import { Button } from "@/components/ui/Button";
+import { ErrorNote } from "@/components/ui/Card";
+import { Icon } from "@/components/ui/Icon";
+import { fadeUp, spring, stagger } from "@/components/ui/motion";
 
 const SUGGESTED_LANGUAGES = ["Spanish", "Polish", "Italian"];
 const SUGGESTED_GOALS = [
@@ -47,18 +52,28 @@ export function Onboarding({
   }
 
   return (
-    <div className="mx-auto max-w-md space-y-5 rounded border bg-white p-6">
-      <div>
-        <h2 className="text-xl font-bold">Welcome 👋</h2>
-        <p className="text-sm text-slate-600">
-          Two quick questions so we can plan your practice.
-        </p>
-      </div>
+    <m.div
+      variants={stagger(0.08)}
+      initial="hidden"
+      animate="show"
+      className="card mx-auto max-w-md space-y-6 p-6 sm:p-7"
+    >
+      <m.div variants={fadeUp} className="space-y-2">
+        <span className="grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br from-indigo-500 to-sky-500 text-white shadow-lift">
+          <Icon name="sparkles" size={22} />
+        </span>
+        <h2 className="text-2xl font-extrabold tracking-tight">Welcome</h2>
+        <p className="text-sm text-muted">Two quick questions so we can plan your practice.</p>
+      </m.div>
 
-      <div>
-        <label className="mb-1 block text-sm font-medium">What are you learning?</label>
+      <m.div variants={fadeUp}>
+        <label htmlFor="onboarding-language" className="field-label">
+          <span className="mr-1.5 text-xs font-bold text-link">1</span>
+          What are you learning?
+        </label>
         <input
-          className="w-full rounded border p-2"
+          id="onboarding-language"
+          className="field"
           value={language}
           onChange={(e) => setLanguage(e.target.value)}
           list="onboarding-languages"
@@ -69,12 +84,47 @@ export function Onboarding({
             <option key={l} value={l} />
           ))}
         </datalist>
-      </div>
+        {/* Quick picks — same value as typing it in the field above. */}
+        <div className="mt-2.5 flex flex-wrap gap-2" role="group" aria-label="Suggested languages">
+          {SUGGESTED_LANGUAGES.map((l) => {
+            const selected = language.trim().toLowerCase() === l.toLowerCase();
+            return (
+              <m.button
+                key={l}
+                type="button"
+                whileTap={{ scale: 0.94 }}
+                transition={spring}
+                onClick={() => setLanguage(l)}
+                aria-pressed={selected}
+                className={
+                  "relative min-h-9 rounded-full border px-3.5 text-sm font-medium transition-colors duration-200 " +
+                  (selected
+                    ? "border-transparent text-brand-fg"
+                    : "border-line bg-surface text-muted hover:border-brand/40 hover:text-fg")
+                }
+              >
+                {selected ? (
+                  <m.span
+                    layoutId="onboarding-language-pill"
+                    transition={spring}
+                    className="absolute inset-0 rounded-full bg-brand"
+                  />
+                ) : null}
+                <span className="relative">{l}</span>
+              </m.button>
+            );
+          })}
+        </div>
+      </m.div>
 
-      <div>
-        <label className="mb-1 block text-sm font-medium">What&apos;s your main goal?</label>
+      <m.div variants={fadeUp}>
+        <label htmlFor="onboarding-goal" className="field-label">
+          <span className="mr-1.5 text-xs font-bold text-link">2</span>
+          What&apos;s your main goal?
+        </label>
         <select
-          className="w-full rounded border p-2"
+          id="onboarding-goal"
+          className="field"
           value={goal}
           onChange={(e) => setGoal(e.target.value)}
           aria-label="Learning goal"
@@ -85,17 +135,21 @@ export function Onboarding({
             </option>
           ))}
         </select>
-      </div>
+      </m.div>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      <AnimatePresence>{error ? <ErrorNote key={error}>{error}</ErrorNote> : null}</AnimatePresence>
 
-      <button
-        className="w-full rounded bg-indigo-600 px-4 py-2 text-white disabled:opacity-50"
-        onClick={save}
-        disabled={saving || !language.trim()}
-      >
-        {saving ? "Saving…" : "Start learning"}
-      </button>
-    </div>
+      <m.div variants={fadeUp}>
+        <Button
+          size="lg"
+          className="w-full"
+          onClick={save}
+          disabled={saving || !language.trim()}
+          loading={saving}
+        >
+          {saving ? "Saving…" : "Start learning"}
+        </Button>
+      </m.div>
+    </m.div>
   );
 }

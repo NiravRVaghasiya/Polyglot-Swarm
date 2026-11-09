@@ -2,10 +2,122 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Design tokens (RGB channels, consumed by tailwind.config.ts). Text/surface
+   pairs are chosen for WCAG AA contrast in both themes. */
 :root {
-  color-scheme: light;
+  color-scheme: light dark;
+
+  --bg: 246 247 251;
+  --surface: 255 255 255;
+  --surface-2: 241 243 249;
+  --fg: 17 24 39;
+  --muted: 85 94 112;
+  --line: 226 229 239;
+
+  --brand: 79 70 229; /* filled buttons: white text 6.3:1 */
+  --brand-fg: 255 255 255;
+  --brand-soft: 238 242 255;
+  --link: 67 56 202;
+
+  --accent: 21 128 61;
+  --accent-soft: 220 252 231;
+  --danger: 185 28 28;
+  --danger-soft: 254 226 226;
+  --warn: 180 83 9;
 }
 
-body {
-  @apply bg-slate-50 text-slate-900;
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: 10 12 22;
+    --surface: 19 22 37;
+    --surface-2: 28 32 52;
+    --fg: 236 238 245;
+    --muted: 160 167 190;
+    --line: 44 49 74;
+
+    --brand: 79 70 229;
+    --brand-fg: 255 255 255;
+    --brand-soft: 38 36 88;
+    --link: 165 180 252;
+
+    --accent: 74 222 128;
+    --accent-soft: 20 54 36;
+    --danger: 248 113 113;
+    --danger-soft: 69 26 30;
+    --warn: 251 191 36;
+  }
+}
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply min-h-dvh bg-bg font-sans text-fg antialiased;
+    /* Soft, static aurora wash behind everything — decorative only. */
+    background-image:
+      radial-gradient(60rem 30rem at 10% -10%, rgb(var(--brand) / 0.12), transparent 60%),
+      radial-gradient(40rem 24rem at 100% 0%, rgb(56 189 248 / 0.1), transparent 60%);
+    background-attachment: fixed;
+  }
+
+  button,
+  [role="tab"],
+  label:has(input[type="radio"]),
+  label:has(input[type="checkbox"]) {
+    @apply cursor-pointer;
+    touch-action: manipulation;
+  }
+
+  button:disabled {
+    @apply cursor-not-allowed;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-brand/60 ring-offset-2 ring-offset-bg;
+  }
+}
+
+@layer components {
+  /* Shared form control look: 44px+ touch height, 16px text (no iOS zoom). */
+  .field {
+    @apply block min-h-11 w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-base text-fg
+      shadow-sm transition-[border-color,box-shadow] duration-200 placeholder:text-muted/70
+      hover:border-brand/40 focus:border-brand focus:shadow-glow focus:outline-none focus-visible:ring-0;
+  }
+
+  .field-label {
+    @apply mb-1.5 block text-sm font-medium text-fg;
+  }
+
+  .card {
+    @apply rounded-2xl border border-line/80 bg-surface/90 p-4 shadow-card backdrop-blur-sm sm:p-5;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium;
+  }
+
+  .skeleton {
+    @apply relative overflow-hidden rounded-lg bg-surface2;
+  }
+  .skeleton::after {
+    content: "";
+    @apply absolute inset-0 -translate-x-full animate-shimmer;
+    background: linear-gradient(90deg, transparent, rgb(var(--surface) / 0.6), transparent);
+  }
+}
+
+/* Respect the OS "reduce motion" setting for CSS-driven motion as well.
+   (Framer Motion is configured with reducedMotion="user" in MotionProvider.) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
