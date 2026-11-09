@@ -4,7 +4,7 @@
 // network-first pass-through for everything else. API calls (which need auth
 // and fresh data) are never cached — only navigations and static assets are.
 
-const CACHE = "polyglot-shell-v1";
+const CACHE = "polyglot-shell-v2";
 const SHELL = ["/", "/manifest.json"];
 
 self.addEventListener("install", (event) => {

@@ -1,8 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, m } from "motion/react";
 import { api, Scenario } from "@/lib/api";
 import { useVoice } from "@/lib/useVoice";
+import { Button } from "@/components/ui/Button";
+import { Card, ErrorNote } from "@/components/ui/Card";
+import { Icon } from "@/components/ui/Icon";
+import { easeOut, spring } from "@/components/ui/motion";
 
 interface Message {
   role: "user" | "assistant";
@@ -18,21 +23,35 @@ export function ChatPanel({ token }: { token: string }) {
   const [input, setInput] = useState("");
   const [report, setReport] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const [ending, setEnding] = useState(false);
   const [speak, setSpeak] = useState(false);
   const voice = useVoice(token);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     api.listScenarios(token).then(setScenarios).catch(() => setScenarios([]));
   }, [token]);
 
+  // Keep the newest message (or the typing indicator) in view.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollTo?.({ top: el.scrollHeight, behavior: "smooth" });
+  }, [messages, busy]);
+
   async function start() {
-    const res = await api.startSession(token, {
-      language: scenarioId ? undefined : language,
-      scenario_id: scenarioId || undefined,
-    });
-    setSessionId(res.session_id);
-    setReport(null);
-    setMessages(res.opening_line ? [{ role: "assistant", content: res.opening_line }] : []);
+    setStarting(true);
+    try {
+      const res = await api.startSession(token, {
+        language: scenarioId ? undefined : language,
+        scenario_id: scenarioId || undefined,
+      });
+      setSessionId(res.session_id);
+      setReport(null);
+      setMessages(res.opening_line ? [{ role: "assistant", content: res.opening_line }] : []);
+    } finally {
+      setStarting(false);
+    }
   }
 
   async function sendText(text: string) {
@@ -60,106 +79,233 @@ export function ChatPanel({ token }: { token: string }) {
 
   async function end() {
     if (!sessionId) return;
-    const res = await api.endSession(token, sessionId);
-    setReport(res.report);
-    setSessionId(null);
+    setEnding(true);
+    try {
+      const res = await api.endSession(token, sessionId);
+      setReport(res.report);
+      setSessionId(null);
+    } finally {
+      setEnding(false);
+    }
   }
 
   return (
-    <div className="space-y-3">
-      {!sessionId ? (
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <input
-            className="rounded border p-2"
-            value={language}
-            onChange={(e) => setLanguage(e.target.value)}
-            placeholder="Language (e.g. Spanish)"
-            aria-label="Target language"
-          />
-          <select
-            className="rounded border p-2"
-            value={scenarioId}
-            onChange={(e) => setScenarioId(e.target.value)}
-            aria-label="Scenario"
+    <div className="space-y-4">
+      <AnimatePresence mode="wait" initial={false}>
+        {!sessionId ? (
+          <m.div
+            key="setup"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0, transition: easeOut }}
+            exit={{ opacity: 0, y: -8, transition: { duration: 0.15 } }}
           >
-            <option value="">Free conversation</option>
-            {scenarios.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.title} [{s.language}]
-              </option>
-            ))}
-          </select>
-          <button className="rounded bg-indigo-600 px-4 py-2 text-white" onClick={start}>
-            Start session
-          </button>
-        </div>
-      ) : (
-        <>
-          <div className="h-80 overflow-y-auto rounded border bg-white p-3">
-            {messages.map((m, i) => (
-              <div key={i} className={m.role === "user" ? "text-right" : ""}>
-                <span
-                  className={
-                    "my-1 inline-block rounded px-3 py-1 " +
-                    (m.role === "user" ? "bg-indigo-100" : "bg-slate-100")
-                  }
-                >
-                  {m.content}
-                </span>
+            <Card title="Start a conversation" icon="chat">
+              <p className="mb-4 text-sm text-muted">
+                Chat freely in your target language, or pick a role-play scenario.
+              </p>
+              <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+                <div>
+                  <label htmlFor="chat-language" className="field-label">
+                    Language
+                  </label>
+                  <input
+                    id="chat-language"
+                    className="field"
+                    value={language}
+                    onChange={(e) => setLanguage(e.target.value)}
+                    placeholder="Language (e.g. Spanish)"
+                    aria-label="Target language"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="chat-scenario" className="field-label">
+                    Scenario
+                  </label>
+                  <select
+                    id="chat-scenario"
+                    className="field"
+                    value={scenarioId}
+                    onChange={(e) => setScenarioId(e.target.value)}
+                    aria-label="Scenario"
+                  >
+                    <option value="">Free conversation</option>
+                    {scenarios.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.title} [{s.language}]
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <Button onClick={start} loading={starting} disabled={starting}>
+                  Start session
+                  {!starting ? <Icon name="arrowRight" size={16} /> : null}
+                </Button>
               </div>
-            ))}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <input
-              className="min-w-0 flex-1 rounded border p-2"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && sendText(input)}
-              placeholder="Type your message…"
-              aria-label="Message"
-            />
-            <button
-              className="rounded bg-indigo-600 px-4 py-2 text-white disabled:opacity-50"
-              onClick={() => sendText(input)}
-              disabled={busy}
-            >
-              Send
-            </button>
-            {voice.supported && (
-              <button
-                className={
-                  "rounded px-4 py-2 text-white disabled:opacity-50 " +
-                  (voice.recording ? "bg-red-600" : "bg-emerald-600")
-                }
-                onClick={toggleMic}
-                disabled={voice.busy}
-                aria-label={voice.recording ? "Stop recording" : "Record voice"}
-                title={voice.recording ? "Stop and send" : "Speak"}
-              >
-                {voice.recording ? "■ Stop" : voice.busy ? "…" : "🎤"}
-              </button>
-            )}
-            <button className="rounded border px-4 py-2" onClick={end}>
-              End
-            </button>
-          </div>
-          {voice.supported && (
-            <label className="flex items-center gap-2 text-sm text-slate-500">
-              <input
-                type="checkbox"
-                checked={speak}
-                onChange={(e) => setSpeak(e.target.checked)}
-              />
-              Speak replies aloud
-            </label>
-          )}
-          {voice.error && <p className="text-sm text-red-600">{voice.error}</p>}
-        </>
-      )}
+            </Card>
+          </m.div>
+        ) : (
+          <m.div
+            key="session"
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1, transition: easeOut }}
+            exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.15 } }}
+            className="card space-y-3 p-3 sm:p-4"
+          >
+            <div className="flex items-center justify-between gap-2 px-1">
+              <span className="flex items-center gap-2 text-sm font-semibold">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="absolute inset-0 animate-pulse-ring rounded-full bg-emerald-500" />
+                  <span className="relative h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                </span>
+                Live session · {language}
+              </span>
+              <Button variant="secondary" size="sm" onClick={end} loading={ending} disabled={ending}>
+                End
+              </Button>
+            </div>
 
-      {report && (
-        <pre className="whitespace-pre-wrap rounded border bg-white p-3 text-sm">{report}</pre>
-      )}
+            <div
+              ref={scrollRef}
+              className="h-[min(26rem,55dvh)] space-y-2 overflow-y-auto overscroll-contain rounded-xl bg-surface2/60 p-3"
+              aria-live="polite"
+              aria-label="Conversation"
+            >
+              {messages.length === 0 ? (
+                <p className="py-10 text-center text-sm text-muted">Say hello to get started.</p>
+              ) : null}
+              {messages.map((msg, i) => {
+                const mine = msg.role === "user";
+                return (
+                  <m.div
+                    key={i}
+                    initial={{ opacity: 0, y: 10, scale: 0.96 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={spring}
+                    style={{ originX: mine ? 1 : 0 }}
+                    className={"flex " + (mine ? "justify-end" : "justify-start")}
+                  >
+                    <span
+                      className={
+                        "max-w-[85%] whitespace-pre-wrap break-words rounded-2xl px-3.5 py-2 text-[15px] leading-relaxed shadow-sm " +
+                        (mine
+                          ? "rounded-br-md bg-brand text-brand-fg"
+                          : "rounded-bl-md border border-line/70 bg-surface text-fg")
+                      }
+                    >
+                      {msg.content}
+                    </span>
+                  </m.div>
+                );
+              })}
+              <AnimatePresence>
+                {busy ? (
+                  <m.div
+                    key="typing"
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, transition: { duration: 0.12 } }}
+                    className="flex"
+                    role="status"
+                  >
+                    <span className="sr-only">Tutor is replying…</span>
+                    <span
+                      aria-hidden="true"
+                      className="flex gap-1 rounded-2xl rounded-bl-md border border-line/70 bg-surface px-3.5 py-3"
+                    >
+                      {[0, 1, 2].map((d) => (
+                        <span
+                          key={d}
+                          className="h-1.5 w-1.5 animate-typing-dot rounded-full bg-muted"
+                          style={{ animationDelay: `${d * 0.15}s` }}
+                        />
+                      ))}
+                    </span>
+                  </m.div>
+                ) : null}
+              </AnimatePresence>
+            </div>
+
+            <div className="flex gap-2">
+              <input
+                className="field min-w-0 flex-1"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && sendText(input)}
+                placeholder="Type your message…"
+                aria-label="Message"
+              />
+              {voice.supported && (
+                <span className="relative">
+                  {voice.recording ? (
+                    <span className="pointer-events-none absolute inset-0 animate-pulse-ring rounded-xl bg-red-500" />
+                  ) : null}
+                  <Button
+                    size="icon"
+                    variant={voice.recording ? "danger" : "success"}
+                    onClick={toggleMic}
+                    disabled={voice.busy}
+                    aria-label={voice.recording ? "Stop recording" : "Record voice"}
+                    title={voice.recording ? "Stop and send" : "Speak"}
+                  >
+                    {voice.busy ? (
+                      <span aria-hidden="true">…</span>
+                    ) : (
+                      <Icon name={voice.recording ? "stop" : "mic"} size={18} />
+                    )}
+                  </Button>
+                </span>
+              )}
+              <Button onClick={() => sendText(input)} disabled={busy}>
+                <Icon name="send" size={16} />
+                <span className="hidden sm:inline">Send</span>
+                <span className="sr-only sm:hidden">Send</span>
+              </Button>
+            </div>
+
+            {voice.supported && (
+              <label className="flex w-fit items-center gap-2.5 px-1 text-sm text-muted">
+                {/* Native checkbox (still the accessible control) styled as a switch. */}
+                <span className="relative inline-flex h-6 w-10 shrink-0">
+                  <input
+                    type="checkbox"
+                    className="peer sr-only"
+                    checked={speak}
+                    onChange={(e) => setSpeak(e.target.checked)}
+                  />
+                  <span
+                    aria-hidden="true"
+                    className="absolute inset-0 rounded-full bg-line transition-colors duration-200 peer-checked:bg-brand peer-focus-visible:ring-2 peer-focus-visible:ring-brand/60 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-bg"
+                  />
+                  <span
+                    aria-hidden="true"
+                    className="absolute left-1 top-1 h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-4"
+                  />
+                </span>
+                <Icon name="volume" size={16} />
+                Speak replies aloud
+              </label>
+            )}
+            <AnimatePresence>
+              {voice.error ? <ErrorNote key={voice.error}>{voice.error}</ErrorNote> : null}
+            </AnimatePresence>
+          </m.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {report ? (
+          <m.div
+            key="report"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0, transition: { ...easeOut, delay: 0.1 } }}
+            exit={{ opacity: 0 }}
+          >
+            <Card title="Session report" icon="sparkles">
+              <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-fg">{report}</pre>
+            </Card>
+          </m.div>
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 }
