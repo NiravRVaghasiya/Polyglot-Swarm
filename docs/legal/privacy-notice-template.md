@@ -66,12 +66,10 @@ significant effects. `<Counsel: confirm whether this is "profiling" in your juri
 
 ## Your rights
 
-You can **download all your data** and have it **permanently deleted** at
-any time by contacting us at `<privacy contact email>`.
-`<Operators: the API serves both requests for a signed-in learner —
-GET /api/v1/privacy/export and DELETE /api/v1/privacy/data — and the host
-CLI has "polyglot privacy". The web app has no buttons for them yet, so
-say how learners reach them in your deployment.>` You can also contact us
+You can **download all your data** and **permanently delete your account
+and data** at any time in the app, under *Your data*. You can also contact
+us at `<privacy contact email>`
+`<operators: "polyglot privacy" on the host serves requests that arrive by email>`
 to exercise your rights `<list the rights that apply, e.g. access, rectification, erasure, restriction, portability, objection, and the right to complain to <supervisory authority>>`.
 
 ## Legal basis

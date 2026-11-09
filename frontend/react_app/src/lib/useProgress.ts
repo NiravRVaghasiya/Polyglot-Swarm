@@ -17,6 +17,8 @@ export interface ProgressData {
 export function useProgress(
   token: string | null,
   language?: string,
+  /** Changing it fetches again (e.g. after a session ends). */
+  refreshKey = 0,
 ): ProgressData {
   const [overview, setOverview] = useState<ProgressOverview | null>(null);
   const [growth, setGrowth] = useState<VocabPoint[]>([]);
@@ -39,7 +41,7 @@ export function useProgress(
     } finally {
       setLoading(false);
     }
-  }, [token, language]);
+  }, [token, language, refreshKey]);
 
   useEffect(() => {
     void load();

@@ -23,6 +23,7 @@ from src.api.schemas import (
     EndSessionResponse,
     HiddenFeedback,
     SessionStateResponse,
+    SessionSummary,
     StartSessionRequest,
     StartSessionResponse,
 )
@@ -103,7 +104,11 @@ async def end_session(
     result = await sessions.finalize(user_id, session_id, state=state)
     if result is None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Session already ending")
-    return EndSessionResponse(report=result["report"], persisted=result["persisted"])
+    return EndSessionResponse(
+        report=result["report"],
+        summary=SessionSummary.model_validate(result["summary"]),
+        persisted=result["persisted"],
+    )
 
 
 @router.post("/chat", response_model=ChatResponse)

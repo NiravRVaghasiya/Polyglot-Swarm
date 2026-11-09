@@ -35,7 +35,7 @@ Related: [readiness audit](readiness-audit.md) (risk register),
 | ☐ | **Which LLM providers** receive learner text, or `LOCAL_ONLY=true` | Hosted providers receive learner messages (see the review's data-flow table). |
 | ☐ | **Whether voice features are offered**; raw audio is kept only with the learner's consent, for 30 days | Voice data may be biometric or sensitive data in some places. |
 | ☐ | **Support and contact address** for privacy requests and security reports | Fill in the privacy notice and `SECURITY.md`. |
-| ☐ | **How learners export or delete their data** | The API serves both (`GET /api/v1/privacy/export`, `DELETE /api/v1/privacy/data`) and the host CLI has `polyglot privacy`, but the web app has no buttons for them: handle requests by email with the CLI, or add the screens. |
+| ☐ | **How learners export or delete their data** | In the web app, under *Your data* (download as JSON; delete after typing DELETE). Requests that arrive by email: `polyglot privacy` on the host. The Gradio UI has no such screens; it is not part of the production profile. |
 | ☐ | **Incident contact** and escalation path | runbook, *Incident severity and escalation* |
 
 ## 3. Legal (needs qualified counsel; not done by the project)

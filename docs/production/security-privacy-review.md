@@ -67,7 +67,7 @@ an operator must assess are listed at the end.
 | Class | Examples | Where | Retention | Deletion |
 |---|---|---|---|---|
 | **Credentials** | password hashes, token hashes | `users`, `auth_tokens` | account lifetime; tokens until expiry (purged by maintenance) | account deletion |
-| **Learner content** | chat messages, typed answers, transcripts | `session_history`, `active_sessions` snapshots (cleared at finalization), `media_submissions.report` | account lifetime | export and delete through the API (`/api/v1/privacy/*`) or `polyglot privacy`; the web app has no screens for them yet |
+| **Learner content** | chat messages, typed answers, transcripts | `session_history`, `active_sessions` snapshots (cleared at finalization), `media_submissions.report` | account lifetime | in-app export and delete (web app, *Your data*; API `/api/v1/privacy/*`), or `polyglot privacy` |
 | **Raw audio** | speaking recordings | not stored by default; with explicit `retain_audio` consent, `media/<user>/` | **30 days**, then purged | purge, submission delete, account delete |
 | **Derived learning data** | evidence, mastery, plans, reviews, adaptive decisions | `evidence`, `skill_states`, `vocabulary`, `adaptive_decisions`, … | account lifetime (it is the learning record) | account delete |
 | **Operational telemetry** | model runs (tokens, latency, cost), daily usage counters, idempotency keys | `model_runs`, `llm_usage_daily` (90 days), `idempotency_keys` (24 h) | as listed | maintenance; account delete covers per-user rows |
