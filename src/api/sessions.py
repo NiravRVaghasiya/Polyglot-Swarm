@@ -99,18 +99,31 @@ def active_count() -> int:
 # --- snapshots -----------------------------------------------------------------
 
 
-def persist_snapshot(state: LearnerState) -> None:
-    """Upsert the session's snapshot (called after start and every turn)."""
+def _insert_snapshot(state: LearnerState) -> None:
+    """Create the session's snapshot row (only when the session starts)."""
     now = _now()
     payload = json.dumps(state, default=str, ensure_ascii=False)
     with _conn() as conn:
         conn.execute(
             "INSERT INTO active_sessions "
             "(user_id, session_id, language, status, state_json, created_at, updated_at) "
-            "VALUES (?, ?, ?, 'active', ?, ?, ?) "
-            "ON CONFLICT(user_id, session_id) DO UPDATE SET state_json = excluded.state_json, "
-            "updated_at = excluded.updated_at WHERE active_sessions.status = 'active'",
+            "VALUES (?, ?, ?, 'active', ?, ?, ?) ON CONFLICT(user_id, session_id) DO NOTHING",
             (state["user_id"], state["session_id"], state["language"], payload, now, now),
+        )
+
+
+def persist_snapshot(state: LearnerState) -> None:
+    """Update the snapshot of a still-active session (after every turn).
+
+    Never inserts: a turn or analysis that finishes after the session was
+    finalized or its user deleted must not bring the row back.
+    """
+    payload = json.dumps(state, default=str, ensure_ascii=False)
+    with _conn() as conn:
+        conn.execute(
+            "UPDATE active_sessions SET state_json = ?, updated_at = ? "
+            "WHERE user_id = ? AND session_id = ? AND status = 'active'",
+            (payload, _now(), state["user_id"], state["session_id"]),
         )
 
 
@@ -134,7 +147,7 @@ def register_session(user_id: str, state: LearnerState) -> None:
     key = (user_id, state["session_id"])
     _active[key] = state
     _last_used[key] = time.monotonic()
-    persist_snapshot(state)
+    _insert_snapshot(state)
     metrics.SESSION_EVENTS.inc(event="started")
 
 
@@ -496,6 +509,24 @@ def export_for_user(user_id: str) -> list[dict[str, Any]]:
             (user_id,),
         ).fetchall()
     return [dict(r) for r in rows]
+
+
+async def stop_for_user(user_id: str) -> None:
+    """Stop the user's sessions in this process before their data is deleted.
+
+    Waits for a turn in progress (it holds the turn lock), cancels the
+    background analysis on the event loop (tasks cannot be cancelled safely
+    from a worker thread) and drops the cached state, so nothing writes for
+    the user afterwards.
+    """
+    loop = asyncio.get_running_loop()
+    for key in [k for k in {*_active, *_pending} if k[0] == user_id]:
+        async with _turn_lock(key):
+            task = _pending.pop(key, None)
+            if task is not None and not task.done() and task.get_loop() is loop:
+                task.cancel()
+                await asyncio.wait({task})
+            drop_session(*key)
 
 
 def delete_for_user(user_id: str) -> int:

@@ -76,3 +76,24 @@ class TestAuthRateLimiting:
             "/api/v1/auth/register", json={"username": "one-too-many", "password": "pw-secret-1"}
         )
         assert resp.status_code == 429
+
+    def test_login_is_limited_per_account_whatever_the_client_ip(self, client):
+        """Behind a proxy the IP comes from a header, so guessing must also be
+        capped per account."""
+        client.post("/api/v1/auth/register", json={"username": "victim", "password": "pw-secret-1"})
+        from src.api import auth
+
+        for _ in range(auth.login_rate_limiter.max_calls):
+            auth.login_rate_limiter.reset("testclient")  # a fresh (spoofed) IP each try
+            client.post("/api/v1/auth/login", json={"username": "victim", "password": "wrong-pw"})
+        auth.login_rate_limiter.reset("testclient")
+        resp = client.post(
+            "/api/v1/auth/login", json={"username": "Victim ", "password": "pw-secret-1"}
+        )
+        assert resp.status_code == 429
+        # Other accounts are unaffected.
+        client.post("/api/v1/auth/register", json={"username": "other", "password": "pw-secret-1"})
+        resp = client.post(
+            "/api/v1/auth/login", json={"username": "other", "password": "pw-secret-1"}
+        )
+        assert resp.status_code == 200
