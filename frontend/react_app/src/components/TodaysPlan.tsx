@@ -37,6 +37,7 @@ const INTENT_STYLE: Record<ActionIntent, { icon: IconName; tone: string }> = {
   introduction: { icon: "sparkles", tone: "bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-300" },
   review: { icon: "book", tone: "bg-slate-500/10 text-slate-700 dark:text-slate-300" },
 };
+
 const list = (items: string[]) => items.map(humanize).join(", ");
 
 export function TodaysPlan({
@@ -53,20 +54,19 @@ export function TodaysPlan({
 }) {
   const { plan, cefr, insights, loading, error } = usePlan(token, language, { goal, refreshKey });
 
-  if (loading) {
+  if (loading && !plan) {
     return (
       <div className="space-y-4">
         <LoadingCard label="Loading your plan…" rows={3} />
-        <LoadingCard label="Loading your CEFR profile…" rows={2} />
+        <LoadingCard label="Loading your level…" rows={2} />
       </div>
     );
   }
   if (error) return <ErrorNote>{error}</ErrorNote>;
-  if (loading && !plan) return <p className="text-slate-500">Loading your plan…</p>;
-  if (error) return <p className="text-red-600">{error}</p>;
 
   const overall = cefr?.overall ?? null;
-  const totalMinutes = plan?.actions.reduce((sum, a) => sum + (a.estimated_minutes ?? 0), 0) ?? 0;
+  const totalMinutes =
+    plan?.actions.reduce((sum, a) => sum + Math.max(1, Math.round(a.estimated_minutes)), 0) ?? 0;
 
   return (
     <div className="space-y-4">
@@ -82,20 +82,19 @@ export function TodaysPlan({
           ) : null
         }
       >
-      <div className="rounded-lg border bg-white p-4">
-        <h3 className="mb-3 font-semibold">Today&apos;s plan</h3>
         {!plan || plan.actions.length === 0 ? (
           <EmptyState icon="chat">No plan yet — have a conversation session first.</EmptyState>
         ) : (
           <m.ol variants={stagger(0.05, 0.1)} initial="hidden" animate="show" className="space-y-2">
             {plan.actions.map((a, i) => {
+              const text = describeAction(a);
               const style = a.intent ? INTENT_STYLE[a.intent] : undefined;
               return (
                 <m.li
                   key={`${a.type}-${a.target}-${i}`}
                   variants={fadeUp}
                   whileHover={{ x: 2 }}
-                  className="group flex gap-3 rounded-xl border border-line/60 bg-surface2/50 p-3 transition-colors duration-200 hover:border-brand/30 hover:bg-surface2"
+                  className="flex gap-3 rounded-xl border border-line/60 bg-surface2/50 p-3 transition-colors duration-200 hover:border-brand/30 hover:bg-surface2"
                 >
                   <span
                     className={
@@ -107,61 +106,39 @@ export function TodaysPlan({
                     <Icon name={style?.icon ?? "book"} size={16} />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-                      <span className="font-semibold">
-                        {a.type.replace(/_/g, " ")}
-                        {a.skill ? (
-                          <span className="ml-2 text-xs font-normal text-muted">({a.skill})</span>
-                        ) : null}
-                        {a.intent ? (
-                          <span
-                            className={"chip ml-2 align-middle " + (style?.tone ?? "bg-brand-soft text-link")}
-                            data-testid="action-intent"
-                          >
-                            {INTENT_LABEL[a.intent] ?? a.intent}
-                          </span>
-                        ) : null}
-                      </span>
-                      <span className="text-xs tabular-nums text-muted">
-                        {a.estimated_minutes} min · priority {a.priority.toFixed(2)}
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <span className="font-semibold">{text.title}</span>
+                      {a.intent ? (
+                        <span
+                          className={"chip " + (style?.tone ?? "bg-brand-soft text-link")}
+                          data-testid="action-intent"
+                        >
+                          {INTENT_LABEL[a.intent] ?? a.intent}
+                        </span>
+                      ) : null}
+                      <span className="ml-auto whitespace-nowrap text-xs tabular-nums text-muted">
+                        ~{Math.max(1, Math.round(a.estimated_minutes))} min
                       </span>
                     </div>
-                    <div className="mt-0.5 text-sm text-muted">{a.reason}</div>
+                    {text.description ? (
+                      <p className="mt-0.5 text-sm text-muted">{text.description}</p>
+                    ) : null}
+                    <details className="group mt-1 text-xs text-muted">
+                      <summary className="inline-flex select-none items-center gap-1 rounded-sm hover:text-fg">
+                        <Icon
+                          name="arrowRight"
+                          size={12}
+                          className="transition-transform duration-200 group-open:rotate-90"
+                        />
+                        Why?
+                      </summary>
+                      <p className="mt-1 pl-4">{a.reason}</p>
+                    </details>
                   </div>
                 </m.li>
               );
             })}
           </m.ol>
-          <ol className="space-y-2">
-            {plan.actions.map((a, i) => {
-              const text = describeAction(a);
-              return (
-                <li key={`${a.type}-${a.target}-${i}`} className="rounded-md bg-slate-50 p-3">
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                    <span className="font-medium">{text.title}</span>
-                    {a.intent ? (
-                      <span
-                        className="rounded bg-indigo-50 px-1.5 py-0.5 text-xs text-indigo-700"
-                        data-testid="action-intent"
-                      >
-                        {INTENT_LABEL[a.intent] ?? a.intent}
-                      </span>
-                    ) : null}
-                    <span className="ml-auto whitespace-nowrap text-xs text-slate-500">
-                      ~{Math.max(1, Math.round(a.estimated_minutes))} min
-                    </span>
-                  </div>
-                  {text.description ? (
-                    <p className="mt-1 text-sm text-slate-600">{text.description}</p>
-                  ) : null}
-                  <details className="mt-1 text-xs text-slate-400">
-                    <summary className="cursor-pointer select-none hover:text-slate-600">Why?</summary>
-                    <p className="mt-1">{a.reason}</p>
-                  </details>
-                </li>
-              );
-            })}
-          </ol>
         )}
       </Card>
 
@@ -171,7 +148,7 @@ export function TodaysPlan({
         icon="layers"
         title={
           <>
-            CEFR profile
+            Your level
             {cefr ? (
               <span data-testid="overall-level">
                 {" "}
@@ -179,22 +156,15 @@ export function TodaysPlan({
                 <span className="ml-1 text-xs font-normal text-muted">
                   ({statusLabel(cefr.overall_status)})
                 </span>
-      <div className="rounded-lg border bg-white p-4">
-        <h3 className="mb-2 font-semibold">
-          Your level
-          {cefr ? (
-            <span data-testid="overall-level">
-              {" "}
-              — overall {overall ?? "not yet assessed"}
-              <span className="ml-1 text-xs font-normal text-slate-400">
-                ({statusLabel(cefr.overall_status)})
               </span>
             ) : null}
           </>
         }
       >
         {!cefr || Object.keys(cefr.skills).length === 0 ? (
-          <EmptyState icon="target">No skill evidence yet.</EmptyState>
+          <EmptyState icon="target">
+            Practise a little and your level per skill (A1–C2) appears here.
+          </EmptyState>
         ) : (
           <m.ul variants={stagger(0.06, 0.15)} initial="hidden" animate="show" className="space-y-3">
             {Object.entries(cefr.skills).map(([skill, a]) => (
@@ -204,32 +174,16 @@ export function TodaysPlan({
                 className="grid grid-cols-[6.5rem_2.5rem_1fr] items-center gap-x-3 gap-y-1 sm:grid-cols-[7rem_2.5rem_1fr_auto]"
               >
                 <span className="truncate font-medium capitalize">{skill}</span>
-                <span
-                  className={
-                    "text-center text-sm font-bold " + (a.cefr ? "text-link" : "text-muted")
-                  }
-                >
+                <span className={"text-center text-sm font-bold " + (a.cefr ? "text-link" : "text-muted")}>
                   {a.cefr ?? "—"}
                 </span>
                 <div
                   className="relative h-2.5 overflow-hidden rounded-full bg-surface2"
-                  title="mastery range (model estimate, not a calibrated probability)"
-          <p className="text-sm text-slate-500">
-            Practise a little and your level per skill (A1–C2) appears here.
-          </p>
-        ) : (
-          <ul className="space-y-2">
-            {Object.entries(cefr.skills).map(([skill, a]) => (
-              <li key={skill} className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                <span className="w-24 capitalize">{skill}</span>
-                <span className="w-8 font-semibold">{a.cefr ?? "—"}</span>
-                <div
-                  className="relative h-2 min-w-[6rem] flex-1 rounded bg-slate-100"
                   title="Likely range of your mastery (a model estimate)"
                 >
                   {a.mastery_low != null && a.mastery_high != null ? (
                     <m.div
-                      className="absolute inset-y-0 origin-left rounded-full bg-gradient-to-r from-indigo-300 to-sky-300 dark:from-indigo-500/60 dark:to-sky-500/60"
+                      className="absolute inset-y-0 origin-left rounded-full bg-linear-to-r from-indigo-300 to-sky-300 dark:from-indigo-500/60 dark:to-sky-500/60"
                       style={{
                         left: `${Math.round(a.mastery_low * 100)}%`,
                         width: `${Math.round((a.mastery_high - a.mastery_low) * 100)}%`,
@@ -241,7 +195,7 @@ export function TodaysPlan({
                   ) : null}
                   {a.mastery != null ? (
                     <m.div
-                      className="absolute inset-y-0 w-1.5 rounded-full bg-brand shadow"
+                      className="absolute inset-y-0 w-1.5 rounded-full bg-brand shadow-sm"
                       style={{ left: `${Math.round(a.mastery * 100)}%`, x: "-50%" }}
                       initial={{ opacity: 0, scaleY: 0 }}
                       animate={{ opacity: 1, scaleY: 1 }}
@@ -249,9 +203,7 @@ export function TodaysPlan({
                     />
                   ) : null}
                 </div>
-                <span className="col-span-3 text-xs text-muted sm:col-span-1 sm:w-36 sm:text-right">
-                  {statusLabel(a.status)} · {a.independent_count ?? a.sample_size} obs
-                <span className="w-full text-xs text-slate-400 sm:w-auto sm:text-right">
+                <span className="col-span-3 text-xs text-muted sm:col-span-1 sm:w-40 sm:text-right">
                   {evidenceText(a.status)} · {plural(a.independent_count ?? a.sample_size, "answer")}
                 </span>
               </m.li>
@@ -259,57 +211,21 @@ export function TodaysPlan({
           </m.ul>
         )}
         {cefr?.unassessed_skills && cefr.unassessed_skills.length > 0 ? (
-          <p className="mt-3 text-xs text-muted">
-            Not yet assessed: {cefr.unassessed_skills.join(", ")}
-          <p className="mt-2 text-xs text-slate-500">
-            Not assessed yet: {list(cefr.unassessed_skills)}
-          </p>
+          <p className="mt-3 text-xs text-muted">Not assessed yet: {list(cefr.unassessed_skills)}</p>
         ) : null}
       </Card>
 
-      {/* Insights */}
-      {insights ? (
-        <Card title="Insights" icon="sparkles" delay={0.12}>
-          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-            <span>
-              Overall level{" "}
-              <span className="font-semibold">{insights.overall_cefr ?? "not yet assessed"}</span>
-            </span>
-            {insights.streak ? (
-              <span className="chip bg-orange-500/10 text-orange-700 dark:text-orange-300">
-                <Icon name="flame" size={12} /> {insights.streak}-day streak
-              </span>
-            ) : null}
-          </p>
-          {insights.weakest_skills.length > 0 ? (
-            <p className="mt-2 text-sm text-muted">
-              Focus areas: {insights.weakest_skills.join(", ")}
-            </p>
-          ) : null}
-          {insights.needs_assessment && insights.needs_assessment.length > 0 ? (
-            <p className="mt-2 text-sm text-muted">
-              Still finding your level in: {insights.needs_assessment.join(", ")}
-            </p>
-          ) : null}
-          {insights.recommended_focus.length > 0 ? (
-            <ul className="mt-3 space-y-1.5 text-sm">
-              {insights.recommended_focus.map((r, i) => (
-                <li key={i} className="flex gap-2">
-                  <Icon name="check" size={16} className="mt-0.5 shrink-0 text-accent" />
-                  <span>{r}</span>
-                </li>
-              ))}
-            </ul>
       {/* Insights. The plan above already shows the recommended activities,
           and "Your level" the skills not assessed yet. */}
       {insights && (insights.streak > 0 || insights.weakest_skills.length > 0) ? (
-        <div className="rounded-lg border bg-white p-4">
-          <h3 className="mb-2 font-semibold">Insights</h3>
+        <Card title="Insights" icon="sparkles" delay={0.12}>
           {insights.streak ? (
-            <p className="text-sm">🔥 {plural(insights.streak, "day")} in a row</p>
+            <span className="chip bg-orange-500/10 text-orange-700 dark:text-orange-300">
+              <Icon name="flame" size={12} /> {plural(insights.streak, "day")} in a row
+            </span>
           ) : null}
           {insights.weakest_skills.length > 0 ? (
-            <p className="text-sm text-slate-600">Focus areas: {list(insights.weakest_skills)}</p>
+            <p className="mt-2 text-sm text-muted">Focus areas: {list(insights.weakest_skills)}</p>
           ) : null}
         </Card>
       ) : null}

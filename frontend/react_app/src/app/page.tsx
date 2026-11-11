@@ -10,6 +10,7 @@ import { ProgressDashboard } from "@/components/ProgressDashboard";
 import { TodaysPlan } from "@/components/TodaysPlan";
 import { ListeningExercise } from "@/components/ListeningExercise";
 import { Onboarding } from "@/components/Onboarding";
+import { PrivacyPanel } from "@/components/PrivacyPanel";
 import { Brand } from "@/components/ui/Brand";
 import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Card";
@@ -27,15 +28,17 @@ const TABS: readonly TabDef<TabId>[] = [
 ];
 
 const isTab = (v: string): v is TabId => TABS.some((t) => t.id === v);
-import { PrivacyPanel } from "@/components/PrivacyPanel";
 
 function Header({ onLogout }: { onLogout: () => void }) {
   return (
-    <header className="flex items-center justify-between">
-      <h1 className="text-xl font-bold sm:text-2xl">🌍 Polyglot Swarm</h1>
-      <button className="rounded-md px-2 py-1 text-sm text-slate-500 hover:bg-slate-100" onClick={onLogout}>
+    <header className="flex items-center justify-between gap-3">
+      <h1>
+        <Brand />
+      </h1>
+      <Button variant="ghost" size="sm" onClick={onLogout}>
+        <Icon name="logout" size={16} />
         Log out
-      </button>
+      </Button>
     </header>
   );
 }
@@ -113,22 +116,9 @@ export default function HomePage() {
   const language = profile?.target_languages?.[0];
   const goal = profile?.goals?.[0];
 
-  const header = (
-    <header className="flex items-center justify-between gap-3">
-      <h1>
-        <Brand />
-      </h1>
-      <Button variant="ghost" size="sm" onClick={logout}>
-        <Icon name="logout" size={16} />
-        Log out
-      </Button>
-    </header>
-  );
-
   if (needsOnboarding) {
     return (
       <main className="mx-auto max-w-3xl space-y-6 p-4 sm:p-6">
-        {header}
         <Header onLogout={logout} />
         <Onboarding token={token} onComplete={onOnboarded} />
       </main>
@@ -137,7 +127,7 @@ export default function HomePage() {
 
   return (
     <main className="mx-auto max-w-3xl space-y-5 px-4 pb-32 pt-4 sm:space-y-6 sm:p-6 sm:pb-12">
-      {header}
+      <Header onLogout={logout} />
 
       <m.div
         initial={{ opacity: 0, y: 8 }}
@@ -159,24 +149,30 @@ export default function HomePage() {
 
       <TabNav tabs={TABS} active={tab} onChange={selectTab} />
 
+      {/* Panels stay mounted while hidden, so a live chat or a half-answered
+          listening task survives a tab switch. */}
       <TabPanel id="today" active={tab === "today"} direction={direction}>
         <SectionTitle>Today</SectionTitle>
-        <TodaysPlan token={token} language={language} goal={goal} />
+        <TodaysPlan token={token} language={language} goal={goal} refreshKey={refreshKey} />
       </TabPanel>
 
       <TabPanel id="practice" active={tab === "practice"} direction={direction}>
         <SectionTitle>Practice</SectionTitle>
-        <ChatPanel token={token} />
+        <ChatPanel token={token} onSessionEnd={refresh} />
       </TabPanel>
 
       <TabPanel id="listening" active={tab === "listening"} direction={direction}>
         <SectionTitle>Listening</SectionTitle>
-        <ListeningExercise token={token} language={language} />
+        <ListeningExercise token={token} language={language} onSubmitted={refresh} />
       </TabPanel>
 
       <TabPanel id="progress" active={tab === "progress"} direction={direction}>
         <SectionTitle>Progress</SectionTitle>
-        <ProgressDashboard token={token} />
+        <ProgressDashboard token={token} refreshKey={refreshKey} />
+        <div className="mt-8">
+          <SectionTitle>Your data</SectionTitle>
+          <PrivacyPanel token={token} onDeleted={logout} />
+        </div>
       </TabPanel>
     </main>
   );
@@ -202,38 +198,6 @@ function ShellSkeleton() {
         <Skeleton className="h-32 w-full rounded-2xl" />
         <Skeleton className="h-48 w-full rounded-2xl" />
       </div>
-    <main className="mx-auto max-w-3xl space-y-8 p-4 sm:p-6">
-      <Header onLogout={logout} />
-
-      <section>
-        <h2 className="mb-2 text-lg font-semibold">Today</h2>
-        <TodaysPlan
-          token={token}
-          language={language}
-          goal={profile?.goals?.[0]}
-          refreshKey={refreshKey}
-        />
-      </section>
-
-      <section>
-        <h2 className="mb-2 text-lg font-semibold">Practice</h2>
-        <ChatPanel token={token} onSessionEnd={refresh} />
-      </section>
-
-      <section>
-        <h2 className="mb-2 text-lg font-semibold">Listening</h2>
-        <ListeningExercise token={token} language={language} onSubmitted={refresh} />
-      </section>
-
-      <section>
-        <h2 className="mb-2 text-lg font-semibold">Progress</h2>
-        <ProgressDashboard token={token} refreshKey={refreshKey} />
-      </section>
-
-      <section>
-        <h2 className="mb-2 text-lg font-semibold">Your data</h2>
-        <PrivacyPanel token={token} onDeleted={logout} />
-      </section>
     </main>
   );
 }

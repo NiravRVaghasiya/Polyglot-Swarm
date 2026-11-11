@@ -2,14 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, m } from "motion/react";
-import { api, Scenario } from "@/lib/api";
+import { api, type EndSessionResponse, Scenario } from "@/lib/api";
 import { useVoice } from "@/lib/useVoice";
 import { Button } from "@/components/ui/Button";
 import { Card, ErrorNote } from "@/components/ui/Card";
 import { Icon } from "@/components/ui/Icon";
 import { easeOut, spring } from "@/components/ui/motion";
-import { api, type EndSessionResponse, Scenario } from "@/lib/api";
-import { useVoice } from "@/lib/useVoice";
 import { SessionSummary } from "./SessionSummary";
 
 interface Message {
@@ -37,11 +35,6 @@ export function ChatPanel({
   const [input, setInput] = useState("");
   const [ended, setEnded] = useState<EndSessionResponse | null>(null);
   const [busy, setBusy] = useState(false);
-  const [starting, setStarting] = useState(false);
-  const [ending, setEnding] = useState(false);
-  const [speak, setSpeak] = useState(false);
-  const voice = useVoice(token);
-  const scrollRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [speak, setSpeak] = useState(false);
   const voice = useVoice(token);
@@ -53,16 +46,10 @@ export function ChatPanel({
 
   // Keep the newest message (or the typing indicator) in view.
   useEffect(() => {
-    const el = scrollRef.current;
-    if (el) el.scrollTo?.({ top: el.scrollHeight, behavior: "smooth" });
-  }, [messages, busy]);
-
-  async function start() {
-    setStarting(true);
-  // Keep the newest message in view.
-  useEffect(() => {
     const log = logRef.current;
-    if (log) log.scrollTop = log.scrollHeight;
+    if (!log) return;
+    if (typeof log.scrollTo === "function") log.scrollTo({ top: log.scrollHeight, behavior: "smooth" });
+    else log.scrollTop = log.scrollHeight;
   }, [messages, busy]);
 
   async function start() {
@@ -74,10 +61,6 @@ export function ChatPanel({
         scenario_id: scenarioId || undefined,
       });
       setSessionId(res.session_id);
-      setReport(null);
-      setMessages(res.opening_line ? [{ role: "assistant", content: res.opening_line }] : []);
-    } finally {
-      setStarting(false);
       setEnded(null);
       setMessages(res.opening_line ? [{ role: "assistant", content: res.opening_line }] : []);
     } catch (e) {
@@ -115,13 +98,6 @@ export function ChatPanel({
 
   async function end() {
     if (!sessionId) return;
-    setEnding(true);
-    try {
-      const res = await api.endSession(token, sessionId);
-      setReport(res.report);
-      setSessionId(null);
-    } finally {
-      setEnding(false);
     setBusy(true);
     setError(null);
     try {
@@ -137,6 +113,8 @@ export function ChatPanel({
     }
   }
 
+  const scenario = scenarios.find((s) => s.id === scenarioId);
+
   return (
     <div className="space-y-4">
       <AnimatePresence mode="wait" initial={false}>
@@ -147,11 +125,11 @@ export function ChatPanel({
             animate={{ opacity: 1, y: 0, transition: easeOut }}
             exit={{ opacity: 0, y: -8, transition: { duration: 0.15 } }}
           >
-            <Card title="Start a conversation" icon="chat">
+            <Card title={ended ? "Ready for another round?" : "Start a conversation"} icon="chat">
               <p className="mb-4 text-sm text-muted">
                 Chat freely in your target language, or pick a role-play scenario.
               </p>
-              <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+              <div className="grid gap-3 sm:grid-cols-[1fr_1.4fr_auto] sm:items-end">
                 <div>
                   <label htmlFor="chat-language" className="field-label">
                     Language
@@ -163,9 +141,11 @@ export function ChatPanel({
                     onChange={(e) => setLanguage(e.target.value)}
                     placeholder="Language (e.g. Spanish)"
                     aria-label="Target language"
+                    disabled={!!scenarioId}
+                    title={scenarioId ? "The scenario sets the language" : undefined}
                   />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <label htmlFor="chat-scenario" className="field-label">
                     Scenario
                   </label>
@@ -179,16 +159,19 @@ export function ChatPanel({
                     <option value="">Free conversation</option>
                     {scenarios.map((s) => (
                       <option key={s.id} value={s.id}>
-                        {s.title} [{s.language}]
+                        {s.title} ({s.language.toUpperCase()}, {s.cefr_min}–{s.cefr_max})
                       </option>
                     ))}
                   </select>
                 </div>
-                <Button onClick={start} loading={starting} disabled={starting}>
-                  Start session
-                  {!starting ? <Icon name="arrowRight" size={16} /> : null}
+                <Button onClick={start} loading={busy} disabled={busy}>
+                  {ended ? "Start another session" : "Start session"}
+                  {!busy ? <Icon name="arrowRight" size={16} /> : null}
                 </Button>
               </div>
+              {scenario ? (
+                <p className="mt-3 text-xs text-muted">The scenario sets the language.</p>
+              ) : null}
             </Card>
           </m.div>
         ) : (
@@ -205,21 +188,26 @@ export function ChatPanel({
                   <span className="absolute inset-0 animate-pulse-ring rounded-full bg-emerald-500" />
                   <span className="relative h-2.5 w-2.5 rounded-full bg-emerald-500" />
                 </span>
-                Live session · {language}
+                Live session · {scenario ? scenario.title : language}
               </span>
-              <Button variant="secondary" size="sm" onClick={end} loading={ending} disabled={ending}>
-                End
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={end}
+                disabled={busy}
+                title="End the session and see your summary"
+              >
+                End &amp; review
               </Button>
             </div>
 
             <div
-              ref={scrollRef}
+              ref={logRef}
               className="h-[min(26rem,55dvh)] space-y-2 overflow-y-auto overscroll-contain rounded-xl bg-surface2/60 p-3"
               aria-live="polite"
-              aria-label="Conversation"
             >
               {messages.length === 0 ? (
-                <p className="py-10 text-center text-sm text-muted">Say hello to get started.</p>
+                <p className="py-10 text-center text-sm text-muted">Say hello to start the conversation.</p>
               ) : null}
               {messages.map((msg, i) => {
                 const mine = msg.role === "user";
@@ -234,7 +222,7 @@ export function ChatPanel({
                   >
                     <span
                       className={
-                        "max-w-[85%] whitespace-pre-wrap break-words rounded-2xl px-3.5 py-2 text-[15px] leading-relaxed shadow-sm " +
+                        "max-w-[85%] whitespace-pre-wrap break-words rounded-2xl px-3.5 py-2 text-[15px] leading-relaxed shadow-xs " +
                         (mine
                           ? "rounded-br-md bg-brand text-brand-fg"
                           : "rounded-bl-md border border-line/70 bg-surface text-fg")
@@ -253,9 +241,8 @@ export function ChatPanel({
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, transition: { duration: 0.12 } }}
                     className="flex"
-                    role="status"
+                    aria-label="Tutor is typing"
                   >
-                    <span className="sr-only">Tutor is replying…</span>
                     <span
                       aria-hidden="true"
                       className="flex gap-1 rounded-2xl rounded-bl-md border border-line/70 bg-surface px-3.5 py-3"
@@ -274,112 +261,6 @@ export function ChatPanel({
             </div>
 
             <div className="flex gap-2">
-    <div className="space-y-3">
-      {!sessionId ? (
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <input
-            className="rounded-md border p-2"
-            value={language}
-            onChange={(e) => setLanguage(e.target.value)}
-            placeholder="Language (e.g. Spanish)"
-            aria-label="Target language"
-            disabled={!!scenarioId}
-            title={scenarioId ? "The scenario sets the language" : undefined}
-          />
-          <select
-            className="min-w-0 flex-1 rounded-md border p-2"
-            value={scenarioId}
-            onChange={(e) => setScenarioId(e.target.value)}
-            aria-label="Scenario"
-          >
-            <option value="">Free conversation</option>
-            {scenarios.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.title} ({s.language.toUpperCase()}, {s.cefr_min}–{s.cefr_max})
-              </option>
-            ))}
-          </select>
-          <button
-            className="rounded-md bg-indigo-600 px-4 py-2 font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
-            onClick={start}
-            disabled={busy}
-          >
-            {ended ? "Start another session" : "Start session"}
-          </button>
-        </div>
-      ) : (
-        <>
-          <div
-            ref={logRef}
-            className="h-80 space-y-2 overflow-y-auto rounded-lg border bg-white p-3"
-            aria-live="polite"
-          >
-            {messages.length === 0 ? (
-              <p className="text-sm text-slate-400">Say hello to start the conversation.</p>
-            ) : null}
-            {messages.map((m, i) => (
-              <div key={i} className={m.role === "user" ? "flex justify-end" : "flex"}>
-                <span
-                  className={
-                    "max-w-[85%] rounded-2xl px-3 py-2 text-sm " +
-                    (m.role === "user"
-                      ? "rounded-br-sm bg-indigo-600 text-white"
-                      : "rounded-bl-sm bg-slate-100 text-slate-900")
-                  }
-                >
-                  {m.content}
-                </span>
-              </div>
-            ))}
-            {busy ? (
-              <div className="flex" aria-label="Tutor is typing">
-                <span className="rounded-2xl rounded-bl-sm bg-slate-100 px-3 py-2 text-sm text-slate-400">
-                  …
-                </span>
-              </div>
-            ) : null}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <input
-              className="min-w-0 flex-1 rounded-md border p-2"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && sendText(input)}
-              placeholder="Type your message…"
-              aria-label="Message"
-            />
-            <button
-              className="rounded-md bg-indigo-600 px-4 py-2 font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
-              onClick={() => sendText(input)}
-              disabled={busy || !input.trim()}
-            >
-              Send
-            </button>
-            {voice.supported && (
-              <button
-                className={
-                  "rounded-md px-4 py-2 text-white disabled:opacity-50 " +
-                  (voice.recording ? "bg-red-600" : "bg-emerald-600 hover:bg-emerald-700")
-                }
-                onClick={toggleMic}
-                disabled={voice.busy}
-                aria-label={voice.recording ? "Stop recording" : "Record voice"}
-                title={voice.recording ? "Stop and send" : "Speak"}
-              >
-                {voice.recording ? "■ Stop" : voice.busy ? "…" : "🎤"}
-              </button>
-            )}
-            <button
-              className="rounded-md border px-4 py-2 hover:bg-slate-50 disabled:opacity-50"
-              onClick={end}
-              disabled={busy}
-              title="End the session and see your summary"
-            >
-              End &amp; review
-            </button>
-          </div>
-          {voice.supported && (
-            <label className="flex items-center gap-2 text-sm text-slate-500">
               <input
                 className="field min-w-0 flex-1"
                 value={input}
@@ -409,7 +290,7 @@ export function ChatPanel({
                   </Button>
                 </span>
               )}
-              <Button onClick={() => sendText(input)} disabled={busy}>
+              <Button onClick={() => sendText(input)} disabled={busy || !input.trim()}>
                 <Icon name="send" size={16} />
                 <span className="hidden sm:inline">Send</span>
                 <span className="sr-only sm:hidden">Send</span>
@@ -432,7 +313,7 @@ export function ChatPanel({
                   />
                   <span
                     aria-hidden="true"
-                    className="absolute left-1 top-1 h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-4"
+                    className="absolute left-1 top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200 peer-checked:translate-x-4"
                   />
                 </span>
                 <Icon name="volume" size={16} />
@@ -446,27 +327,20 @@ export function ChatPanel({
         )}
       </AnimatePresence>
 
+      <AnimatePresence>{error ? <ErrorNote key={error}>{error}</ErrorNote> : null}</AnimatePresence>
+
       <AnimatePresence>
-        {report ? (
+        {ended ? (
           <m.div
-            key="report"
+            key="summary"
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0, transition: { ...easeOut, delay: 0.1 } }}
             exit={{ opacity: 0 }}
           >
-            <Card title="Session report" icon="sparkles">
-              <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-fg">{report}</pre>
-            </Card>
+            <SessionSummary summary={ended.summary} report={ended.report} />
           </m.div>
         ) : null}
       </AnimatePresence>
-      {error ? (
-        <p role="alert" className="text-sm text-red-600">
-          {error}
-        </p>
-      ) : null}
-
-      {ended ? <SessionSummary summary={ended.summary} report={ended.report} /> : null}
     </div>
   );
 }

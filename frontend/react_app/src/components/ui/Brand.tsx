@@ -14,7 +14,7 @@ export function Brand({ size = "md" }: { size?: "md" | "lg" }) {
         animate={{ rotate: 0, scale: 1, opacity: 1 }}
         transition={softSpring}
         className={
-          "grid place-items-center rounded-xl bg-gradient-to-br from-indigo-500 to-sky-500 text-white shadow-lift " +
+          "grid place-items-center rounded-xl bg-linear-to-br from-indigo-500 to-sky-500 text-white shadow-lift " +
           (lg ? "h-12 w-12" : "h-9 w-9")
         }
       >
@@ -22,7 +22,7 @@ export function Brand({ size = "md" }: { size?: "md" | "lg" }) {
       </m.span>
       <span
         className={
-          "bg-gradient-to-r from-indigo-600 to-sky-500 bg-clip-text font-extrabold tracking-tight text-transparent dark:from-indigo-300 dark:to-sky-300 " +
+          "bg-linear-to-r from-indigo-600 to-sky-500 bg-clip-text font-extrabold tracking-tight text-transparent dark:from-indigo-300 dark:to-sky-300 " +
           (lg ? "text-3xl" : "text-xl sm:text-2xl")
         }
       >
