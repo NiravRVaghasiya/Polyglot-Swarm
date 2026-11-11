@@ -4,7 +4,12 @@
 // only on the signed-in learner's own data).
 
 import { useState } from "react";
+import { AnimatePresence, m } from "motion/react";
 import { api } from "@/lib/api";
+import { Button } from "@/components/ui/Button";
+import { ErrorNote } from "@/components/ui/Card";
+import { Icon } from "@/components/ui/Icon";
+import { easeOut } from "@/components/ui/motion";
 
 const CONFIRM_WORD = "DELETE";
 
@@ -46,73 +51,76 @@ export function PrivacyPanel({ token, onDeleted }: { token: string; onDeleted: (
   }
 
   return (
-    <div className="space-y-3 rounded-lg border bg-white p-4">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-slate-600">
+    <div className="card space-y-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="flex items-start gap-2 text-sm text-muted">
+          <Icon name="book" size={16} className="mt-0.5 shrink-0" />
           Download everything stored about you: your account, lessons and learning record.
         </p>
-        <button
-          type="button"
-          className="rounded-md border px-4 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-50"
-          onClick={download}
-          disabled={busy}
-        >
+        <Button type="button" variant="secondary" onClick={download} disabled={busy}>
           Download my data
-        </button>
+        </Button>
       </div>
 
-      <div className="border-t pt-3">
+      <div className="border-t border-line pt-4">
         {!confirming ? (
-          <button
-            type="button"
-            className="text-sm font-medium text-red-700 hover:underline"
-            onClick={() => setConfirming(true)}
-          >
-            Delete my account and data…
-          </button>
-        ) : (
-          <div className="space-y-2 rounded-md bg-red-50 p-3 text-sm text-red-900">
-            <p>
-              This permanently deletes your account, lessons and progress. It cannot be undone.
-              Copies in backups expire within 30 days.
-            </p>
-            <label className="block">
-              Type <span className="font-mono font-semibold">{CONFIRM_WORD}</span> to confirm
-              <input
-                className="mt-1 block w-full rounded-md border border-red-200 bg-white p-2 sm:w-48"
-                value={typed}
-                onChange={(e) => setTyped(e.target.value)}
-                aria-label={`Type ${CONFIRM_WORD} to confirm`}
-              />
-            </label>
-            <div className="flex gap-2">
+            <div>
               <button
                 type="button"
-                className="rounded-md bg-red-700 px-4 py-2 font-medium text-white disabled:opacity-50"
-                onClick={remove}
-                disabled={busy || typed !== CONFIRM_WORD}
+                className="rounded-sm text-sm font-semibold text-danger hover:underline"
+                onClick={() => setConfirming(true)}
               >
-                Delete permanently
-              </button>
-              <button
-                type="button"
-                className="rounded-md border border-red-200 bg-white px-4 py-2"
-                onClick={() => {
-                  setConfirming(false);
-                  setTyped("");
-                }}
-              >
-                Cancel
+                Delete my account and data…
               </button>
             </div>
-          </div>
-        )}
+          ) : (
+            <m.div
+              key="confirm"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0, transition: easeOut }}
+              className="space-y-3 rounded-xl border border-danger/30 bg-danger-soft p-4 text-sm text-fg"
+            >
+              <p className="flex items-start gap-2">
+                <Icon name="alert" size={16} className="mt-0.5 shrink-0 text-danger" />
+                <span>
+                  This permanently deletes your account, lessons and progress. It cannot be undone.
+                  Copies in backups expire within 30 days.
+                </span>
+              </p>
+              <label className="block font-medium">
+                Type <span className="font-mono font-bold text-danger">{CONFIRM_WORD}</span> to confirm
+                <input
+                  className="field mt-1.5 sm:w-56"
+                  value={typed}
+                  onChange={(e) => setTyped(e.target.value)}
+                  aria-label={`Type ${CONFIRM_WORD} to confirm`}
+                  autoComplete="off"
+                />
+              </label>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="danger"
+                  onClick={remove}
+                  disabled={busy || typed !== CONFIRM_WORD}
+                >
+                  Delete permanently
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    setConfirming(false);
+                    setTyped("");
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </m.div>
+          )}
       </div>
-      {error ? (
-        <p role="alert" className="text-sm text-red-700">
-          {error}
-        </p>
-      ) : null}
+      <AnimatePresence>{error ? <ErrorNote key={error}>{error}</ErrorNote> : null}</AnimatePresence>
     </div>
   );
 }

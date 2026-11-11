@@ -3,30 +3,54 @@
 // The end-of-session report, rendered from the structured `summary` the API
 // returns. Falls back to the plain-text report for older servers.
 
+import { m } from "motion/react";
 import type { SessionSummary as Summary } from "@/lib/api";
 import { evidenceText, humanize } from "@/lib/labels";
+import { Icon, type IconName } from "@/components/ui/Icon";
+import { fadeUp, pop, stagger } from "@/components/ui/motion";
 
 export function SessionSummary({ summary, report }: { summary?: Summary; report: string }) {
   if (!summary) {
-    return <pre className="whitespace-pre-wrap rounded-lg border bg-white p-4 text-sm">{report}</pre>;
+    return (
+      <pre className="card whitespace-pre-wrap font-sans text-sm leading-relaxed text-fg">{report}</pre>
+    );
   }
   const { level, scenario } = summary;
 
   return (
-    <div className="space-y-4 rounded-lg border bg-white p-4" aria-label="Session summary">
-      <h3 className="text-lg font-semibold">Session complete 🎉</h3>
+    <m.div
+      variants={stagger(0.07)}
+      initial="hidden"
+      animate="show"
+      className="card space-y-5"
+      aria-label="Session summary"
+    >
+      <m.div variants={fadeUp} className="flex items-center gap-3">
+        <m.span
+          variants={pop}
+          className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-linear-to-br from-emerald-400 to-teal-500 text-white shadow-lift"
+          aria-hidden="true"
+        >
+          <Icon name="check" size={22} strokeWidth={3} />
+        </m.span>
+        <h3 className="text-lg font-bold tracking-tight">Session complete</h3>
+      </m.div>
 
       {scenario ? (
-        <div
+        <m.div
+          variants={fadeUp}
           className={
-            "rounded-md p-3 text-sm " +
-            (scenario.passed ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800")
+            "rounded-xl border p-3 text-sm " +
+            (scenario.passed
+              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-800 dark:text-emerald-200"
+              : "border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-200")
           }
         >
-          <p className="font-medium">
+          <p className="flex items-center gap-1.5 font-semibold">
+            <Icon name={scenario.passed ? "target" : "alert"} size={16} />
             {humanize(scenario.id)}: {scenario.passed ? "goal reached" : "not quite yet"}
           </p>
-          <p>
+          <p className="mt-0.5">
             Target words used: {Math.round(scenario.vocab_coverage * 100)}% ·{" "}
             {scenario.grammar_ok ? "grammar on track" : "lots of grammar slips"}
           </p>
@@ -37,96 +61,122 @@ export function SessionSummary({ summary, report }: { summary?: Summary; report:
               ))}
             </ul>
           ) : null}
-        </div>
+        </m.div>
       ) : null}
 
-      <section>
-        <h4 className="mb-1 font-medium">Corrections</h4>
+      <Section title="Corrections" icon="check">
         {summary.corrections.length === 0 ? (
-          <p className="text-sm text-slate-500">No mistakes spotted this time.</p>
+          <p className="text-sm text-muted">No mistakes spotted this time.</p>
         ) : (
           <ul className="space-y-2">
             {summary.corrections.map((c, i) => (
-              <li key={i} className="rounded-md bg-slate-50 p-2 text-sm">
-                <span className="text-red-700 line-through">{c.original}</span>
-                <span className="mx-2 text-slate-400">→</span>
-                <span className="font-medium text-emerald-700">{c.correction}</span>
-                {c.explanation ? <p className="mt-1 text-slate-600">{c.explanation}</p> : null}
+              <li key={i} className="rounded-xl border border-line/60 bg-surface2/60 p-3 text-sm">
+                <span className="text-danger line-through decoration-danger/60">{c.original}</span>
+                <span className="mx-2 text-muted" aria-hidden="true">
+                  →
+                </span>
+                <span className="font-semibold text-accent">{c.correction}</span>
+                {c.explanation ? <p className="mt-1 text-muted">{c.explanation}</p> : null}
               </li>
             ))}
             {summary.correction_count > summary.corrections.length ? (
-              <li className="text-xs text-slate-500">
+              <li className="text-xs text-muted">
                 and {summary.correction_count - summary.corrections.length} more
               </li>
             ) : null}
           </ul>
         )}
-      </section>
+      </Section>
 
-      <section>
-        <h4 className="mb-1 font-medium">New words</h4>
+      <Section title="New words" icon="book">
         {summary.new_words.length === 0 ? (
-          <p className="text-sm text-slate-500">None this session.</p>
+          <p className="text-sm text-muted">None this session.</p>
         ) : (
-          <ul className="flex flex-wrap gap-2">
+          <m.ul variants={stagger(0.035)} className="flex flex-wrap gap-2">
             {summary.new_words.map((w) => (
-              <li key={w} className="rounded-full bg-indigo-50 px-3 py-1 text-sm text-indigo-800">
+              <m.li
+                key={w}
+                variants={pop}
+                className="rounded-full bg-brand-soft px-3 py-1 text-sm font-medium text-link"
+              >
                 {w}
-              </li>
+              </m.li>
             ))}
             {summary.new_word_count > summary.new_words.length ? (
-              <li className="px-1 py-1 text-xs text-slate-500">
+              <li className="px-1 py-1 text-xs text-muted">
                 +{summary.new_word_count - summary.new_words.length} more
               </li>
             ) : null}
-          </ul>
+          </m.ul>
         )}
-      </section>
+      </Section>
 
       {summary.cultural_notes.length > 0 ? (
-        <section>
-          <h4 className="mb-1 font-medium">Culture notes</h4>
-          <ul className="list-disc pl-5 text-sm text-slate-700">
+        <Section title="Culture notes" icon="globe">
+          <ul className="list-disc space-y-1 pl-5 text-sm">
             {summary.cultural_notes.map((n) => (
               <li key={n}>{n}</li>
             ))}
           </ul>
-        </section>
+        </Section>
       ) : null}
 
       {summary.transfers.length > 0 ? (
-        <section>
-          <h4 className="mb-1 font-medium">In your other languages</h4>
-          <ul className="space-y-1 text-sm text-slate-700">
+        <Section title="In your other languages" icon="layers">
+          <ul className="space-y-1.5 text-sm">
             {summary.transfers.map((t) => (
               <li key={t.word}>
-                <span className="font-medium">{t.word}</span>
+                <span className="font-semibold">{t.word}</span>
                 {Object.entries(t.cognates).length > 0
                   ? ` — similar to ${Object.entries(t.cognates)
                       .map(([lang, w]) => `${w} (${lang})`)
                       .join(", ")}`
                   : ""}
                 {t.false_friends.map((f) => (
-                  <span key={`${f.language}-${f.word}`} className="block text-amber-700">
-                    ⚠ False friend: {f.word} ({f.language}) {f.warning}
+                  <span
+                    key={`${f.language}-${f.word}`}
+                    className="mt-0.5 flex items-start gap-1 text-warn"
+                  >
+                    <Icon name="alert" size={14} className="mt-0.5 shrink-0" />
+                    <span>
+                      False friend: {f.word} ({f.language}) {f.warning}
+                    </span>
                   </span>
                 ))}
               </li>
             ))}
           </ul>
-        </section>
+        </Section>
       ) : null}
 
-      <p className="border-t pt-3 text-sm text-slate-600">
+      <m.p variants={fadeUp} className="border-t border-line pt-3 text-sm text-muted">
         Level:{" "}
-        <span className="font-medium text-slate-900">
-          {level.status === null
-            ? "unavailable right now"
-            : level.estimate ?? "not assessed yet"}
+        <span className="font-semibold text-fg">
+          {level.status === null ? "unavailable right now" : level.estimate ?? "not assessed yet"}
         </span>
         {level.status !== null ? ` (${evidenceText(level.status.replace(/ /g, "_"))})` : ""}
-        <span className="text-slate-400"> · the tutor is speaking at {level.working_level}</span>
-      </p>
-    </div>
+        <span> · the tutor is speaking at {level.working_level}</span>
+      </m.p>
+    </m.div>
+  );
+}
+
+function Section({
+  title,
+  icon,
+  children,
+}: {
+  title: string;
+  icon: IconName;
+  children: React.ReactNode;
+}) {
+  return (
+    <m.section variants={fadeUp}>
+      <h4 className="mb-2 flex items-center gap-1.5 text-sm font-semibold uppercase tracking-wider text-muted">
+        <Icon name={icon} size={14} />
+        {title}
+      </h4>
+      {children}
+    </m.section>
   );
 }

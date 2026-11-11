@@ -1,9 +1,11 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
-/* Design tokens (RGB channels, consumed by tailwind.config.ts). Text/surface
-   pairs are chosen for WCAG AA contrast in both themes. */
+/* ------------------------------------------------------------------------
+   Design tokens. Raw values are RGB channels on :root (swapped for dark
+   mode below); @theme exposes them to Tailwind as semantic colours, so one
+   class (`bg-surface`, `text-muted`, `bg-brand/10`, ...) works in both themes.
+   Text/surface pairs are chosen for WCAG AA contrast in both themes.
+   ------------------------------------------------------------------------ */
 :root {
   color-scheme: light dark;
 
@@ -48,6 +50,76 @@
   }
 }
 
+@theme {
+  --color-bg: rgb(var(--bg));
+  --color-surface: rgb(var(--surface));
+  --color-surface2: rgb(var(--surface-2));
+  --color-fg: rgb(var(--fg));
+  --color-muted: rgb(var(--muted));
+  --color-line: rgb(var(--line));
+  --color-brand: rgb(var(--brand));
+  --color-brand-fg: rgb(var(--brand-fg));
+  --color-brand-soft: rgb(var(--brand-soft));
+  --color-link: rgb(var(--link));
+  --color-accent: rgb(var(--accent));
+  --color-accent-soft: rgb(var(--accent-soft));
+  --color-danger: rgb(var(--danger));
+  --color-danger-soft: rgb(var(--danger-soft));
+  --color-warn: rgb(var(--warn));
+
+  /* next/font exposes the self-hosted face as --font-jakarta (layout.tsx). */
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+
+  --radius-xl: 0.875rem;
+  --radius-2xl: 1.25rem;
+
+  --shadow-card: 0 1px 2px rgb(15 23 42 / 0.04), 0 4px 16px -4px rgb(15 23 42 / 0.08);
+  --shadow-lift: 0 2px 4px rgb(15 23 42 / 0.06), 0 12px 32px -8px rgb(79 70 229 / 0.25);
+  --shadow-glow: 0 0 0 4px rgb(79 70 229 / 0.15);
+
+  --animate-shimmer: shimmer 1.6s infinite;
+  --animate-typing-dot: typing-dot 1.2s ease-in-out infinite;
+  --animate-pulse-ring: pulse-ring 1.4s cubic-bezier(0.2, 0.6, 0.4, 1) infinite;
+  --animate-eq-bar: eq-bar 0.9s ease-in-out infinite;
+
+  @keyframes shimmer {
+    100% {
+      transform: translateX(100%);
+    }
+  }
+  @keyframes typing-dot {
+    0%,
+    60%,
+    100% {
+      transform: translateY(0);
+      opacity: 0.4;
+    }
+    30% {
+      transform: translateY(-4px);
+      opacity: 1;
+    }
+  }
+  @keyframes pulse-ring {
+    0% {
+      transform: scale(1);
+      opacity: 0.55;
+    }
+    100% {
+      transform: scale(1.6);
+      opacity: 0;
+    }
+  }
+  @keyframes eq-bar {
+    0%,
+    100% {
+      transform: scaleY(0.3);
+    }
+    50% {
+      transform: scaleY(1);
+    }
+  }
+}
+
 @layer base {
   html {
     -webkit-tap-highlight-color: transparent;
@@ -62,20 +134,22 @@
     background-attachment: fixed;
   }
 
-  button,
+  /* Tailwind 4 defaults buttons to cursor: default; this app wants pointers. */
+  button:not(:disabled),
   [role="tab"],
+  summary,
   label:has(input[type="radio"]),
   label:has(input[type="checkbox"]) {
-    @apply cursor-pointer;
+    cursor: pointer;
     touch-action: manipulation;
   }
 
   button:disabled {
-    @apply cursor-not-allowed;
+    cursor: not-allowed;
   }
 
   :focus-visible {
-    @apply outline-none ring-2 ring-brand/60 ring-offset-2 ring-offset-bg;
+    @apply outline-hidden ring-2 ring-brand/60 ring-offset-2 ring-offset-bg;
   }
 }
 
@@ -83,8 +157,9 @@
   /* Shared form control look: 44px+ touch height, 16px text (no iOS zoom). */
   .field {
     @apply block min-h-11 w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-base text-fg
-      shadow-sm transition-[border-color,box-shadow] duration-200 placeholder:text-muted/70
-      hover:border-brand/40 focus:border-brand focus:shadow-glow focus:outline-none focus-visible:ring-0;
+      shadow-xs transition-[border-color,box-shadow] duration-200 placeholder:text-muted/70
+      hover:border-brand/40 focus:border-brand focus:shadow-glow focus:outline-hidden focus-visible:ring-0
+      disabled:cursor-not-allowed disabled:opacity-60;
   }
 
   .field-label {

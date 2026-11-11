@@ -10,7 +10,7 @@ import { MotionProvider } from "@/components/ui/MotionProvider";
 const sans = Plus_Jakarta_Sans({
   subsets: ["latin", "latin-ext"],
   display: "swap",
-  variable: "--font-sans",
+  variable: "--font-jakarta",
 });
 
 export const metadata: Metadata = {

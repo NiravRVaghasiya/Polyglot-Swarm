@@ -59,7 +59,7 @@ export function Onboarding({
       className="card mx-auto max-w-md space-y-6 p-6 sm:p-7"
     >
       <m.div variants={fadeUp} className="space-y-2">
-        <span className="grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br from-indigo-500 to-sky-500 text-white shadow-lift">
+        <span className="grid h-11 w-11 place-items-center rounded-xl bg-linear-to-br from-indigo-500 to-sky-500 text-white shadow-lift">
           <Icon name="sparkles" size={22} />
         </span>
         <h2 className="text-2xl font-extrabold tracking-tight">Welcome</h2>
