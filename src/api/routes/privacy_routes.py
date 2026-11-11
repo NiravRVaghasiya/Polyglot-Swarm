@@ -9,6 +9,8 @@ a client-supplied one).
 
 from __future__ import annotations
 
+import asyncio
+
 from fastapi import APIRouter, Depends
 
 from src.api.deps import get_current_user
@@ -26,14 +28,18 @@ def export_my_data(user_id: str = Depends(get_current_user)) -> DataExportRespon
 
 
 @router.delete("/data", response_model=DataDeletionResponse)
-def delete_my_data(user_id: str = Depends(get_current_user)) -> DataDeletionResponse:
+async def delete_my_data(user_id: str = Depends(get_current_user)) -> DataDeletionResponse:
     """Permanently delete every stored record for the authenticated user.
 
     Irreversible: this also invalidates the caller's own bearer token (the
     account row and every token for it are removed), so the request that
     triggers this is the last authenticated request that account can make.
+    The user's running turns and analyses are stopped first, so none of them
+    writes data back after the deletion.
     """
+    from src.api import sessions
     from src.memory.privacy import delete_user_data
 
-    result = delete_user_data(user_id)
+    await sessions.stop_for_user(user_id)
+    result = await asyncio.to_thread(delete_user_data, user_id)
     return DataDeletionResponse(deleted=result)

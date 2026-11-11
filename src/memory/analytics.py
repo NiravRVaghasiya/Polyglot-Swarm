@@ -75,9 +75,6 @@ def record_error(
 ) -> dict[str, Any]:
     """Record one occurrence of a grammar error type, incrementing frequency.
 
-    Re-occurring after being marked mastered resets the mastery flag, since the
-    learner is evidently still making the mistake.
-
     Returns the resulting error-pattern row.
     """
     init_db()
@@ -103,32 +100,9 @@ def record_error(
     return dict(row)
 
 
-def mark_mastered(
-    user_id: str,
-    language: str,
-    error_type: str,
-    *,
-    mastered_at: str | None = None,
-) -> None:
-    """Mark an error pattern as mastered (learner no longer makes it)."""
-    init_db()
-    when = mastered_at or _now()
-    with get_connection() as conn:
-        conn.execute(
-            """
-            UPDATE error_patterns
-            SET mastered = 1, mastered_date = ?
-            WHERE user_id=? AND language=? AND error_type=?
-            """,
-            (when, user_id, language, error_type),
-        )
-
-
 def get_error_patterns(
     user_id: str,
     language: str | None = None,
-    *,
-    include_mastered: bool = True,
 ) -> list[dict[str, Any]]:
     """Return a user's error patterns, most frequent first."""
     init_db()
@@ -137,8 +111,6 @@ def get_error_patterns(
     if language is not None:
         clauses.append("language = ?")
         params.append(language)
-    if not include_mastered:
-        clauses.append("mastered = 0")
 
     where = " AND ".join(clauses)
     with get_connection() as conn:
@@ -156,8 +128,8 @@ def top_weaknesses(
     *,
     limit: int = 5,
 ) -> list[str]:
-    """Return the error_type names of a user's top unmastered weaknesses."""
-    patterns = get_error_patterns(user_id, language, include_mastered=False)
+    """Return the error_type names of a user's most frequent errors."""
+    patterns = get_error_patterns(user_id, language)
     return [p["error_type"] for p in patterns[:limit]]
 
 

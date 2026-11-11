@@ -314,3 +314,52 @@ async def test_five_turns_record_the_same_evidence_and_report_as_the_synchronous
     assert async_result["report"] == sync_result["report"]
     for key in ("grammar_errors", "new_vocabulary", "cultural_notes", "cefr_level", "turn_count"):
         assert async_state[key] == sync_state[key], key
+
+
+def _snapshot_rows(user_id: str) -> int:
+    from src.memory.db import get_connection
+
+    with get_connection() as conn:
+        return int(
+            conn.execute(
+                "SELECT COUNT(*) FROM active_sessions WHERE user_id = ?", (user_id,)
+            ).fetchone()[0]
+        )
+
+
+class TestDeletionDuringAnalysis:
+    async def test_deleting_the_account_stops_the_analysis_and_nothing_comes_back(self, api, gate):
+        from src.api import sessions
+        from src.memory import user_profile
+
+        client, headers, user_id = api
+        sid = await _start(client, headers)
+        await _chat(client, headers, sid, "hola t1")
+        task = sessions._pending[(user_id, sid)]
+
+        resp = await client.delete("/api/v1/privacy/data", headers=headers)
+        assert resp.status_code == 200, resp.text
+        gate.set()
+        await asyncio.sleep(0.2)
+
+        assert task.cancelled()
+        assert _snapshot_rows(user_id) == 0
+        assert not user_profile.profile_exists(user_id)
+        # The idle-session recovery has nothing to finalize for the user.
+        outcome = await sessions.recover_idle_sessions(idle_hours=0)
+        assert outcome["finalized"] == 0 and _snapshot_rows(user_id) == 0
+
+    def test_a_late_snapshot_does_not_recreate_a_deleted_session(self, temp_storage):
+        from src.api import sessions
+        from src.memory import schema
+        from src.orchestrator.lifecycle import build_initial_state
+
+        schema.init_all()
+        sessions.reset()
+        state = build_initial_state("u-late", "Spanish", session_id="s-late")
+        sessions.register_session("u-late", state)
+        assert _snapshot_rows("u-late") == 1
+
+        sessions.delete_for_user("u-late")
+        sessions.persist_snapshot(state)  # a turn that finished after the deletion
+        assert _snapshot_rows("u-late") == 0

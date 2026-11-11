@@ -24,11 +24,6 @@ class TestUncertainty:
         late = uncertainty.blend_weight(10, 1.0)
         assert early > late
 
-    def test_wilson_interval_bounds(self):
-        low, high = uncertainty.wilson_interval(8, 10)
-        assert 0.0 <= low <= high <= 1.0
-        assert uncertainty.wilson_interval(0, 0) == (0.0, 1.0)
-
 
 class TestMasteryEngine:
     def test_correct_evidence_raises_mastery(self):

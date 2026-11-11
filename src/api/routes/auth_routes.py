@@ -56,6 +56,9 @@ def login(req: LoginRequest, request: Request) -> TokenResponse:
     """Authenticate and return a bearer token."""
     try:
         auth.login_rate_limiter.check(_client_key(request))
+        # Per account too: behind a proxy the client IP comes from a header,
+        # so the IP bucket alone cannot stop guessing one account's password.
+        auth.login_rate_limiter.check(f"account:{req.username.strip().lower()}")
     except RateLimitExceededError as exc:
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)) from exc
 

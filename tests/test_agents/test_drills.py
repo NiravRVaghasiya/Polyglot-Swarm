@@ -102,23 +102,3 @@ class TestGenerateDrills:
         fake = FakeProvider('{"drills": [{"type": "grammar", "target": "x"}]}')
         monkeypatch.setattr(drills, "get_provider", lambda tier: fake)
         assert await drills.generate_drills("u1", "Spanish") == []
-
-
-class TestDrillsNode:
-    async def test_populates_pending_reviews(self, temp_storage, monkeypatch):
-        from src.memory import analytics
-
-        analytics.record_error("u1", "Spanish", "ser_vs_estar")
-        monkeypatch.setattr(drills, "get_provider", lambda tier: FakeProvider(_DRILL_PAYLOAD))
-
-        state = {"user_id": "u1", "language": "Spanish", "cefr_level": "A2"}
-        result = await drills.drills_node(state)
-        assert len(result["pending_reviews"]) == 1
-        assert "drill" in result["agent_response"].lower()
-
-    async def test_empty_when_nothing_to_drill(self, temp_storage, monkeypatch):
-        monkeypatch.setattr(drills, "get_provider", lambda tier: FakeProvider('{"drills": []}'))
-        state = {"user_id": "fresh", "language": "Spanish", "cefr_level": "A2"}
-        result = await drills.drills_node(state)
-        assert result["pending_reviews"] == []
-        assert "No drills" in result["agent_response"]

@@ -92,7 +92,7 @@ class TestComputeMetrics:
 
 
 class TestAssessmentNode:
-    async def test_persists_cefr_to_profile(self, temp_storage, monkeypatch):
+    def test_persists_cefr_to_profile(self, temp_storage, monkeypatch):
         from src.memory import user_profile
 
         # Simulate a B1-sized vocabulary without a slow bulk insert.
@@ -106,8 +106,7 @@ class TestAssessmentNode:
             "messages": [{"role": "user", "content": long_sentence}],
             "grammar_errors": [],
         }
-        result = await assessment.assessment_node(state)
-        assert result["cefr_level"] == "B1"
+        assert assessment.update_working_level(state) == "B1"
 
         # Persisted to the profile for next session.
         profile = user_profile.load_profile("u1")

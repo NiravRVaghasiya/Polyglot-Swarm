@@ -1,4 +1,4 @@
-"""Tests for the JSON user profile store."""
+"""Tests for the user profile store."""
 
 from __future__ import annotations
 
@@ -66,9 +66,18 @@ class TestRoundTrip:
         assert load_profile("dave").interests == ["music"]
 
 
-class TestAtomicWrite:
-    def test_no_temp_files_left_behind(self, temp_storage):
+class TestLegacyJsonProfiles:
+    def test_saving_writes_no_json_file(self, temp_storage):
         create_profile("erin")
-        profiles = list((temp_storage / "user_profiles").iterdir())
-        # Only the final JSON file should remain — no .tmp leftovers.
-        assert [p.name for p in profiles] == ["erin.json"]
+        assert not (temp_storage / "user_profiles" / "erin.json").exists()
+
+    def test_a_legacy_json_profile_still_loads_and_is_back_filled(self, temp_storage):
+        from src.memory import profiles_db
+
+        folder = temp_storage / "user_profiles"
+        folder.mkdir(parents=True, exist_ok=True)
+        (folder / "old.json").write_text(
+            UserProfile(user_id="old", goals=["travel"]).model_dump_json(), encoding="utf-8"
+        )
+        assert load_profile("old").goals == ["travel"]
+        assert profiles_db.get("old") is not None

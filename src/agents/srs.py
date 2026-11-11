@@ -18,10 +18,11 @@ from typing import Any
 
 from fsrs import Card, Rating, Scheduler
 
+from src.config import settings
 from src.orchestrator.state import LearnerState
 
 # Default scheduler; parameters can be personalized per-user with enough data.
-scheduler = Scheduler()
+scheduler = Scheduler(desired_retention=settings.fsrs_desired_retention)
 
 _RATING_MAP = {
     1: Rating.Again,

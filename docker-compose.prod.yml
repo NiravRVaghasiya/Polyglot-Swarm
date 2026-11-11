@@ -40,9 +40,14 @@ x-app: &app
 services:
   api:
     <<: *app
+    # Trust X-Forwarded-For only from the host's reverse proxy, which reaches
+    # this 127.0.0.1-bound port through Docker's bridge (172.16.0.0/12). With
+    # `*` uvicorn takes the client-supplied first entry, so the per-IP login
+    # limit could be dodged. Another proxy address: set FORWARDED_ALLOW_IPS.
     command: >-
       uvicorn src.api.app:app --host 0.0.0.0 --port 8000 --workers 1
-      --proxy-headers --forwarded-allow-ips=* --timeout-graceful-shutdown 30
+      --proxy-headers --forwarded-allow-ips=${FORWARDED_ALLOW_IPS:-127.0.0.1,172.16.0.0/12}
+      --timeout-graceful-shutdown 30
     ports:
       - "127.0.0.1:8000:8000"
     deploy:

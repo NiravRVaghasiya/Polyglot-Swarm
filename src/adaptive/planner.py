@@ -84,7 +84,7 @@ from src.adaptive.memory import (
     replay_memory,
 )
 from src.adaptive.snapshot import CatalogObjective, LearnerSnapshot
-from src.evidence.difficulty import CEFR_ORDER
+from src.learner.cefr_bands import CEFR_ORDER
 from src.learner.estimation import EvidenceStatus, status_rank
 
 ENGINE = "adaptive-nba-v1"
@@ -311,7 +311,7 @@ def _level_index(cefr: str | None) -> int:
 
 
 def _importance(skill: str, cefr: str | None, constraints: PlanConstraints, target: str) -> float:
-    weight = GOAL_SKILL_WEIGHTS.get(constraints.goal, {}).get(skill, 1.0) / 1.5
+    weight = constraints.skill_weight(skill) / 1.5
     beyond = _level_index(cefr) - _level_index(target)
     level = 1.0 if beyond <= 0 else (0.5 if beyond == 1 else 0.2)
     return _clip(weight * level)

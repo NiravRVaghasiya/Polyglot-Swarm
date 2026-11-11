@@ -41,15 +41,9 @@ from src.adaptive.learner_model import (
 )
 from src.learner.estimation import EvidenceMasteryEngine
 from src.learner.mastery_engine import MasteryEngine, SkillBelief
+from src.util import sigmoid
 
 _SIGNAL = {"correct": 1.0, "incorrect": 0.0}
-
-
-def _sigmoid(x: float) -> float:
-    if x >= 0:
-        return 1.0 / (1.0 + math.exp(-x))
-    e = math.exp(x)
-    return e / (1.0 + e)
 
 
 def outcome(row: dict[str, Any]) -> float | None:
@@ -113,7 +107,7 @@ class _RaschLearner:
             self._cache = {key: self.engine.estimate_all(rows).get(skill)}
         est = self._cache[key]
         theta = 0.0 if est is None or est.ability is None else est.ability
-        return _sigmoid(theta - difficulty_logit(row.get("difficulty")))
+        return sigmoid(theta - difficulty_logit(row.get("difficulty")))
 
     def observe(self, row: dict[str, Any]) -> None:
         self.history.append(row)
@@ -330,7 +324,7 @@ class _EloLearner:
 
     def predict(self, row: dict[str, Any]) -> float:
         skill = str(row["skill"])
-        return _sigmoid(self.theta.get(skill, 0.0) + self.sub.get(_kc(row), 0.0) - self._b(row))
+        return sigmoid(self.theta.get(skill, 0.0) + self.sub.get(_kc(row), 0.0) - self._b(row))
 
     def observe(self, row: dict[str, Any]) -> None:
         y = outcome(row)

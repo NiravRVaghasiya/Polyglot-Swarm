@@ -16,9 +16,8 @@ from __future__ import annotations
 from typing import Any
 
 from src.agents.difficulty_signals import assess_difficulty, combine, extract_signals
+from src.learner.cefr_bands import CEFR_ORDER
 from src.orchestrator.state import LearnerState
-
-CEFR_ORDER = ["A1", "A2", "B1", "B2", "C1", "C2"]
 
 # How the Conversation Agent should behave at each level.
 _LEVEL_GUIDANCE = {

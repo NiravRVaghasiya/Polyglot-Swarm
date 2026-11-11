@@ -34,15 +34,3 @@ async def build_async_checkpointer() -> Any:
     saver = AsyncSqliteSaver(conn)
     await saver.setup()
     return saver
-
-
-def build_sync_checkpointer() -> Any:
-    """Build and set up a synchronous :class:`SqliteSaver` at ``settings.db_path``."""
-    import sqlite3
-
-    from langgraph.checkpoint.sqlite import SqliteSaver
-
-    conn = sqlite3.connect(str(_db_path()), check_same_thread=False)
-    saver = SqliteSaver(conn)
-    saver.setup()
-    return saver

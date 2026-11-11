@@ -12,7 +12,6 @@ for proportions. Spearman correlations use average ranks for ties.
 from __future__ import annotations
 
 import math
-import random
 from collections.abc import Callable, Sequence
 from typing import Any
 
@@ -548,9 +547,3 @@ def analyse_synthetic(records: list[dict[str, Any]]) -> dict[str, Any]:
         "latency_ms_p90": percentile(lat, 0.9),
     }
     return out
-
-
-def shuffle_seeded(xs: list[Any]) -> list[Any]:
-    ys = xs[:]
-    random.Random(SEED).shuffle(ys)
-    return ys

@@ -125,7 +125,7 @@ Type `quit` in the terminal chat to end the session and see your report. Run `po
 | Ollama: model `llama3.1:8b` not found | Run `ollama pull llama3.1:8b`, or set `LLM_LOCAL=ollama/<model>` to one from `ollama list`. |
 | Ollama: out of memory | Set `OLLAMA_NUM_CTX=4096`, or use a smaller model (`ollama pull llama3.2:3b`, then `LLM_LOCAL=ollama/llama3.2:3b`). |
 | React dashboard can't reach the server | Start the REST API on port 8000. Serving the dashboard from another address? Add it to `CORS_ORIGINS`. |
-| "Address already in use" | Change `API_PORT` / `GRADIO_SERVER_PORT` in `.env`, or pass `--port 8001` to `uvicorn`. |
+| "Address already in use" | Pass `--port 8001` to `uvicorn`, or change `GRADIO_SERVER_PORT` in `.env` for the web app. |
 | Microphone or spoken replies don't work | Install the voice extra, `python -m pip install -e ".[voice]"`, plus [ffmpeg](https://ffmpeg.org/download.html). |
 
 Every setting is documented in [`.env.example`](.env.example).

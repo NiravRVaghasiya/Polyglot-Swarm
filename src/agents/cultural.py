@@ -26,6 +26,7 @@ from src.evaluation.policies import ABSTAIN_THRESHOLD
 from src.llm.factory import get_provider
 from src.llm.prompts import render_prompt
 from src.llm.provider import Message
+from src.llm.schemas import strip_code_fences
 from src.orchestrator.state import LearnerState
 
 logger = logging.getLogger("polyglot.cultural")
@@ -99,13 +100,7 @@ def _select_confident_notes(notes: list[dict[str, Any]]) -> list[dict[str, Any]]
 def _parse_cultural_response(response_text: str) -> list[dict[str, Any]]:
     """Parse the LLM JSON response into a list of cultural note dicts."""
     try:
-        text = response_text.strip()
-        if text.startswith("```"):
-            text = text.split("```")[1]
-            if text.startswith("json"):
-                text = text[4:]
-
-        data = json.loads(text)
+        data = json.loads(strip_code_fences(response_text))
         notes = data.get("notes", [])
         parsed: list[dict[str, Any]] = []
         for n in notes:

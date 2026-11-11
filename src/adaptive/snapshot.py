@@ -144,7 +144,7 @@ def snapshot_from_store(
 
 def _target_from_profile(user_id: str, language: str) -> str:
     """One CEFR level above the learner's working level (default B1)."""
-    from src.evidence.difficulty import CEFR_ORDER
+    from src.learner.cefr_bands import CEFR_ORDER
 
     try:
         from src.memory import user_profile

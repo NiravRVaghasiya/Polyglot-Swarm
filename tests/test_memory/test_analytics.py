@@ -25,30 +25,6 @@ class TestErrorPatterns:
         u1_es = analytics.get_error_patterns("u1", "Spanish")
         assert {p["error_type"] for p in u1_es} == {"ser_vs_estar", "gender_agreement"}
 
-    def test_mark_mastered(self, temp_storage):
-        analytics.record_error("u1", "Spanish", "ser_vs_estar")
-        analytics.mark_mastered("u1", "Spanish", "ser_vs_estar")
-
-        patterns = analytics.get_error_patterns("u1", "Spanish")
-        assert patterns[0]["mastered"] == 1
-        assert patterns[0]["mastered_date"] is not None
-
-    def test_reoccurrence_resets_mastery(self, temp_storage):
-        analytics.record_error("u1", "Spanish", "ser_vs_estar")
-        analytics.mark_mastered("u1", "Spanish", "ser_vs_estar")
-        # Learner makes the mistake again -> no longer mastered.
-        row = analytics.record_error("u1", "Spanish", "ser_vs_estar")
-        assert row["mastered"] == 0
-        assert row["mastered_date"] is None
-
-    def test_include_mastered_filter(self, temp_storage):
-        analytics.record_error("u1", "Spanish", "mastered_one")
-        analytics.record_error("u1", "Spanish", "active_one")
-        analytics.mark_mastered("u1", "Spanish", "mastered_one")
-
-        active = analytics.get_error_patterns("u1", "Spanish", include_mastered=False)
-        assert {p["error_type"] for p in active} == {"active_one"}
-
     def test_ordered_by_frequency(self, temp_storage):
         for _ in range(3):
             analytics.record_error("u1", "Spanish", "frequent")
@@ -57,12 +33,10 @@ class TestErrorPatterns:
         patterns = analytics.get_error_patterns("u1", "Spanish")
         assert patterns[0]["error_type"] == "frequent"
 
-    def test_top_weaknesses_excludes_mastered(self, temp_storage):
+    def test_top_weaknesses_most_frequent_first(self, temp_storage):
         for _ in range(5):
             analytics.record_error("u1", "Spanish", "big_problem")
         analytics.record_error("u1", "Spanish", "small_problem")
-        analytics.record_error("u1", "Spanish", "solved")
-        analytics.mark_mastered("u1", "Spanish", "solved")
 
         top = analytics.top_weaknesses("u1", "Spanish", limit=2)
         assert top == ["big_problem", "small_problem"]

@@ -71,7 +71,7 @@ from src.adaptive.memory import live_retrievability, rating_for
 from src.adaptive.planner import PlannerConfig, Recommendation
 from src.adaptive.planner import plan as adaptive_plan
 from src.adaptive.snapshot import CatalogObjective, LearnerSnapshot
-from src.evidence.difficulty import CEFR_ORDER
+from src.learner.cefr_bands import CEFR_ORDER
 
 POLICIES = ("static", "adaptive", "adaptive_predictive", "adaptive_full")
 #: Policy every other one is compared against, paired per learner. Until the

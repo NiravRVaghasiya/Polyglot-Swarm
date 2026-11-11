@@ -28,8 +28,8 @@ class TestRegistryIntegrity:
             assert spec.version >= 1
 
     def test_core_agent_prompts_are_registered(self):
-        # The four prompts migrated from inline string constants in Gate B.
-        for name in ("conversation", "grammar", "vocabulary", "review"):
+        # The prompts migrated from inline string constants in Gate B.
+        for name in ("conversation", "grammar", "vocabulary"):
             assert name in PROMPT_REGISTRY
 
     def test_previously_templated_prompts_are_registered(self):
@@ -69,14 +69,13 @@ class TestRenderPrompt:
 
     def test_defaults_to_current_version(self):
         rendered = render_prompt(
-            "review",
+            "vocabulary",
             language="Polish",
-            word="dom",
-            translation="house",
-            context="",
-            scenario_hint="",
+            cefr_level="A1",
+            user_text="dom",
+            agent_text="dom",
         )
-        assert rendered.version == PROMPT_REGISTRY["review"].version
+        assert rendered.version == PROMPT_REGISTRY["vocabulary"].version
 
     def test_unknown_prompt_raises(self):
         with pytest.raises(UnknownPromptError):

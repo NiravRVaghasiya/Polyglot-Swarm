@@ -22,7 +22,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, TypeVar
 
@@ -285,8 +284,3 @@ def leakage_report(task: str, version: str | None = None) -> dict[str, list[str]
         "shared_texts": sorted(texts(dev) & texts(test)),
         "in_prompts": sorted(t for t in texts(test) if t in prompts),
     }
-
-
-def manifest_age() -> str:
-    """Timestamp helper for reports (UTC ISO-8601)."""
-    return datetime.now(UTC).isoformat()
