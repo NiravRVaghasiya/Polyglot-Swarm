@@ -192,6 +192,7 @@ Adding a language pack is data, not code: see [language packs](docs/language-pac
 | `polyglot experiment` | Run controlled comparisons between variants |
 | `polyglot privacy` | Export or delete your data |
 | `polyglot security` | Backups and the audit log |
+| `polyglot ops` | Server operations: verified backups, restore, maintenance, database and config checks ([runbook](docs/production/operations-runbook.md)) |
 | `polyglot results` | Regenerate the measured results |
 
 Add `--help` to any command for its options.
@@ -218,12 +219,12 @@ Add `--help` to any command for its options.
 ## Development
 
 ```bash
-make check     # lint + format check + type check + tests (same as CI)
+make check     # lint + format check + type check + tests
 make test      # tests only: offline, no API keys needed
 make results   # rerun benchmarks and evaluations into docs/results.md
 ```
 
-Tests run fully offline: an offline demo mode swaps every AI call for a predictable fake.
+Tests run fully offline: an offline demo mode swaps every AI call for a predictable fake. CI runs `make check` plus the benchmarks, evaluations, strict type checks on `evals/`, a secret and dependency scan, and a Docker build; see [`ci.yml`](.github/workflows/ci.yml).
 
 <details>
 <summary><b>Windows without <code>make</code></b></summary>
