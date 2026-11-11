@@ -107,6 +107,9 @@ class Settings(BaseSettings):
     local_only: bool = False
 
     # Server
+    #: Not read by anything (uvicorn takes --host/--port). Kept only so .env
+    #: files from older versions, which set them, still load: .env rejects
+    #: unknown keys.
     api_host: str = "0.0.0.0"
     api_port: int = 8000
     gradio_server_port: int = 7860

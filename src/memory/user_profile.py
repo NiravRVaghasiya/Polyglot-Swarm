@@ -1,27 +1,20 @@
-"""User profile store — per-user JSON persistence.
+"""User profile store.
 
-Each learner has a profile stored as ``{profiles_dir}/{user_id}.json`` holding
-their native language, target languages, per-language CEFR level, goals,
-interests, and preferences. Profiles are local-first and human-readable.
-
-The store is intentionally simple (one JSON file per user) since the MVP is
-single-user-per-process; the schema carries ``user_id`` so the same code scales
-to multi-user once auth is added in the API phase.
+Each learner has a profile holding their native language, target languages,
+per-language CEFR level, goals, interests, and preferences. It is stored in
+SQLite (:mod:`src.memory.profiles_db`). Older versions also wrote
+``{profiles_dir}/{user_id}.json``; such a file is still read when no SQLite
+row exists, and removed when the profile is deleted.
 """
 
 from __future__ import annotations
 
 import json
-import os
-import tempfile
 from pathlib import Path
 
 from pydantic import BaseModel, Field
 
 from src.config import settings
-
-# CEFR levels, ordered. Used as the value type for per-language proficiency.
-CEFR_LEVELS = ("A1", "A2", "B1", "B2", "C1", "C2")
 
 #: The band the tutor pitches its language at before anything is known about
 #: the learner. It is an *instructional* default for prompts only: it is never
@@ -90,7 +83,8 @@ def load_profile(user_id: str) -> UserProfile:
     """Load a user's profile, returning a default if none exists yet.
 
     SQLite is the source of truth (Phase 2): if a row exists it wins. Otherwise
-    the JSON mirror is used (and back-filled into SQLite for consistency).
+    a JSON file written by an older version is used (and back-filled into
+    SQLite).
     Loading a missing profile never raises — it returns a sensible default so
     first-time users get a working session without a separate signup step.
     """
@@ -115,32 +109,10 @@ def load_profile(user_id: str) -> UserProfile:
 
 
 def save_profile(profile: UserProfile) -> UserProfile:
-    """Persist a profile to disk atomically and return it.
-
-    The write goes to a temp file in the same directory, then is atomically
-    renamed into place so a crash mid-write cannot corrupt an existing profile.
-    """
-    directory = _profiles_dir()
-    path = _profile_path(profile.user_id)
-    payload = profile.model_dump_json(indent=2)
-
-    fd, tmp_name = tempfile.mkstemp(dir=directory, suffix=".tmp")
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as handle:
-            handle.write(payload)
-        os.replace(tmp_name, path)
-    except BaseException:
-        # Clean up the temp file on any failure so we don't leak partial writes.
-        if os.path.exists(tmp_name):
-            os.unlink(tmp_name)
-        raise
-
-    # Write through to the SQLite source of truth. The JSON file remains a
-    # human-readable mirror; SQLite is authoritative for reads.
+    """Persist a profile to SQLite (the only store written) and return it."""
     from src.memory import profiles_db
 
     profiles_db.save(profile.model_dump())
-
     return profile
 
 
@@ -160,11 +132,9 @@ def update_profile(user_id: str, **fields: object) -> UserProfile:
 
 
 def delete_profile(user_id: str) -> None:
-    """Delete a user's profile: the SQLite row and its JSON mirror (Phase 21).
+    """Delete a user's profile: the SQLite row and any legacy JSON file (Phase 21).
 
-    Both stores are written on every save (see :func:`save_profile`), so both
-    must be removed for a complete deletion; a no-op (not an error) if either
-    is already absent.
+    A no-op (not an error) if either is already absent.
     """
     from src.memory import profiles_db
 

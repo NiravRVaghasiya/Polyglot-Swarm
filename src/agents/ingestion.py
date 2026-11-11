@@ -20,6 +20,7 @@ from typing import Any
 from src.llm.factory import get_provider
 from src.llm.prompts import render_prompt
 from src.llm.provider import Message
+from src.llm.schemas import strip_code_fences
 
 logger = logging.getLogger("polyglot.ingestion")
 
@@ -79,12 +80,7 @@ async def simplify_and_extract(
 def _parse_ingestion(response_text: str) -> dict[str, Any]:
     """Parse the ingestion JSON, tolerating code fences."""
     try:
-        text = response_text.strip()
-        if text.startswith("```"):
-            text = text.split("```")[1]
-            if text.startswith("json"):
-                text = text[4:]
-        data = json.loads(text)
+        data = json.loads(strip_code_fences(response_text))
         vocab = [
             {
                 "word": v.get("word", ""),

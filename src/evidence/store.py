@@ -59,11 +59,6 @@ _COLUMNS = (
 )
 
 
-def record_event(event: LearningEvent) -> None:
-    """Persist a single evidence event (idempotent on ``event_id``)."""
-    record_events([event])
-
-
 def record_events(events: list[LearningEvent]) -> int:
     """Persist a batch of events. Returns the number newly inserted.
 

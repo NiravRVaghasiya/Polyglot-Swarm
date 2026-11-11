@@ -13,6 +13,7 @@ from typing import Any
 from src.llm.factory import get_provider
 from src.llm.prompts import render_prompt
 from src.llm.provider import Message
+from src.llm.schemas import strip_code_fences
 from src.orchestrator.state import LearnerState, VocabularyItem
 
 logger = logging.getLogger("polyglot.vocabulary")
@@ -94,13 +95,7 @@ def _parse_vocabulary_response(response_text: str) -> list[VocabularyItem]:
     import json
 
     try:
-        text = response_text.strip()
-        if text.startswith("```"):
-            text = text.split("```")[1]
-            if text.startswith("json"):
-                text = text[4:]
-
-        data = json.loads(text)
+        data = json.loads(strip_code_fences(response_text))
         # A model may answer with a bare list or with non-object items; the
         # contract is {"words": [{...}]}, so anything else yields no words
         # rather than an AttributeError that would break the turn.

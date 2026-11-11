@@ -12,7 +12,6 @@ from src.memory import (
     profiles_db,
     schema,
     sessions,
-    skill_state,
     user_profile,
 )
 
@@ -131,17 +130,6 @@ class TestSessions:
         resumable = sessions.latest_resumable("u1", "Spanish")
         assert resumable is not None
         assert resumable["session_id"] == "s2"
-
-
-class TestSkillState:
-    def test_upsert_and_get(self, temp_storage):
-        skill_state.upsert_skill("u1", "Spanish", "grammar", mastery=0.52, uncertainty=0.1)
-        skills = skill_state.get_skills("u1", "Spanish")
-        assert skills["grammar"]["mastery"] == 0.52
-
-    def test_mastery_clamped(self, temp_storage):
-        row = skill_state.upsert_skill("u1", "Spanish", "speaking", mastery=1.5)
-        assert row["mastery"] == 1.0
 
 
 class TestAssessments:

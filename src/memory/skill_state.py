@@ -28,40 +28,6 @@ SKILLS = (
 )
 
 
-def upsert_skill(
-    user_id: str,
-    language: str,
-    skill: str,
-    *,
-    mastery: float,
-    uncertainty: float = 0.5,
-    sample_size: int = 0,
-) -> dict[str, Any]:
-    """Insert or replace a skill's current belief. Returns the resulting row."""
-    init_all()
-    mastery = max(0.0, min(1.0, mastery))
-    uncertainty = max(0.0, min(1.0, uncertainty))
-    with get_connection() as conn:
-        conn.execute(
-            """
-            INSERT INTO skill_states (user_id, language, skill, mastery, uncertainty,
-                                      sample_size, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(user_id, language, skill) DO UPDATE SET
-                mastery = excluded.mastery,
-                uncertainty = excluded.uncertainty,
-                sample_size = excluded.sample_size,
-                updated_at = excluded.updated_at
-            """,
-            (user_id, language, skill, mastery, uncertainty, sample_size, _now()),
-        )
-        row = conn.execute(
-            "SELECT * FROM skill_states WHERE user_id=? AND language=? AND skill=?",
-            (user_id, language, skill),
-        ).fetchone()
-    return dict(row)
-
-
 def get_skills(user_id: str, language: str) -> dict[str, dict[str, Any]]:
     """Return all skill beliefs for a user/language, keyed by skill name."""
     init_all()

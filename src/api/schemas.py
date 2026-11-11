@@ -145,9 +145,9 @@ class ReviewSubmitRequest(BaseModel):
 class TranscribeRequest(BaseModel):
     #: Base64-encoded audio (the browser's recorded blob).
     audio_base64: str
-    #: File extension/format hint for the temp file Whisper reads (e.g. "webm",
-    #: "wav", "ogg"). Defaults to wav.
-    audio_format: str = "wav"
+    #: File extension/format hint for the temp file Whisper reads. Defaults to
+    #: wav. A fixed list: it becomes part of a file name.
+    audio_format: Literal["wav", "webm", "ogg", "mp3", "m4a", "mp4", "flac"] = "wav"
     #: Free-form language name to hint the transcriber (optional).
     language: str | None = None
 
@@ -157,7 +157,8 @@ class TranscribeResponse(BaseModel):
 
 
 class TtsRequest(BaseModel):
-    text: str
+    #: Far beyond one tutor reply; stops one request sending a huge text to Edge TTS.
+    text: str = Field(max_length=5000)
     language: str | None = None
 
 

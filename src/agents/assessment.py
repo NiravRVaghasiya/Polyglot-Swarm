@@ -27,10 +27,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from src.learner.cefr_bands import CEFR_ORDER
 from src.memory import analytics, user_profile, vocabulary_db
 from src.orchestrator.state import LearnerState
-
-CEFR_ORDER = ["A1", "A2", "B1", "B2", "C1", "C2"]
 
 # (max_vocab_exclusive, level) — first bucket whose bound the vocab is under.
 _VOCAB_BANDS = [
@@ -170,16 +169,3 @@ def persist_evidence_profile(user_id: str, language: str) -> None:
         import logging
 
         logging.getLogger("polyglot.assessment").warning("CEFR profile failed: %s", exc)
-
-
-async def assessment_node(state: LearnerState) -> dict[str, str]:
-    """Update the working level and persist the evidence-backed CEFR profile.
-
-    Returns a state update with the (possibly changed) ``cefr_level`` — the
-    tutor's working level. The multidimensional profile (Phase 12, ADR-0031)
-    is persisted alongside; it has no default level and may report
-    ``insufficient_evidence``.
-    """
-    new_level = update_working_level(state)
-    persist_evidence_profile(state["user_id"], state["language"])
-    return {"cefr_level": new_level}

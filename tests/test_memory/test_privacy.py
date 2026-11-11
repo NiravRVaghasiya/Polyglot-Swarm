@@ -8,21 +8,33 @@ from src.memory import (
     collocations,
     experiments,
     privacy,
+    schema,
     session_history,
     skill_state,
     user_profile,
     vocabulary_db,
 )
+from src.memory.db import get_connection
 
 
 def _seed_user(user_id: str) -> None:
     user_profile.create_profile(user_id, target_languages=["Spanish"])
     vocabulary_db.upsert_word(user_id, "Spanish", "mesa", translation="table")
-    collocations.upsert_collocation(user_id, "Spanish", "tomar una decisión")
+    schema.init_all()
+    with get_connection() as conn:  # rows no current code path writes
+        conn.execute(
+            "INSERT INTO collocations (user_id, language, phrase, created_at, updated_at) "
+            "VALUES (?, 'Spanish', 'tomar una decisión', '', '')",
+            (user_id,),
+        )
+        conn.execute(
+            "INSERT INTO skill_states (user_id, language, skill, mastery, uncertainty, "
+            "sample_size, updated_at) VALUES (?, 'Spanish', 'grammar', 0.5, 0.5, 0, '')",
+            (user_id,),
+        )
     session_history.record_turn("s1", user_id, "Spanish", role="user", content="Hola")
     analytics.record_error(user_id, "Spanish", "ser_vs_estar")
     analytics.log_session(user_id, "Spanish")
-    skill_state.upsert_skill(user_id, "Spanish", "grammar", mastery=0.5)
 
 
 class TestExportUserData:

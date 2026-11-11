@@ -8,8 +8,6 @@ so the mastery engine, assessment, and UI agree on what uncertainty means.
 
 from __future__ import annotations
 
-import math
-
 # With this many (confidence-weighted) observations, uncertainty is ~halved
 # relative to the prior. A gentle curve: informative but not overconfident.
 _HALF_LIFE = 5.0
@@ -37,18 +35,3 @@ def blend_weight(prior_n: float, new_confidence: float) -> float:
     """
     prior_n = max(0.0, prior_n)
     return max(0.0, min(1.0, new_confidence / (prior_n + 1.0)))
-
-
-def wilson_interval(successes: float, n: float, z: float = 1.96) -> tuple[float, float]:
-    """Wilson score interval for a proportion — a calibrated CI for mastery.
-
-    Useful where a proportion (e.g. correct/total) is the natural estimate.
-    Returns (low, high) clamped to [0, 1]. Returns (0, 1) for ``n <= 0``.
-    """
-    if n <= 0:
-        return (0.0, 1.0)
-    phat = successes / n
-    denom = 1 + z * z / n
-    center = (phat + z * z / (2 * n)) / denom
-    margin = (z * math.sqrt((phat * (1 - phat) + z * z / (4 * n)) / n)) / denom
-    return (max(0.0, center - margin), min(1.0, center + margin))

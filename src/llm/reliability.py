@@ -19,6 +19,8 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 
+from src.config import settings
+
 
 @dataclass
 class _BreakerState:
@@ -155,7 +157,10 @@ def _http_status(exc: BaseException) -> int | None:
 #: RoutingProvider (and fresh concrete provider instances) on every call —
 #: only a state keyed by the stable provider *name* and living outside any
 #: single RoutingProvider instance can remember failures across calls.
-default_circuit_breaker = CircuitBreaker()
+default_circuit_breaker = CircuitBreaker(
+    failure_threshold=settings.llm_circuit_breaker_failure_threshold,
+    cooldown_seconds=settings.llm_circuit_breaker_cooldown_seconds,
+)
 
 
 __all__ = [

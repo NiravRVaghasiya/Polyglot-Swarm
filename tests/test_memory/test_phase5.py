@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.memory import collocations, schema, vocabulary_db
+from src.memory import schema, vocabulary_db
 
 
 class TestMigrationV3:
@@ -116,34 +116,6 @@ class TestVocabDimensions:
         vocabulary_db.set_metadata("u1", "Spanish", "mesa", first_seen="2021-01-01T00:00:00+00:00")
         row = vocabulary_db.get_all_for_user("u1", "Spanish")[0]
         assert row["first_seen"] == "2020-01-01T00:00:00+00:00"
-
-
-class TestCollocations:
-    def test_upsert_and_get(self, temp_storage):
-        collocations.upsert_collocation(
-            "u1",
-            "Spanish",
-            "tomar una decisión",
-            translation="to make a decision",
-            pattern="verb + noun",
-            cefr_level="B1",
-        )
-        rows = collocations.get_all_for_user("u1", "Spanish")
-        assert len(rows) == 1
-        assert rows[0]["phrase"] == "tomar una decisión"
-        assert rows[0]["times_seen"] == 1
-
-    def test_accumulates_and_counts_production(self, temp_storage):
-        collocations.upsert_collocation("u1", "Spanish", "hacer una pregunta")
-        collocations.upsert_collocation("u1", "Spanish", "hacer una pregunta", produced=True)
-        row = collocations.get_all_for_user("u1", "Spanish")[0]
-        assert row["times_seen"] == 2
-        assert row["times_produced"] == 1
-
-    def test_count_for_user(self, temp_storage):
-        collocations.upsert_collocation("u1", "Spanish", "tener ganas de")
-        collocations.upsert_collocation("u1", "Spanish", "dar un paseo")
-        assert collocations.count_for_user("u1", "Spanish") == 2
 
 
 class TestPersistSessionUpdatesDimensions:

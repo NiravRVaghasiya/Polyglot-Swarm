@@ -25,6 +25,7 @@ from src.evaluation.policies import is_high_impact
 from src.llm.factory import get_provider
 from src.llm.prompts import render_prompt
 from src.llm.provider import Message, Tier
+from src.llm.schemas import strip_code_fences
 from src.orchestrator.state import LearnerState
 
 logger = logging.getLogger("polyglot.evaluator")
@@ -164,12 +165,7 @@ def _valid_override_indices(raw: Any, count: int) -> set[int]:
 def _parse_evaluation(response_text: str) -> dict[str, Any]:
     """Parse the evaluator LLM JSON response, tolerating code fences."""
     try:
-        text = response_text.strip()
-        if text.startswith("```"):
-            text = text.split("```")[1]
-            if text.startswith("json"):
-                text = text[4:]
-        data = json.loads(text)
+        data = json.loads(strip_code_fences(response_text))
         if not isinstance(data, dict):
             return {"overrides": [], "adjustments": {}, "notes": []}
         return data

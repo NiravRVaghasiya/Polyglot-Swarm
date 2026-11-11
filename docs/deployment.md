@@ -91,8 +91,9 @@ Notable groups:
 - **Logging**: `LOG_LEVEL` (default `INFO`), `LOG_FORMAT` (`text` for local
   dev, `json` for a log aggregator).
 - **Storage**: `DATA_DIR`, `DB_PATH`, `CHROMA_PATH`, `PROFILES_DIR`.
-- **Server**: `API_HOST`, `API_PORT`, `GRADIO_SERVER_PORT`, `CORS_ORIGINS`
+- **Server**: `GRADIO_SERVER_PORT`, `CORS_ORIGINS`
   (browser origins allowed to call the API; defaults to the React dev server).
+  The API's host and port are uvicorn's `--host`/`--port` flags.
 - **Security**: `TOKEN_TTL_HOURS`, `TELEMETRY_ENABLED`, `MIN_PASSWORD_LENGTH`,
   `METRICS_TOKEN`, `GRADIO_AUTH`.
 - **Production controls** (ADR-0035):

@@ -42,7 +42,7 @@ from src.adaptive.learner_model import LearnerEstimates, SubskillModel
 from src.adaptive.memory import MemoryState, replay_memory
 from src.adaptive.planner import MASTERED_PROBABILITY, WEAK_PROBABILITY, _recent_share
 from src.adaptive.snapshot import CatalogObjective, LearnerSnapshot
-from src.evidence.difficulty import CEFR_ORDER
+from src.learner.cefr_bands import CEFR_ORDER
 from src.learner.estimation import EvidenceStatus
 
 PATH_VERSION = "adaptive-path-v1"

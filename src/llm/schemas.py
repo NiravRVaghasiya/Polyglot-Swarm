@@ -203,21 +203,6 @@ class VocabularyExtraction(BaseModel):
     words: list[VocabularyItemModel] = Field(default_factory=list)
 
 
-class IngestionVocab(BaseModel):
-    """One harvested word from ingested content."""
-
-    word: str
-    translation: str = ""
-    pos: str = ""
-
-
-class IngestionResult(BaseModel):
-    """The ingestion agent's structured response."""
-
-    simplified: str = ""
-    vocab: list[IngestionVocab] = Field(default_factory=list)
-
-
 class VerifierDecision(BaseModel):
     """An evaluator/verifier decision, supporting explicit abstention.
 
@@ -240,8 +225,8 @@ class VerifierDecision(BaseModel):
 def strip_code_fences(text: str) -> str:
     """Return the inner content of a ```` ``` ````-fenced block, if present.
 
-    LLMs frequently wrap JSON in markdown fences despite instructions not to.
-    This mirrors the ad-hoc stripping the agents already do, centralized.
+    LLMs frequently wrap JSON in markdown fences despite instructions not to;
+    every agent that parses a JSON reply goes through here.
     """
     stripped = text.strip()
     if stripped.startswith("```"):

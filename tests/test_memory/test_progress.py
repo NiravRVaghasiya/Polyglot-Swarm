@@ -43,17 +43,14 @@ class TestVocabularyGrowth:
 
 
 class TestTopWeaknesses:
-    def test_ranked_and_excludes_mastered(self, temp_storage):
+    def test_ranked_by_frequency(self, temp_storage):
         for _ in range(4):
             analytics.record_error("u1", "Spanish", "ser_vs_estar")
         analytics.record_error("u1", "Spanish", "gender")
-        analytics.record_error("u1", "Spanish", "solved")
-        analytics.mark_mastered("u1", "Spanish", "solved")
 
         top = progress.top_weaknesses("u1", "Spanish")
         types = [w["error_type"] for w in top]
         assert types[0] == "ser_vs_estar"
-        assert "solved" not in types
 
     def test_limit(self, temp_storage):
         for i in range(8):

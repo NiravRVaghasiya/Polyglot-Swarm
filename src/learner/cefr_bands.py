@@ -31,8 +31,3 @@ def mastery_to_cefr(mastery: float) -> str:
         if mastery < bound:
             return level
     return "C2"
-
-
-def band_index(level: str) -> int:
-    """Return the ordinal of a CEFR band (A1=0 .. C2=5)."""
-    return CEFR_ORDER.index(level)

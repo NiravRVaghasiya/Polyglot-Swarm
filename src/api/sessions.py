@@ -241,24 +241,26 @@ async def finalize(
     :func:`src.orchestrator.lifecycle.finalize_session`, marks the session
     ``finalized`` and clears its snapshot. On failure the claim is released
     (status back to ``active``) and the error re-raised, so the recovery task
-    retries it.
+    retries it. A turn still running finishes first (it holds the turn lock),
+    so its message is in the report.
     """
     from src.orchestrator.lifecycle import finalize_session
 
     state = state or await asyncio.to_thread(get_session, user_id, session_id)
     if state is None:
         return None
-    await wait_for_analysis(state)
-    if not await asyncio.to_thread(_claim, user_id, session_id):
-        return None
-    try:
-        result = await finalize_session(state)
-    except Exception:
-        await asyncio.to_thread(_set_status, user_id, session_id, "active", clear_state=False)
-        metrics.SESSION_EVENTS.inc(event="finalize_failed")
-        raise
-    await asyncio.to_thread(_set_status, user_id, session_id, "finalized", clear_state=True)
-    drop_session(user_id, session_id)
+    async with _turn_lock((user_id, session_id)):
+        await wait_for_analysis(state)
+        if not await asyncio.to_thread(_claim, user_id, session_id):
+            return None
+        try:
+            result = await finalize_session(state)
+        except Exception:
+            await asyncio.to_thread(_set_status, user_id, session_id, "active", clear_state=False)
+            metrics.SESSION_EVENTS.inc(event="finalize_failed")
+            raise
+        await asyncio.to_thread(_set_status, user_id, session_id, "finalized", clear_state=True)
+        drop_session(user_id, session_id)
     metrics.SESSION_EVENTS.inc(event="finalized")
     return result
 

@@ -16,8 +16,8 @@ from typing import Any
 from src.llm.factory import get_provider
 from src.llm.prompts import render_prompt
 from src.llm.provider import Message
+from src.llm.schemas import strip_code_fences
 from src.memory import progress, vocabulary_db
-from src.orchestrator.state import LearnerState
 
 logger = logging.getLogger("polyglot.drills")
 
@@ -72,12 +72,7 @@ async def generate_drills(
 def _parse_drills(response_text: str) -> list[dict[str, Any]]:
     """Parse the drills LLM JSON response, tolerating code fences."""
     try:
-        text = response_text.strip()
-        if text.startswith("```"):
-            text = text.split("```")[1]
-            if text.startswith("json"):
-                text = text[4:]
-        data = json.loads(text)
+        data = json.loads(strip_code_fences(response_text))
         drills = data.get("drills", [])
         result: list[dict[str, Any]] = []
         for d in drills:
@@ -95,24 +90,3 @@ def _parse_drills(response_text: str) -> list[dict[str, Any]]:
         return result
     except (json.JSONDecodeError, KeyError, TypeError, IndexError):
         return []
-
-
-async def drills_node(state: LearnerState) -> dict[str, Any]:
-    """Graph node: generate drills for the current learner into state.
-
-    Populates ``pending_reviews`` with drill items (reusing the existing state
-    field) so the review flow can present them, and echoes a short summary.
-    """
-    drills = await generate_drills(
-        state["user_id"],
-        state["language"],
-        cefr_level=state.get("cefr_level", "A2"),
-    )
-    if not drills:
-        return {
-            "agent_response": "No drills to practice right now — come back after a session!",
-            "pending_reviews": [],
-        }
-
-    summary = f"Generated {len(drills)} targeted drill(s). First up:\n{drills[0]['prompt']}"
-    return {"agent_response": summary, "pending_reviews": drills}

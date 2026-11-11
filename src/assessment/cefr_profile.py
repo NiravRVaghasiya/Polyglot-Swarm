@@ -27,7 +27,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from src.learner import get_knowledge_model
-from src.learner.cefr_bands import CEFR_ORDER, MASTERY_BANDS, mastery_to_cefr
+from src.learner.cefr_bands import CEFR_ORDER, mastery_to_cefr
 from src.learner.estimation import EvidenceStatus, SkillEstimate, status_rank
 from src.memory import assessments
 from src.memory.skill_state import SKILLS
@@ -50,9 +50,6 @@ METHOD = "cefr-profile-v2"
 
 #: How many skills must be provisional or better before an overall band is given.
 MIN_SKILLS_FOR_OVERALL = 2
-
-# Kept for callers that imported the private name.
-_MASTERY_BANDS = MASTERY_BANDS
 
 
 def _min_level(levels: list[str]) -> str | None:

@@ -66,7 +66,6 @@ PROMPT_REGISTRY: dict[str, PromptSpec] = {
     # grammar prompt plus the situational context. See evals/real.
     "grammar_context": PromptSpec("grammar_context", 1, "grammar_context_v1.jinja2"),
     "vocabulary": PromptSpec("vocabulary", 1, "vocabulary_v1.jinja2"),
-    "review": PromptSpec("review", 1, "review_v1.jinja2"),
     # Prompts that already lived as jinja2 templates — now registered/versioned
     # too, so every agent prompt goes through one versioned path.
     "cultural": PromptSpec("cultural", 1, "cultural.jinja2"),

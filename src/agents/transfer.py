@@ -19,7 +19,7 @@ from src.languages.transfer_graph import candidates_for_words
 from src.llm.factory import get_provider
 from src.llm.prompts import render_prompt
 from src.llm.provider import Message
-from src.llm.schemas import TransferEdge
+from src.llm.schemas import TransferEdge, strip_code_fences
 from src.memory import user_profile
 from src.orchestrator.state import LearnerState
 
@@ -126,12 +126,7 @@ async def suggest_transfers(
 def _parse_transfers(response_text: str) -> list[dict[str, Any]]:
     """Parse the transfer LLM JSON response, tolerating code fences."""
     try:
-        text = response_text.strip()
-        if text.startswith("```"):
-            text = text.split("```")[1]
-            if text.startswith("json"):
-                text = text[4:]
-        data = json.loads(text)
+        data = json.loads(strip_code_fences(response_text))
         transfers = data.get("transfers", [])
         result: list[dict[str, Any]] = []
         for t in transfers:

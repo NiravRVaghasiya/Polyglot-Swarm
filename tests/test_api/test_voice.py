@@ -48,6 +48,17 @@ class TestTranscribe:
         assert resp.status_code == 200
         assert resp.json()["transcript"] == "hola mundo"
 
+    def test_unknown_audio_format_is_rejected(self, auth_client):
+        """The format becomes part of a temp file name, so only known ones pass."""
+        client, headers, _ = auth_client
+        audio = base64.b64encode(b"fake-audio").decode("ascii")
+        resp = client.post(
+            "/api/v1/voice/transcribe",
+            json={"audio_base64": audio, "audio_format": "a/b"},
+            headers=headers,
+        )
+        assert resp.status_code == 422
+
     def test_missing_voice_extra_is_503(self, auth_client, monkeypatch):
         client, headers, _ = auth_client
         import src.speech.stt as stt
@@ -74,6 +85,11 @@ class TestSpeak:
         resp = client.post("/api/v1/voice/speak", json={"text": "   "}, headers=headers)
         assert resp.status_code == 200
         assert resp.json()["audio_base64"] == ""
+
+    def test_oversized_text_is_rejected(self, auth_client):
+        client, headers, _ = auth_client
+        resp = client.post("/api/v1/voice/speak", json={"text": "a" * 5001}, headers=headers)
+        assert resp.status_code == 422
 
     def test_success_path_returns_base64_audio(self, auth_client, monkeypatch):
         client, headers, _ = auth_client

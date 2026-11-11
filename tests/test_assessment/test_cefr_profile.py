@@ -1,4 +1,4 @@
-"""Phase 12 tests: multidimensional CEFR profile + assessment_node upgrade."""
+"""Phase 12 tests: multidimensional CEFR profile."""
 
 from __future__ import annotations
 
@@ -122,7 +122,7 @@ class TestPersistProfile:
 
 
 class TestAssessmentNodeUpgrade:
-    async def test_returns_cefr_level_and_persists_profile(self, temp_storage, monkeypatch):
+    def test_returns_cefr_level_and_persists_profile(self, temp_storage, monkeypatch):
         from src.agents import assessment
         from src.memory import user_profile, vocabulary_db
 
@@ -140,11 +140,11 @@ class TestAssessmentNodeUpgrade:
             ],
             "grammar_errors": [],
         }
-        result = await assessment.assessment_node(state)
+        # What finalize_session does: the working level, then the CEFR profile.
+        level = assessment.update_working_level(state)
+        assessment.persist_evidence_profile("u3", "Spanish")
 
-        # Legacy contract preserved: returns {cefr_level} + updates profile.
-        assert "cefr_level" in result
-        assert user_profile.load_profile("u3").cefr_for("Spanish") == result["cefr_level"]
+        assert user_profile.load_profile("u3").cefr_for("Spanish") == level
 
         # Phase 12 addition: the multidimensional profile was persisted.
         history = assessments.assessment_history("u3", "Spanish")

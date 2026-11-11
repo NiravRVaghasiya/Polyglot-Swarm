@@ -31,7 +31,7 @@ import hashlib
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
-from typing import Any, Protocol
+from typing import Any
 
 
 class Modality(StrEnum):
@@ -183,21 +183,3 @@ class AssessmentReport:
             "evidence_ids": list(self.evidence_ids),
             "created_at": self.created_at,
         }
-
-
-class Processor(Protocol):
-    """A processing stage: asset + decoded signal -> observation."""
-
-    name: str
-
-    def process(self, asset: MediaAsset, signal: Any, **kwargs: Any) -> Observation: ...
-
-
-class Assessor(Protocol):
-    """An assessment stage: observations + task -> dimension results."""
-
-    name: str
-
-    def assess(
-        self, observations: dict[str, Observation], task: dict[str, Any]
-    ) -> list[DimensionResult]: ...

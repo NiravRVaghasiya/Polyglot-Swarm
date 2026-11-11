@@ -2,9 +2,8 @@
 
 Phase 2 makes SQLite the source of truth for learner state. Profiles were
 previously JSON-only (:mod:`src.memory.user_profile`); this store persists the
-same fields to the ``profiles`` table. ``user_profile`` now writes through to
-here and reads here first, keeping the JSON file as a human-readable mirror so
-existing behavior and tests continue to work.
+same fields to the ``profiles`` table; ``user_profile`` reads and writes here,
+and only reads an old JSON file when no row exists.
 
 Kept dependency-light and free of the pydantic model import to avoid cycles:
 callers pass/receive plain dicts of the profile fields.

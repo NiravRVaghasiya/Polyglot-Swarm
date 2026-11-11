@@ -17,7 +17,7 @@ Assumptions (documented in ``docs/learner-model.md``):
 
 from __future__ import annotations
 
-CEFR_ORDER = ("A1", "A2", "B1", "B2", "C1", "C2")
+from src.learner.cefr_bands import CEFR_ORDER
 
 
 def cefr_to_difficulty(level: str | None) -> float | None:

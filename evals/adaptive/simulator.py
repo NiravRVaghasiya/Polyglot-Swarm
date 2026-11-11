@@ -59,7 +59,9 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from src.evidence.difficulty import CEFR_ORDER, cefr_to_difficulty
+from src.evidence.difficulty import cefr_to_difficulty
+from src.learner.cefr_bands import CEFR_ORDER
+from src.util import sigmoid
 
 T0 = datetime(2026, 1, 1, tzinfo=UTC)
 SIM_LANGUAGE = "Simulated"
@@ -71,13 +73,6 @@ _DIFFICULTY_SCALE = 4.0
 def sim_time(days: float) -> str:
     """ISO timestamp ``days`` after the simulation epoch."""
     return (T0 + timedelta(days=days)).isoformat()
-
-
-def _sigmoid(x: float) -> float:
-    if x >= 0:
-        return 1.0 / (1.0 + math.exp(-x))
-    e = math.exp(x)
-    return e / (1.0 + e)
 
 
 def _uniform(*key: object) -> float:
@@ -295,7 +290,7 @@ class SimLearner:
             p_k = p_known if known else 0.0
             return p_k * (1.0 - cfg.slip) + (1.0 - p_k) * guess
         theta = self.ability(item.objective_id, t) + session_offset
-        return guess + (1.0 - guess - cfg.slip) * _sigmoid(theta - item.true_b)
+        return guess + (1.0 - guess - cfg.slip) * sigmoid(theta - item.true_b)
 
     def session_offset(self, session_index: int) -> float:
         return _gauss(
